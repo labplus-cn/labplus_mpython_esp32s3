@@ -62,5 +62,14 @@ list(APPEND EXTRA_COMPONENT_DIRS main_${IDF_TARGET})
 # Enable the panic handler wrapper
 idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=esp_panic_handler" APPEND)
 
+add_custom_target(
+    merge_bin
+    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/makeimg.py" ${MICROPY_BOARD}
+    DEPENDS 
+        ${PROJECT_BIN}
+    VERBATIM
+    COMMAND_EXPAND_LISTS
+    )
+
 # Define the project.
 project(micropython)

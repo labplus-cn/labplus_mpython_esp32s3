@@ -189,7 +189,12 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
     idf.py -D MICROPY_BOARD=labplus_Ledong_pro build
     idf.py -D MICROPY_BOARD=mpython build
     ```
-
+    合并固件
+    ```
+    idf.py -D MICROPY_BOARD=labplus_Ledong_pro merge_bin
+    idf.py -D MICROPY_BOARD=labplus_Ledong_pro build merge_bin
+    ```
+    
 5. 固件烧录
 
     ```bash
