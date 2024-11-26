@@ -32,63 +32,63 @@ import ustruct
 import math
 from max30102 import MAX30102
 
-class Thermistor:
-    """
-    NTC 模块。也适用于其他的热敏电阻。
+# class Thermistor:
+#     """
+#     NTC 模块。也适用于其他的热敏电阻。
 
-    :param pin: 掌控板引脚号,如使用P0,pin=0.
-    :param series_resistor: 与热敏电阻连接的串联电阻器的值。默认是10K电阻。
-    :param nominal_resistance: 在标称温度下热敏电阻的阻值。
-    :param nominal_temperature: 在标称电阻值下热敏电阻的温度值(以摄氏度为单位)。默认使用25.0摄氏度。
-    :param b_coefficient: 热敏电阻的温度系数。
-    :param high_side: 表示热敏电阻是连接在电阻分压器的高侧还是低侧。默认high_side为True。
-    """
+#     :param pin: 掌控板引脚号,如使用P0,pin=0.
+#     :param series_resistor: 与热敏电阻连接的串联电阻器的值。默认是10K电阻。
+#     :param nominal_resistance: 在标称温度下热敏电阻的阻值。
+#     :param nominal_temperature: 在标称电阻值下热敏电阻的温度值(以摄氏度为单位)。默认使用25.0摄氏度。
+#     :param b_coefficient: 热敏电阻的温度系数。
+#     :param high_side: 表示热敏电阻是连接在电阻分压器的高侧还是低侧。默认high_side为True。
+#     """
 
-    def __init__(
-        self,
-        pin,
-        series_resistor=10000.0,
-        nominal_resistance=10000.0,
-        nominal_temperature=25.0,
-        b_coefficient=3935.0,
-        high_side=True
-    ):
-        self.adc = ADC(Pin(eval("Pin.P{}".format(pin))))
-        self.adc.atten(ADC.ATTN_11DB)
-        self.series_resistor = series_resistor
-        self.nominal_resistance = nominal_resistance
-        self.nominal_temperature = nominal_temperature
-        self.b_coefficient = b_coefficient
-        self.high_side = high_side
+#     def __init__(
+#         self,
+#         pin,
+#         series_resistor=10000.0,
+#         nominal_resistance=10000.0,
+#         nominal_temperature=25.0,
+#         b_coefficient=3935.0,
+#         high_side=True
+#     ):
+#         self.adc = ADC(Pin(eval("Pin.P{}".format(pin))))
+#         self.adc.atten(ADC.ATTN_11DB)
+#         self.series_resistor = series_resistor
+#         self.nominal_resistance = nominal_resistance
+#         self.nominal_temperature = nominal_temperature
+#         self.b_coefficient = b_coefficient
+#         self.high_side = high_side
     
-    def getTemper(self):
-        """
-        获取温度,读取异常则返回None
+#     def getTemper(self):
+#         """
+#         获取温度,读取异常则返回None
 
-        :return: 温度,单位摄氏度
-        """
-        try:
-            if self.high_side:
-                # Thermistor connected from analog input to high logic level.
-                reading = self.adc.read_u16() / 64
-                reading = (1023 * self.series_resistor) / reading
-                reading -= self.series_resistor
-            else:
-                # Thermistor connected from analog input to ground.
-                reading = self.series_resistor / (65535.0 / self.adc.read_u16() - 1.0)
-            steinhart = reading / self.nominal_resistance  # (R/Ro)
-            steinhart = math.log(steinhart)  # ln(R/Ro)
-            steinhart /= self.b_coefficient  # 1/B * ln(R/Ro)
-            steinhart += 1.0 / (self.nominal_temperature + 273.15)  # + (1/To)
-            steinhart = 1.0 / steinhart  # Invert
-            steinhart -= 273.15  # convert to C
+#         :return: 温度,单位摄氏度
+#         """
+#         try:
+#             if self.high_side:
+#                 # Thermistor connected from analog input to high logic level.
+#                 reading = self.adc.read_u16() / 64
+#                 reading = (1023 * self.series_resistor) / reading
+#                 reading -= self.series_resistor
+#             else:
+#                 # Thermistor connected from analog input to ground.
+#                 reading = self.series_resistor / (65535.0 / self.adc.read_u16() - 1.0)
+#             steinhart = reading / self.nominal_resistance  # (R/Ro)
+#             steinhart = math.log(steinhart)  # ln(R/Ro)
+#             steinhart /= self.b_coefficient  # 1/B * ln(R/Ro)
+#             steinhart += 1.0 / (self.nominal_temperature + 273.15)  # + (1/To)
+#             steinhart = 1.0 / steinhart  # Invert
+#             steinhart -= 273.15  # convert to C
 
-            return steinhart
-        except:
-            return None
+#             return steinhart
+#         except:
+#             return None
 
-# 兼容以前旧接口
-NTC = Thermistor
+# # 兼容以前旧接口
+# NTC = Thermistor
 
 class SHT20(object):
     """
@@ -1062,30 +1062,30 @@ class Scan_Rfid():
                 print("find card: {}" .format(serial_num))
                 return Rfid(i2c, serial_num)
 
-class GasSensor():
-    '''
-    乐动模块 烟雾传感器
-    '''
-    def __init__(self, pin):
-        '''初始化参数，引脚'''
-        self.pin = MPythonPin(pin, PinMode.ANALOG)
-        self.threshold = 2000 
+# class GasSensor():
+#     '''
+#     乐动模块 烟雾传感器
+#     '''
+#     def __init__(self, pin):
+#         '''初始化参数，引脚'''
+#         self.pin = MPythonPin(pin, PinMode.ANALOG)
+#         self.threshold = 2000 
 
-    def detect(self):
-        '''是否探测到，布尔类型True/False'''
-        tmp = self.pin.read_analog()
-        if(tmp>=self.threshold):
-            return True
-        else:
-            return False
+#     def detect(self):
+#         '''是否探测到，布尔类型True/False'''
+#         tmp = self.pin.read_analog()
+#         if(tmp>=self.threshold):
+#             return True
+#         else:
+#             return False
 
-    def get_raw_val(self):
-        '''获取烟雾传感器裸数据，模拟值'''
-        return self.pin.read_analog()
+#     def get_raw_val(self):
+#         '''获取烟雾传感器裸数据，模拟值'''
+#         return self.pin.read_analog()
 
-    def set_threshold(self, threshold):
-        '''设置烟雾传感器阈值，模拟值'''
-        self.threshold = threshold
+#     def set_threshold(self, threshold):
+#         '''设置烟雾传感器阈值，模拟值'''
+#         self.threshold = threshold
 
 class IRObstacle():
     '''
@@ -1153,7 +1153,6 @@ class FanPWM():
 
     def pwm(self,num):
         self.pin.write_analog(int(numberMap(num,0,100,0,1023)))
-
 
 
 '''
@@ -1314,5 +1313,17 @@ class EncoderMotor(object):
         elif (self.batch == 0):
             print('新编码电机才支持')
             return
+        
+    def motor_run(self,num,speed):
+        """"
+        单个编码电机驱动num:电机编号 M1:1 M2:2 speed:转速量程 -100-100
+        """
+        i2c.writeto(self.i2c_addr,bytearray([8, num, speed]))
+    
+    def setvater_pump(self,speed):
+        """"
+        水泵开关 speed:转速量程:-100-180
+        """
+        i2c.writeto(self.i2c_addr,bytearray([7, speed]))
 
 # encoder_motor = EncoderMotor()
