@@ -1327,3 +1327,44 @@ class EncoderMotor(object):
         i2c.writeto(self.i2c_addr,bytearray([7, speed]))
 
 # encoder_motor = EncoderMotor()
+
+'''
+循迹传感器
+'''
+class LineFollow(object):
+    def __init__(self,num1,num2):
+        if(isinstance(num1, int) and isinstance(num2, int)):
+            self.pin1 = MPythonPin(num1, PinMode.ANALOG)
+            self.pin2 = MPythonPin(num2, PinMode.ANALOG)
+            self.threshold = [2000, 2000]
+        else:
+            raise ValueError('参数错误')
+
+    def detect(self,num):
+        '''是否探测到，num 1/2 return int 0/1'''
+        if(isinstance(num, int)):
+            tmp = self.get_raw_val()[num-1]
+            if(tmp<=self.threshold[num-1]):
+                return 1
+            else:
+                return 0
+
+    def get_raw_val(self):
+        ''' list [0,0]  0-4095 '''
+        try:
+            tmp = [max(min(self.pin1.read_analog(), 4095), 0),max(min(self.pin2.read_analog(), 4095), 0)]
+            return tmp
+        except Exception as e:
+            print(e)
+            return [-1,-1]
+       
+    def set_threshold(self, threshold):
+        '''设置阈值'''
+        if(isinstance(threshold, list)):
+            if(len(threshold) == 2):
+                self.threshold = threshold
+            else:
+                raise ValueError('参数错误')
+        else:
+            raise ValueError('参数错误')
+                  

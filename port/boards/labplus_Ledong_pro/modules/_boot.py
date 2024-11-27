@@ -4,6 +4,7 @@ import uos
 from flashbdev import bdev
 from neopixel import NeoPixel
 import machine 
+import ubinascii
 
 # 上电后立即关闭rgb,防止随机灯亮问题
 _rgb = NeoPixel(machine.Pin(33, machine.Pin.OUT), 4, 3, 1,0.1)
@@ -21,4 +22,10 @@ except OSError:
 for count in range(3):
     print("=$%#=")
     time.sleep_ms(150)
+
+
+# mac地址
+mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
+print(mac)
+
 gc.collect()

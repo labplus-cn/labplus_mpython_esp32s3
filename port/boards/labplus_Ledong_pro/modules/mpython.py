@@ -1041,7 +1041,7 @@ class Touch:
 
     def __irq_handler(self, value):
         # when pressed
-        print("%d" % value)
+        # print("%d" % value)
         if value == 1:
             if self.event_pressed is not None:
                 self.event_pressed(value)
