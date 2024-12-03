@@ -48,7 +48,12 @@ class NeoPixel:
 
     def write(self):
         # BITSTREAM_TYPE_HIGH_LOW = 0
-        bitstream(self.pin, 0, self.timing, self.buf)
+        if self._brightness > 0.99:
+            # neopixel_write(self.pin, self.buf, self.timing)
+            bitstream(self.pin, 0, self.timing, self.buf)
+        else:
+            # neopixel_write(self.pin, bytearray([int(i * self._brightness) for i in self.buf]), self.timing)
+            bitstream(self.pin, 0, self.timing, bytearray([int(i * self._brightness) for i in self.buf]))
         
     def brightness(self, brightness):
         self._brightness = min(max(brightness, 0.0), 1.0)
