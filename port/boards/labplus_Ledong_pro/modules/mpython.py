@@ -20,6 +20,7 @@ import framebuf
 import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
+from _ntptime import *
 
 i2c = I2C(0, scl=Pin(34), sda=Pin(35), freq=400000)
 

@@ -69,9 +69,9 @@ class MPythonESPNow(ESPNowBase):
         if peer is not None:
             self.send(peer, msg, False)
     
-    def send_msg(self, peer, msg) -> None: 
+    def send_msg(self, peer_mac, msg) -> None: 
         # 发送字符串消息
-        peer = self.hex_str_to_bytes(peer)
+        peer = self.hex_str_to_bytes(peer_mac)
         msg = self.convert_to_str_bytes(msg)
         try:
             self.send(peer, msg, False)
@@ -125,7 +125,7 @@ class MPythonESPNow(ESPNowBase):
                     espnow_data = recv_msg.decode('utf-8')
                     espnow_rssi = info[0]
                     time_ms = info[1]
-                    print(f"MAC: {espnow_mac}, RSSI: {espnow_rssi} dBm, Time: {time_ms} ms")
+                    # print(f"MAC: {espnow_mac}, RSSI: {espnow_rssi} dBm, Time: {time_ms} ms")
                 return espnow_mac,espnow_data,espnow_rssi
             except: #8266没有检测信号的功能
                 return host_adr,recv_msg,0
