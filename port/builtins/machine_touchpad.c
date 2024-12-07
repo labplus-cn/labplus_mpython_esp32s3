@@ -158,7 +158,7 @@ static void machine_touchpad_timer_cb(void *args)
         if (touchpad_inactive_timeout[i]) {
             touchpad_inactive_timeout[i]--;
             if (touchpad_inactive_timeout[i] == 0) {
-                mp_obj_t handler = MP_STATE_PORT(machine_touchpad_irq_handler)[i];
+                mp_obj_t handler = MP_STATE_PORT(machine_touchpad_irq_handler)[i + 1];
                 if(handler){
                     mp_sched_schedule(handler, mp_obj_new_int(0));
                 }
