@@ -390,7 +390,7 @@ static mp_obj_t mpython_music_pitch(size_t n_args, const mp_obj_t *pos_args, mp_
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_frequency, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
         { MP_QSTR_duration, MP_ARG_INT, {.u_int = -1} },
-        { MP_QSTR_pin,    MP_ARG_INT, {.u_int = 16} },
+        { MP_QSTR_pin,    MP_ARG_INT, {.u_int = 21} },
         { MP_QSTR_wait,   MP_ARG_BOOL, {.u_bool = true} },
     };
 

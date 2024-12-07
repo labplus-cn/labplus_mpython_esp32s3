@@ -1,6 +1,6 @@
-menu "Audio Media HAL"
+menu "mpython board"
 
-choice AUDIO_BOARD
+choice MPYTHON_BOARD
     prompt "Audio hardware board"
     default LABPLUS_CLASSROOM_KIT_NANJING_BOARD
     help

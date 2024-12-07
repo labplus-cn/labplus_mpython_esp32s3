@@ -7,9 +7,9 @@ set(SDKCONFIG_DEFAULTS
     ${SDKCONFIG_IDF_VERSION_SPECIFIC}
     boards/sdkconfig.ble 
     boards/sdkconfig.240mhz
-    boards/labplus_Ledong_pro/sdkconfig.spiram 
-    boards/labplus_Ledong_pro/sdkconfig.board
-    boards/labplus_Ledong_pro/sdkconfig.usb
+    boards/labplus_for_xuejing/sdkconfig.spiram 
+    boards/labplus_for_xuejing/sdkconfig.board
+    boards/labplus_for_xuejing/sdkconfig.usb
 )
 
 if(NOT MPY_PORT_DIR)

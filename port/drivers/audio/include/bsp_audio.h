@@ -35,6 +35,8 @@
     #include "audio/driver/labplus_classroom_kit_nanjing/bsp_board.h"
 #elif CONFIG_LABPLUS_LEDONG_PRO_BOARD
     #include "labplus_Ledong_pro/bsp_audio_board.h"
+#elif CONFIG_LABPLUS_FOR_XUEJING_BOARD
+    #include "labplus_for_xuejing/bsp_audio_board.h"
 #else 
     #error "Please select type of dev board"
 #endif
