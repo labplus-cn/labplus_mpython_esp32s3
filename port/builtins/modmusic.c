@@ -27,6 +27,7 @@
 #include "driver/mcpwm.h"
 #include "driver/gpio.h"
 #include "esp_err.h"
+#include "esp_timer.h"
 
 #include "py/nlr.h"
 #include "py/runtime.h"
@@ -89,10 +90,15 @@ enum {
 
 // #define music_data MP_STATE_PORT(music_data)
 music_data_t *music_data;
+volatile uint32_t ticker_ticks_ms = 0;
+
+static void timer_1ms_ticker(void *args)
+{
+    ticker_ticks_ms += 1;
+    mpython_music_tick();
+}
 
 static uint32_t start_note(const char *note_str, size_t note_len);
-
-extern volatile uint32_t ticker_ticks_ms;
 
 void mpython_music_tick(void) {
     if (music_data == NULL) {
@@ -476,6 +482,16 @@ static mp_obj_t music_init(void) {
     music_data->async_note = NULL;
 
     music_init_contorl();
+
+	// for music function
+	const esp_timer_create_args_t periodic_timer_args = {
+		.callback = &timer_1ms_ticker,
+		.name = "music tick timer"
+	};
+	esp_timer_handle_t periodic_timer;
+    ticker_ticks_ms = 0;
+	ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+	ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 1000));
 
     return mp_const_none;
 }

@@ -41,8 +41,6 @@
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "startup/oled.h"
-#include "esp_timer.h"		// add by zkh
-#include "driver/timer.h"
 
 #include "py/stackctrl.h"
 #include "py/nlr.h"
@@ -89,14 +87,6 @@ int vprintf_null(const char *format, va_list ap) {
     return 0;
 }
 
-volatile uint32_t ticker_ticks_ms = 0;
-extern void mpython_music_tick(void);
-static void timer_1ms_ticker(void *args)
-{
-    ticker_ticks_ms += 1;
-    mpython_music_tick();
-}
-
 void mpython_display_exception(mp_obj_t exc_in)
 {
     size_t n, *values;
@@ -124,21 +114,6 @@ void mpython_display_exception(mp_obj_t exc_in)
         vstr_clear(&vstr);
         oled_deinit();
     }
-}
-
-void mpython_stop_timer(void) {
-    // disable all timer and thread created by main.py
-    for (timer_group_t g = TIMER_GROUP_0; g < TIMER_GROUP_MAX; g++) {
-        for (timer_idx_t i = TIMER_0; i < TIMER_MAX; i++) {
-            timer_pause(g, i);
-        }
-    }
-}
-
-void mpython_stop_thread(void) {
-    #if MICROPY_PY_THREAD
-    mp_thread_deinit();
-    #endif  
 }
 
 time_t platform_mbedtls_time(time_t *timer) {
@@ -209,16 +184,6 @@ soft_reset:
     machine_i2s_init0();
     #endif
 
-	// for music function
-	const esp_timer_create_args_t periodic_timer_args = {
-		.callback = &timer_1ms_ticker,
-		.name = "music tick timer"
-	};
-	esp_timer_handle_t periodic_timer;
-    ticker_ticks_ms = 0;
-	ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-	ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 1000));
-    
     // run boot-up scripts
     pyexec_frozen_module("_boot.py", false);
     int ret = pyexec_file_if_exists("boot.py");

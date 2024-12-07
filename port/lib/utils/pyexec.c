@@ -42,10 +42,9 @@
 #include "shared/readline/readline.h"
 #include "pyexec.h"
 #include "genhdr/mpversion.h"
+#include "modmachine.h"
 
 extern void mpython_display_exception(mp_obj_t exc_in);
-extern void mpython_stop_timer(void);
-extern void mpython_stop_thread(void);
 
 pyexec_mode_kind_t pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
 int pyexec_system_exit = 0;
@@ -633,9 +632,11 @@ friendly_repl_reset:
             // break
             mp_hal_stdout_tx_str("\r\n");
             // disable all timer create by user
-            mpython_stop_timer();
+            machine_timer_deinit_all();
             // delete all thread create by user
-            mpython_stop_thread();
+            #if MICROPY_PY_THREAD
+            mp_thread_deinit();
+            #endif
             continue;
         } else if (ret == CHAR_CTRL_D) {
             // exit for a soft reset
