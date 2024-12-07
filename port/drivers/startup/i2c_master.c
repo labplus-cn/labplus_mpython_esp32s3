@@ -61,6 +61,7 @@ volatile bool i2c_initialized = false;
 void i2c_master_init()
 {
     int i2c_master_port = I2C_MASTER_NUM;
+    i2c_driver_delete(I2C_MASTER_NUM);
     i2c_config_t conf;
     conf.mode = I2C_MODE_MASTER;
     conf.sda_io_num = I2C_MASTER_SDA_IO;
