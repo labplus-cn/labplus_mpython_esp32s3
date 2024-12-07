@@ -58,21 +58,20 @@ static esp_err_t bsp_i2s_init(uint32_t sample_rate, int channel_format, int bits
     esp_err_t ret_val = ESP_OK;
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    i2s_slot_mode_t channel_fmt = I2S_SLOT_MODE_STEREO;
-    if (channel_format == 1) {
-        channel_fmt = I2S_SLOT_MODE_MONO;
-    } else if (channel_format == 2) {
-        channel_fmt = I2S_SLOT_MODE_STEREO;
-    } else {
-        ESP_LOGE(TAG, "Unable to configure channel_format %d", channel_format);
-        channel_format = 1;
-        channel_fmt = I2S_SLOT_MODE_MONO;
-    }
+    // i2s_slot_mode_t channel_fmt = I2S_SLOT_MODE_STEREO;
+    // if (channel_format == 1) {
+    //     channel_fmt = I2S_SLOT_MODE_MONO;
+    // } else if (channel_format == 2) {
+    //     channel_fmt = I2S_SLOT_MODE_STEREO;
+    // } else {
+    //     ESP_LOGE(TAG, "Unable to configure channel_format %d", channel_format);
+    //     channel_fmt = I2S_SLOT_MODE_MONO;
+    // }
 
-    if (bits_per_sample != 16 && bits_per_sample != 32) {
-        ESP_LOGE(TAG, "Unable to configure bits_per_sample %d", bits_per_sample);
-        bits_per_sample = 16;
-    }
+    // if (bits_per_sample != 16 && bits_per_sample != 32) {
+    //     ESP_LOGE(TAG, "Unable to configure bits_per_sample %d", bits_per_sample);
+    //     bits_per_sample = 16;
+    // }
 
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM, I2S_ROLE_MASTER);
     chan_cfg.auto_clear = true;

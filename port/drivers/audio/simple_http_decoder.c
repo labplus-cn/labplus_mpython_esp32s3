@@ -19,7 +19,6 @@
 #include "esp_audio_dec_default.h"
 #include "esp_audio_dec_reg.h"
 #include "esp_audio_simple_dec.h"
-#include "esp_timer.h"
 #include "wav_codec.h"
 #include "player.h"
 #include "bsp_audio.h"

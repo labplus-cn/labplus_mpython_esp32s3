@@ -29,7 +29,7 @@ typedef union {
     esp_aac_dec_cfg_t aac_cfg;
 } simp_dec_all_t;
 
-static esp_audio_simple_dec_type_t get_simple_decoder_type(char *file)
+static esp_audio_simple_dec_type_t get_simple_decoder_type(const char *file)
 {
     char *ext = strrchr(file, '.');
     if (ext == NULL) {

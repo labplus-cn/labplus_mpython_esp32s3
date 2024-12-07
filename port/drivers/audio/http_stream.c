@@ -193,10 +193,8 @@ static void _prepare_range(http_stream_t *http, int64_t pos)
     }
 }  */
 
-esp_err_t http_open(char *uri)
+esp_err_t http_open(const char *uri)
 {
-    int64_t data_len;
-
     if (uri == NULL) {
         ESP_LOGE(TAG, "Error open connection, uri = NULL");
         return ESP_FAIL;

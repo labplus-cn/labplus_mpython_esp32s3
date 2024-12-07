@@ -28,7 +28,7 @@ typedef struct
 {
     wav_codec_t *wav_codec;
     // int frame_size;
-    char *file_uri;
+    const char *file_uri;
     int player_state;
     int vol;
     QueueHandle_t player_queue;

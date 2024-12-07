@@ -102,7 +102,7 @@ typedef struct http_stream {
 #define HTTP_STREAM_TASK_PRIO           (4)
 #define HTTP_STREAM_RINGBUFFER_SIZE     (20 * 1024)
 
-esp_err_t http_open(char *uri);
+esp_err_t http_open(const char *uri);
 void http_close(void);
 int http_read(char *buffer, int len);
 void http_stream_set_server_cert(const char *cert);
