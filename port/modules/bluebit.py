@@ -1180,7 +1180,7 @@ class EncoderMotor(object):
             self.i2c_addr = 18
             self.batch = 1 
             self.stop()
-            print('编码电机')
+            # print('编码电机')
         else:
             print('编码电机有故障！')
         
@@ -1321,12 +1321,16 @@ class EncoderMotor(object):
         i2c.writeto(self.i2c_addr,bytearray([8, num, speed]))
     
     def setvater_pump(self,speed):
-        """"
+        """
         水泵开关 speed:转速量程:-100-180
         """
         i2c.writeto(self.i2c_addr,bytearray([7, speed]))
 
-# encoder_motor = EncoderMotor()
+    def motor_info(self,num,off):
+        """ 串口获取速度值输出 num:电机编号 M1:1 M2:2 off:开关 1:开  0:关"""
+        i2c.writeto(self.i2c_addr,bytearray([9, num, off]))
+        
+
 
 '''
 循迹传感器

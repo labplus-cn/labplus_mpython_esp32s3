@@ -840,14 +840,20 @@ class MPythonPin():
         if mode == PinMode.OUT:
             if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT not supported on P%d' % pin)
+            self.Pin = Pin(self.id, Pin.IN, pull)
+            sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
             if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
+            self.Pin = Pin(self.id, Pin.IN, pull)
+            sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
             if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('PWM not supported on P%d' % pin)
+            self.Pin = Pin(self.id, Pin.IN, pull)
+            sleep_ms(1)
             self.pwm = PWM(Pin(self.id), duty=0)
         if mode == PinMode.ANALOG:
             if pin not in [0, 1, 2, 3, 6, 7]:
@@ -1033,6 +1039,7 @@ class Touch:
 
     def __init__(self, pin):
         self.__touch_pad = TouchPad(pin)
+        self.__touch_pad.config(30000)
         self.__touch_pad.irq(self.__irq_handler)
         self.event_pressed = None
         self.event_released = None
