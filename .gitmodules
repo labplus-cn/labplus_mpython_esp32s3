@@ -7,3 +7,6 @@
 [submodule "esp-idf"]
 	path = esp-idf
 	url = git@github.com:labplus-cn/esp-idf-v5.0.4.git
+[submodule "port/usercmodule/lv_binding_micropython"]
+	path = port/usercmodule/lv_binding_micropython
+	url = https://github.com/labplus-cn/lv_binding_micropython.git
