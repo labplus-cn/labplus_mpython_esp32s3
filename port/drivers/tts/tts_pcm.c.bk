@@ -1,0 +1,116 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "freertos/semphr.h"
+#include "esp_tts.h"
+#include "esp_tts_voice_xiaole.h"
+#include "esp_tts_voice_template.h"
+#include "esp_tts_player.h"
+#include "ringbuf.h"
+
+#include "esp_partition.h"
+#include "esp_idf_version.h"
+
+typedef struct {
+    char text[256];   // 存储待转换的文本
+    short* pcm_data;  // 存储 PCM 数据
+    SemaphoreHandle_t done_semaphore;  // 任务完成信号量
+} tts_task_param_t;
+
+static short* pcm_buffer = NULL;
+static int pcm_data_len = 0;
+
+void tts_task(void* param) {
+    tts_task_param_t* task_param = (tts_task_param_t*)param;
+    
+    const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "font");
+    if (part == NULL) {
+        printf("Couldn't find voice data partition!\n");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    const void* voicedata;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    esp_partition_mmap_handle_t mmap;
+    esp_err_t err = esp_partition_mmap(part, 0, part->size, ESP_PARTITION_MMAP_DATA, (const void**)&voicedata, &mmap);
+#else
+    spi_flash_mmap_handle_t mmap;
+    esp_err_t err = esp_partition_mmap(part, 0, part->size, SPI_FLASH_MMAP_DATA, &voicedata, &mmap);
+#endif
+    if (err != ESP_OK) {
+        printf("Couldn't map voice data partition!\n");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    esp_tts_voice_t* voice = esp_tts_voice_set_init(&esp_tts_voice_template, (int16_t*)voicedata);
+    if (voice == NULL) {
+        printf("TTS voice init failed!\n");
+        return;
+    }
+    esp_tts_handle_t* tts_handle = esp_tts_create(voice);
+    if (!tts_handle || !task_param || !task_param->text) {
+        printf("Invalid TTS handle or text!\n");
+        return;
+    }
+
+    pcm_data_len = 0;
+    if (!pcm_buffer) {
+        pcm_buffer = malloc(16000 * sizeof(short));
+    }
+    if (!pcm_buffer) {
+        printf("Failed to allocate PCM buffer\n");
+        vTaskDelete(NULL);
+        return;
+    }
+    printf("Parsing text: %s\n", task_param->text);
+    printf("TTS handle: %p\n", tts_handle);
+    if (esp_tts_parse_chinese(tts_handle, task_param->text)) {
+        int len;
+        int total_len = 0;
+        printf("Start creat voice\n");
+        do {
+            short* pcm = esp_tts_stream_play(tts_handle, &len, 3);
+            if (len > 0) {
+                //if (total_len + len > 16000) break;  // 防止缓冲区溢出
+                memcpy(pcm_buffer + total_len, pcm, len * sizeof(short));
+                total_len += len;
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));  // 让出 CPU，避免 WDT 复位
+        } while (len > 0);
+        pcm_data_len = total_len;
+    }
+
+    esp_tts_stream_reset(tts_handle);
+
+    // 释放任务
+    xSemaphoreGive(task_param->done_semaphore);
+    vTaskDelete(NULL);
+}
+
+// 供外部调用的函数
+short* text_to_pcm(const char* text, int* out_len) {
+    static SemaphoreHandle_t done_semaphore = NULL;
+    if (done_semaphore == NULL) {
+        done_semaphore = xSemaphoreCreateBinary();
+    }
+
+    tts_task_param_t task_param;
+    strncpy(task_param.text, text, sizeof(task_param.text) - 1);
+    task_param.text[sizeof(task_param.text) - 1] = '\0';
+    task_param.pcm_data = NULL;
+    task_param.done_semaphore = done_semaphore;
+
+    // 启动任务
+    xTaskCreatePinnedToCore(tts_task, "tts_task", 8192, &task_param, 5, NULL, 0);
+
+    // 等待任务完成
+    xSemaphoreTake(done_semaphore, portMAX_DELAY);
+    *out_len = pcm_data_len;
+    return pcm_buffer;
+}

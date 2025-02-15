@@ -1,0 +1,9 @@
+#pragma once
+#ifdef __cplusplus
+extern "C" {
+#endif
+short* text_to_pcm(const char* text, int* out_len);
+#ifdef __cplusplus
+}
+#endif
+

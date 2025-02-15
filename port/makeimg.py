@@ -104,7 +104,8 @@ arg_partitions_bin = "partition_table/partition-table.bin"
 arg_application_bin = "micropython.bin"
 arg_output_bin = bin_name
 arg_output_uf2= uf2_name
-arg_font_bin = "../Noto_Sans_CJK_SC_Light16.bin"
+# arg_font_bin = "../Noto_Sans_CJK_SC_Light16.bin"
+arg_font_bin = "../components/esp-sr/esp-tts/esp_tts_chinese/esp_tts_voice_data_xiaoxin.dat"
 
 # Load required sdkconfig values.
 idf_target = load_sdkconfig_str_value(arg_sdkconfig, "IDF_TARGET", "").upper()
