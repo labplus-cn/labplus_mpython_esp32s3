@@ -140,7 +140,7 @@ files_in = [
     ("bootloader", offset_bootloader, max_size_bootloader, arg_bootloader_bin),
     ("partitions", offset_partitions, max_size_partitions, arg_partitions_bin),
     ("application", offset_application, max_size_application, arg_application_bin),
-    ("font", offset_font, max_size_font, arg_font_bin),
+    # ("font", offset_font, max_size_font, arg_font_bin),
 ]
 file_out = arg_output_bin
 
