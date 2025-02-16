@@ -71,10 +71,9 @@ add_custom_target(
     COMMAND_EXPAND_LISTS
     )
 
-    
-# if(NOT USER_C_MODULES)
-# set(USER_C_MODULES ${CMAKE_CURRENT_LIST_DIR}/usercmodule/lv_binding_micropython/bindings.cmake)
-# endif()
+if(MPYTHON_PRO_BOARD OR LABPLUS_LEDONG_V2_BOARD)
+    set(USER_C_MODULES ${CMAKE_CURRENT_LIST_DIR}/usercmodule/micropython.cmake)
+endif()
 
 # Define the project.
 project(micropython)

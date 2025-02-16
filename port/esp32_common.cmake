@@ -148,6 +148,10 @@ list(APPEND IDF_COMPONENTS
     esp_http_client
 )
 
+if(MPYTHON_PRO_BOARD OR LABPLUS_LEDONG_V2_BOARD)
+list(APPEND IDF_COMPONENTS esp_lcd)
+endif()
+
 # list(APPEND IDF_COMPONENTS 
 # # audio_stream
 # audio_sal
