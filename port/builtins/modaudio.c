@@ -135,6 +135,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(audio_loudness_obj, audio_loudness);
 
 static mp_obj_t audio_record(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
+    audio_init();
     enum { ARG_file_name, ARG_record_time, ARG_bits_per_sample, ARG_channels, ARG_sampleRate};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_file_name,    MP_ARG_REQUIRED | MP_ARG_OBJ },

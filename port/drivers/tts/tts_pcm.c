@@ -52,17 +52,19 @@ void tts_task(void* param) {
 
     if (esp_tts_parse_chinese(tts_handle, task_param->text)) {
 	int len[1]={0};
+	bsp_codec_dev_delete();
 	bsp_codec_dev_create();
-	//bsp_audio_set_play_vol(50);
-	bsp_codec_dev_open(16000,1,256000);
+	bsp_audio_set_play_vol(50);
+	bsp_codec_dev_open(16000,2,32);
         do {
-            short* pcm = esp_tts_stream_play(tts_handle, len, 1);
-            bsp_audio_play(pcm, len[0] * 2, portMAX_DELAY);
-	    printf("data:%d \n", len[0]);
-            vTaskDelay(pdMS_TO_TICKS(10));
+            short* pcm = esp_tts_stream_play(tts_handle, len, 2);
+            bsp_audio_play2(pcm, len[0]*2, portMAX_DELAY);
+           // vTaskDelay(pdMS_TO_TICKS(10));
         } while (len[0] > 0);
+	bsp_codec_dev_close();
+	bsp_codec_dev_delete();
     }
-
+    
     esp_tts_stream_reset(tts_handle);
     xSemaphoreGive(task_param->done_semaphore);
     vTaskDelete(NULL);

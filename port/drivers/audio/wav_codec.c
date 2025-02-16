@@ -19,6 +19,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,8 @@
 #include "audio.h"
 #include "player.h"
 #include "recorder.h"
+
+SemaphoreHandle_t xBinarySemaphore;  // 定义信号量
 
 static const char *TAG = "wav_codec";
 
@@ -99,7 +102,7 @@ void wav_file_read_task(void *arg)
 		if(!wav_codec){ break; }
 		player->wav_codec = wav_codec;
 
-		if(!wav_codec_ringbuff){
+		if(!wav_codec_ringbuff){/
 			wav_codec_ringbuff = xRingbufferCreate(STREAM_OUT_RINGBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
 			if(!wav_codec_ringbuff){ break; }
 		}else{
@@ -291,5 +294,6 @@ exit:
         free(stream_buff);
     }
     // ESP_LOGE(TAG, "stream in task end, RAM left: %ld", esp_get_free_heap_size());
+    xSemaphoreGive(xBinarySemaphore);
     vTaskDelete(NULL);
 }
