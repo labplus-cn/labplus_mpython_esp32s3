@@ -42,9 +42,12 @@
 #if CONFIG_IDF_TARGET_ESP32
 #define I2C_MASTER_SCL_IO                  22               /*!< gpio number for I2C master clock */
 #define I2C_MASTER_SDA_IO                  23               /*!< gpio number for I2C master data  */
-#elif CONFIG_IDF_TARGET_ESP32S3
+#elif CONFIG_LABPLUS_FOR_XUEJING_BOARD
 #define I2C_MASTER_SCL_IO                  34               
 #define I2C_MASTER_SDA_IO                  35
+#elif CONFIG_MPYTHON_PRO_BOARD || CONFIG_LABPLUS_LEDONG_V2_BOARD
+#define I2C_MASTER_SCL_IO                  43               
+#define I2C_MASTER_SDA_IO                  44
 #endif
 #define I2C_MASTER_NUM                     I2C_NUM_0       /*!< I2C port number for master dev */
 #define I2C_MASTER_TX_BUF_DISABLE          0                /*!< I2C master do not need buffer */

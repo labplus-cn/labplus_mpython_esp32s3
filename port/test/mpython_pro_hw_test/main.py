@@ -5,26 +5,26 @@ import os
 spi = lvgl_esp32.SPI(
     2,
     baudrate=80_000_000,
-    sck=21,
-    mosi=47,
+    sck=36,
+    mosi=37,
     miso=8,
 )
 spi.init()
 
 display = lvgl_esp32.Display(
     spi=spi,
-    width=240,
-    height=240,
+    width=320,
+    height=172,
     gap_x=0,
-    gap_y=0,
-    swap_xy=False,
+    gap_y=34,
+    swap_xy=True,
     mirror_x=False,
-    mirror_y=False,
+    mirror_y=True,
     invert=True,
     bgr=False,
-    reset=42,
-    dc=43,
-    cs=44,
+    reset=7,
+    dc=35,
+    cs=34,
     pixel_clock=20_000_000,
 )
 display.init()
@@ -33,28 +33,28 @@ import lvgl as lv
 import lvgl_esp32
 from machine import Pin
 
-bl = Pin(48, mode = Pin.OUT, pull = Pin.PULL_UP)
-bl.value(0)
+bl = Pin(33, mode = Pin.OUT, pull = Pin.PULL_UP)
+bl.value(1)
 
 wrapper = lvgl_esp32.Wrapper(display)
 wrapper.init()
 
-# screen = lv.screen_active()
-# screen.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
+screen = lv.screen_active()
+screen.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
 
-# label = lv.label(screen)
-# label.set_text("Hello world from MicroPython")
-# label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
-# label.align(lv.ALIGN.CENTER, 0, 0)
+label = lv.label(screen)
+label.set_text("Hello world from MicroPython")
+label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
+label.align(lv.ALIGN.TOP_LEFT, 0, 50)
 
-scr = lv.obj()
-scr.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
-btn = lv.button(scr)
-btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
-label = lv.label(btn)
-label.set_style_text_font(lv.font_montserrat_24, 0)
-label.set_text('jiang zhao hui!')
-lv.screen_load(scr)
+# scr = lv.obj()
+# scr.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
+# btn = lv.button(scr)
+# btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
+# label = lv.label(btn)
+# # label.set_style_text_font(lv.font_montserrat_24, 0)
+# label.set_text('jiang zhao hui!')
+# lv.screen_load(scr)
 
 # a = lv.anim_t()
 # a.init()
