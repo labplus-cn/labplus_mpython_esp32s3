@@ -957,7 +957,7 @@ class wifi:
         print('disable AP WiFi...')
 
 # 3 rgb leds
-rgb = NeoPixel(Pin(33, Pin.OUT), 3, 3, 1, brightness=0.3)
+rgb = NeoPixel(Pin(8, Pin.OUT), 3, 3, 1, brightness=0.3)
 rgb.write()
 
 # light sensor
