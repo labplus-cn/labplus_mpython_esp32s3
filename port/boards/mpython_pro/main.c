@@ -55,7 +55,7 @@
 #include "shared/timeutils/timeutils.h"
 #include "mbedtls/platform_time.h"
 
-#include "uart.h"
+#include "driver/uart.h"
 #include "usb.h"
 #include "usb_serial_jtag.h"
 #include "modmachine.h"
@@ -136,6 +136,7 @@ void mp_task(void *pvParameter) {
     usb_init();
     #endif
     #if MICROPY_HW_ENABLE_UART_REPL
+    ESP_LOGE("esp_init", "use MICROPY_HW_ENABLE_UART_REPL........................................");
     uart_stdout_init();
     #endif
     machine_init();
@@ -155,18 +156,18 @@ void mp_task(void *pvParameter) {
     }
 
 soft_reset:
-    hw_init_flags = 0;
+    // hw_init_flags = 0;
     // startup
     // iic总线错误,打印提示信息
-    if (oled_init() == false) { 
-        ESP_LOGE("system", "%s", msg_iic_failed);
-        hw_init_flags |= 0x0001;
-    } else {
-        oled_drawImg(img_mpython);
-        // oled_drawImg(img_InnovaBit);
-        oled_show();
-        oled_deinit();
-    }
+    // if (oled_init() == false) { 
+    //     ESP_LOGE("system", "%s", msg_iic_failed);
+    //     hw_init_flags |= 0x0001;
+    // } else {
+    //     oled_drawImg(img_mpython);
+    //     // oled_drawImg(img_InnovaBit);
+    //     oled_show();
+    //     oled_deinit();
+    // }
 
     // initialise the stack pointer for the main thread
     mp_stack_set_top((void *)sp);

@@ -46,8 +46,8 @@
 #define I2C_MASTER_SCL_IO                  34               
 #define I2C_MASTER_SDA_IO                  35
 #elif CONFIG_MPYTHON_PRO_BOARD || CONFIG_LABPLUS_LEDONG_V2_BOARD
-#define I2C_MASTER_SCL_IO                  43               
-#define I2C_MASTER_SDA_IO                  44
+#define I2C_MASTER_SCL_IO                  16 //43               
+#define I2C_MASTER_SDA_IO                  15 //44
 #endif
 #define I2C_MASTER_NUM                     I2C_NUM_0       /*!< I2C port number for master dev */
 #define I2C_MASTER_TX_BUF_DISABLE          0                /*!< I2C master do not need buffer */
