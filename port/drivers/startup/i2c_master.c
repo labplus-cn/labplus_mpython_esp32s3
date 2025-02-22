@@ -62,6 +62,14 @@ void i2c_master_init()
 {
     int i2c_master_port = I2C_MASTER_NUM;
     i2c_driver_delete(I2C_MASTER_NUM);
+    gpio_config_t uart0_conf = {
+        .pin_bit_mask = (1ULL << I2C_MASTER_SDA_IO) | (1ULL << I2C_MASTER_SCL_IO),
+        .mode = GPIO_MODE_INPUT_OUTPUT,
+        .pull_up_en = 0,
+        .pull_down_en = 0,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&uart0_conf);
     i2c_config_t conf;
     conf.mode = I2C_MODE_MASTER;
     conf.sda_io_num = I2C_MASTER_SDA_IO;

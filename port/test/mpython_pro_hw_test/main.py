@@ -1,3 +1,130 @@
+from mpython import *
+
+'''
+1、按键功能测试
+说明：按A键，终端打印A，B键，打印B
+'''
+
+# button A
+from mpython import *
+
+def on_button_a_pressed(_):
+    print('A')
+
+button_a.event_pressed = on_button_a_pressed
+
+# button B
+def on_button_b_pressed(_):
+    print('B')
+
+button_b.event_pressed = on_button_b_pressed
+
+# #######################################################################
+
+'''
+2、6轴
+说明：打印6轴数据
+'''
+from mpython import *
+import time
+
+while True:
+    print('加速度 x:' + str(accelerometer.get_x()))
+    print('加速度 y:' + str(accelerometer.get_y()))
+    print('加速度 z:' + str(accelerometer.get_z()))
+    print('角速度 x:' + str(gyroscope.get_x()))
+    print('角速度 y:' + str(gyroscope.get_y()))
+    print('角速度 z:' + str(gyroscope.get_z()))
+    print('-------------------------------------------------------')
+    time.sleep(1)
+    
+#########################################################################
+
+'''
+3、磁力计
+说明：打印磁力计3轴数据
+'''
+from mpython import *
+import time
+
+while True:
+    print('磁力计 x:' + str(magnetic.get_x()))
+    print('磁力计 y:' + str(magnetic.get_y()))
+    print('磁力计 z:' + str(magnetic.get_z()))
+    print('-------------------------------------------------------')
+    time.sleep(1)
+  
+#########################################################################
+'''
+4、声音触发器
+说明：打印声音采样值
+'''
+from mpython import *
+import time
+
+while True:
+    print(sound.read())
+    time.sleep_ms(50)
+    
+#########################################################################
+'''
+5、触摸按键
+说明：打印触摸按键值
+'''
+from mpython import *
+
+def on_touchpad_p_pressed(_):
+    print('P')
+
+touchpad_p.event_pressed = on_touchpad_p_pressed
+
+def on_touchpad_o_pressed(_):
+    print('O')
+
+touchpad_o.event_pressed = on_touchpad_o_pressed
+
+def on_touchpad_y_pressed(_):
+    print('Y')
+
+touchpad_y.event_pressed = on_touchpad_y_pressed
+
+def on_touchpad_n_pressed(_):
+    print('N')
+
+touchpad_n.event_pressed = on_touchpad_n_pressed
+
+def on_touchpad_t_pressed(_):
+    print('T')
+
+touchpad_t.event_pressed = on_touchpad_t_pressed
+
+def on_touchpad_h_pressed(_):
+    print('H')
+
+touchpad_h.event_pressed = on_touchpad_h_pressed
+
+'''
+6、金手指IO
+说明：外接LED模块，用代码测试每一个IO，效果闪灯。
+'''
+from mpython import *
+
+p0 = MPythonPin(0, PinMode.OUT)
+
+import time
+while True:
+    p0.write_digital(1)
+    time.sleep(0.1)
+    p0.write_digital(0)
+    time.sleep(0.1)
+    
+'''
+7、
+'''
+    
+'''
+TFT LCD
+'''
 import lvgl_esp32
 import os
 
