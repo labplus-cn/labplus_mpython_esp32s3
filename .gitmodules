@@ -4,3 +4,9 @@
 [submodule "port/usercmodule/lv_binding_micropython"]
 	path = port/usercmodule/lv_binding_micropython
 	url = https://github.com/labplus-cn/lv_binding_micropython.git
+[submodule "esp-idf"]
+	path = esp-idf
+	url = https://github.com/espressif/esp-idf.git
+[submodule "micropython"]
+	path = micropython
+	url = https://github.com/micropython/micropython.git
