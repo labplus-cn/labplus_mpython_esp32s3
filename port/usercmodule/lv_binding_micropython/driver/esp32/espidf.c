@@ -8,20 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "soc/cpu.h"
-
-
-// ESP IDF has some functions that are declared but not implemented.
-// To avoid linking errors, provide empty implementation
-
-inline void gpio_pin_wakeup_disable(void){}
-inline void gpio_pin_wakeup_enable(uint32_t i, GPIO_INT_TYPE intr_state){}
-inline void gpio_intr_ack_high(uint32_t ack_mask){}
-inline void gpio_intr_ack(uint32_t ack_mask){}
-inline uint32_t gpio_intr_pending_high(void){return 0;}
-inline uint32_t gpio_intr_pending(void){return 0;}
-inline void gpio_intr_handler_register(gpio_intr_handler_fn_t fn, void *arg){}
-inline void gpio_init(void){}
+// #include "soc/cpu.h"
 
 void task_delay_ms(int ms)
 {
@@ -49,10 +36,10 @@ void *spi_transaction_set_cb(mp_obj_t pre_cb, mp_obj_t post_cb)
     return callbacks;
 }
 
-STATIC void isr_print_strn(void *env, const char *str, size_t len) {
+static void isr_print_strn(void *env, const char *str, size_t len) {
     size_t i;
     (void)env;
-    for (i=0; i<len; i++) ets_write_char_uart(str[i]);
+    // for (i=0; i<len; i++) ets_write_char_uart(str[i]);
 }
 
 static const mp_print_t mp_isr_print = {NULL, isr_print_strn};
@@ -63,7 +50,7 @@ static inline void cb_isr(mp_obj_t cb, mp_obj_t arg)
 {
     if (cb != NULL && cb != mp_const_none) {
 
-        volatile uint32_t sp = (uint32_t)get_sp();
+        // volatile uint32_t sp = (uint32_t)get_sp();
 
         // Calling micropython from ISR
         // See: https://github.com/micropython/micropython/issues/4895
@@ -72,8 +59,8 @@ static inline void cb_isr(mp_obj_t cb, mp_obj_t arg)
 
         mp_state_thread_t ts; // local thread state for the ISR
         mp_thread_set_state(&ts);
-        mp_stack_set_top((void*)sp); // need to include in root-pointer scan
-        mp_stack_set_limit(configIDLE_TASK_STACK_SIZE - 1024); // tune based on ISR thread stack size
+        // mp_stack_set_top((void*)sp); // need to include in root-pointer scan
+        // mp_stack_set_limit(configIDLE_TASK_STACK_SIZE - 1024); // tune based on ISR thread stack size
         mp_locals_set(mp_state_ctx.thread.dict_locals); // use main thread's locals
         mp_globals_set(mp_state_ctx.thread.dict_globals); // use main thread's globals
 
@@ -85,7 +72,7 @@ static inline void cb_isr(mp_obj_t cb, mp_obj_t arg)
             mp_call_function_1(cb, arg);
             nlr_pop();
         } else {
-            ets_printf("Uncaught exception in IRQ callback handler!\n");
+            // ets_printf("Uncaught exception in IRQ callback handler!\n");
             mp_obj_print_exception(&mp_isr_print, MP_OBJ_FROM_PTR(nlr.ret_val));
         }
 

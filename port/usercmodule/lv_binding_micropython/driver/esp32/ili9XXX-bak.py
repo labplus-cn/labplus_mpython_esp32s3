@@ -52,7 +52,7 @@ DISPLAY_TYPE_ST7789 = const(4)
 DISPLAY_TYPE_ST7735 = const(5)
 
 _TRANSFER_BUFFER_LENGTH = const(16)
-_MALLOC_DMA = lv.MALLOC_CAP.DMA | lv.MALLOC_CAP.INTERNAL
+_MALLOC_DMA = esp.MALLOC_CAP.DMA | esp.MALLOC_CAP.INTERNAL
 
 class ili9XXX:
 
@@ -61,7 +61,7 @@ class ili9XXX:
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=lv.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=240, height=320, start_x=0, start_y=0,
+        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=240, height=320, start_x=0, start_y=0,
         invert=False, double_buffer=True, half_duplex=True, display_type=0, asynchronous=False, initialize=True,
         color_format=lv.COLOR_FORMAT.RGB565, swap_rgb565_bytes=False
     ):
@@ -103,17 +103,17 @@ class ili9XXX:
         self.swap_rgb565_bytes = swap_rgb565_bytes
         self.rgb565_swap_func = lv.draw_sw_rgb565_swap if swap_rgb565_bytes else None
 
-        flush_cb = lv.ili9xxx_flush if hybrid and hasattr(lv, 'ili9xxx_flush') else self.flush
+        flush_cb = esp.ili9xxx_flush if hybrid and hasattr(esp, 'ili9xxx_flush') else self.flush
 
         if not color_format:
             raise RuntimeError(f"No color format defined for display {self.display_name}")
 
         # SPI
 
-        self.start_time_ptr = lv.C_Pointer()
-        self.end_time_ptr = lv.C_Pointer()
-        self.trans_result_ptr = lv.C_Pointer()
-        self.trans = lv.spi_transaction_t()
+        self.start_time_ptr = esp.C_Pointer()
+        self.end_time_ptr = esp.C_Pointer()
+        self.trans_result_ptr = esp.C_Pointer()
+        self.trans = esp.spi_transaction_t()
         self.flush_acc_setup_cycles = 0
         self.flush_acc_dma_cycles = 0
 
@@ -122,7 +122,7 @@ class ili9XXX:
         self.monitor_acc_time = 0
         self.monitor_acc_px = 0
         self.monitor_count = 0
-        self.cycles_in_ms = lv.esp_clk_cpu_freq() // 1000
+        self.cycles_in_ms = esp.esp_clk_cpu_freq() // 1000
 
         if invert:
             self.init_cmds.append({'cmd': 0x21})
@@ -130,11 +130,11 @@ class ili9XXX:
         # Allocate display buffer(s)
 
         self.buf_size = (self.width * self.height * self.pixel_size) // factor
-        self.buf1 = lv.heap_caps_malloc(self.buf_size, _MALLOC_DMA)
+        self.buf1 = esp.heap_caps_malloc(self.buf_size, _MALLOC_DMA)
         if not self.buf1:
-            free = lv.heap_caps_get_largest_free_block(_MALLOC_DMA)
+            free = esp.heap_caps_get_largest_free_block(_MALLOC_DMA)
             raise RuntimeError(f"Not enough DMA-capable memory to allocate display buffer. Needed: {self.buf_size} bytes, largest free block: {free} bytes")
-        self.buf2 = lv.heap_caps_malloc(self.buf_size, _MALLOC_DMA) if double_buffer else None
+        self.buf2 = esp.heap_caps_malloc(self.buf_size, _MALLOC_DMA) if double_buffer else None
 
         # Register display driver
 
@@ -168,7 +168,7 @@ class ili9XXX:
         # TODO: Register finalizer callback to deinit SPI.
         # That would get called on soft reset.
 
-        buscfg = lv.spi_bus_config_t({
+        buscfg = esp.spi_bus_config_t({
             "miso_io_num": self.miso,
             "mosi_io_num": self.mosi,
             "sclk_io_num": self.clk,
@@ -177,11 +177,11 @@ class ili9XXX:
             "max_transfer_sz": self.buf_size,
         })
 
-        devcfg_flags = lv.SPI_DEVICE.NO_DUMMY
+        devcfg_flags = esp.SPI_DEVICE.NO_DUMMY
         if self.half_duplex:
-            devcfg_flags |= lv.SPI_DEVICE.HALFDUPLEX
+            devcfg_flags |= esp.SPI_DEVICE.HALFDUPLEX
 
-        devcfg = lv.spi_device_interface_config_t({
+        devcfg = esp.spi_device_interface_config_t({
             "clock_speed_hz": self.mhz*1000*1000,   # Clock out at DISP_SPI_MHZ MHz
             "mode": self.spimode,                   # SPI mode 0 by default
             "spics_io_num": self.cs,                # CS pin
@@ -190,14 +190,14 @@ class ili9XXX:
             "duty_cycle_pos": 128,
         })
 
-        if self.hybrid and hasattr(lv, 'ili9xxx_post_cb_isr'):
+        if self.hybrid and hasattr(esp, 'ili9xxx_post_cb_isr'):
             devcfg.pre_cb = None
-            devcfg.post_cb = lv.ili9xxx_post_cb_isr
+            devcfg.post_cb = esp.ili9xxx_post_cb_isr
         else:
-            devcfg.pre_cb = lv.ex_spi_pre_cb_isr
-            devcfg.post_cb = lv.ex_spi_post_cb_isr
+            devcfg.pre_cb = esp.ex_spi_pre_cb_isr
+            devcfg.post_cb = esp.ex_spi_post_cb_isr
 
-        lv.gpio_pad_select_gpio(self.cs)
+        esp.gpio_pad_select_gpio(self.cs)
 
         # Initialize the SPI bus, if needed.
 
@@ -205,32 +205,32 @@ class ili9XXX:
            buscfg.sclk_io_num >= 0:
 
             if buscfg.miso_io_num  >= 0:
-                lv.gpio_pad_select_gpio(self.miso)
-                lv.gpio_set_direction(self.miso, lv.GPIO_MODE.INPUT)
-                lv.gpio_set_pull_mode(self.miso, lv.GPIO.PULLUP_ONLY)
+                esp.gpio_pad_select_gpio(self.miso)
+                esp.gpio_set_direction(self.miso, esp.GPIO_MODE.INPUT)
+                esp.gpio_set_pull_mode(self.miso, esp.GPIO.PULLUP_ONLY)
 
-            lv.gpio_pad_select_gpio(self.mosi)
-            lv.gpio_pad_select_gpio(self.clk)
-            lv.gpio_set_direction(self.mosi, lv.GPIO_MODE.OUTPUT)
-            lv.gpio_set_direction(self.clk, lv.GPIO_MODE.OUTPUT)
+            esp.gpio_pad_select_gpio(self.mosi)
+            esp.gpio_pad_select_gpio(self.clk)
+            esp.gpio_set_direction(self.mosi, esp.GPIO_MODE.OUTPUT)
+            esp.gpio_set_direction(self.clk, esp.GPIO_MODE.OUTPUT)
 
-            ret = lv.spi_bus_initialize(self.spihost, buscfg, 1)
+            ret = esp.spi_bus_initialize(self.spihost, buscfg, 1)
             if ret != 0: raise RuntimeError("Failed initializing SPI bus")
 
-        self.trans_buffer = lv.heap_caps_malloc(_TRANSFER_BUFFER_LENGTH, _MALLOC_DMA)
+        self.trans_buffer = esp.heap_caps_malloc(_TRANSFER_BUFFER_LENGTH, _MALLOC_DMA)
         self.cmd_trans_data = self.trans_buffer.__dereference__(1)
         self.word_trans_data = self.trans_buffer.__dereference__(4)
 
         # Attach the LCD to the SPI bus
 
-        ptr_to_spi = lv.C_Pointer()
-        ret = lv.spi_bus_add_device(self.spihost, devcfg, ptr_to_spi)
+        ptr_to_spi = esp.C_Pointer()
+        ret = esp.spi_bus_add_device(self.spihost, devcfg, ptr_to_spi)
         if ret != 0: raise RuntimeError("Failed adding SPI device")
         self.spi = ptr_to_spi.ptr_val
 
         self.bytes_transmitted = 0
-        completed_spi_transaction = lv.spi_transaction_t()
-        cast_spi_transaction_instance = lv.spi_transaction_t.__cast_instance__
+        completed_spi_transaction = esp.spi_transaction_t()
+        cast_spi_transaction_instance = esp.spi_transaction_t.__cast_instance__
 
         def post_isr(arg):
             reported_transmitted = self.bytes_transmitted
@@ -240,8 +240,8 @@ class ili9XXX:
         # Called in ISR context!
         def flush_isr(spi_transaction_ptr):
             self.disp_drv.flush_ready()
-            # lv.spi_device_release_bus(self.spi)
-            lv.get_ccount(self.end_time_ptr)
+            # esp.spi_device_release_bus(self.spi)
+            esp.get_ccount(self.end_time_ptr)
 
             # cast_spi_transaction_instance(completed_spi_transaction, spi_transaction_ptr)
             # self.bytes_transmitted += completed_spi_transaction.length
@@ -250,7 +250,7 @@ class ili9XXX:
             # except RuntimeError:
             #     pass
 
-        self.spi_callbacks = lv.spi_transaction_set_cb(None, flush_isr)
+        self.spi_callbacks = esp.spi_transaction_set_cb(None, flush_isr)
 
     #
     # Deinitialize SPI device and bus, and free memory
@@ -273,30 +273,30 @@ class ili9XXX:
 
             ret = 0
             while ret == 0:
-                ret = lv.spi_device_get_trans_result(self.spi, self.trans_result_ptr , 1)
+                ret = esp.spi_device_get_trans_result(self.spi, self.trans_result_ptr , 1)
 
             # Remove device
 
-            lv.spi_bus_remove_device(self.spi)
+            esp.spi_bus_remove_device(self.spi)
             self.spi = None
 
             # Free SPI bus
 
-            lv.spi_bus_free(self.spihost)
+            esp.spi_bus_free(self.spihost)
             self.spihost = None
 
         # Free RAM
 
         if self.buf1:
-            lv.heap_caps_free(self.buf1)
+            esp.heap_caps_free(self.buf1)
             self.buf1 = None
 
         if self.buf2:
-            lv.heap_caps_free(self.buf2)
+            esp.heap_caps_free(self.buf2)
             self.buf2 = None
 
         if self.trans_buffer:
-            lv.heap_caps_free(self.trans_buffer)
+            esp.heap_caps_free(self.trans_buffer)
             self.trans_buffer = None
 
     ######################################################
@@ -305,34 +305,34 @@ class ili9XXX:
         self.trans.length = len(data) * 8   # Length is in bytes, transaction length is in bits.
         self.trans.tx_buffer = data         # data should be allocated as DMA-able memory
         self.trans.user = None
-        lv.spi_device_polling_transmit(self.spi, self.trans)
+        esp.spi_device_polling_transmit(self.spi, self.trans)
 
     def spi_send_dma(self, data):
         self.trans.length = len(data) * 8   # Length is in bytes, transaction length is in bits.
         self.trans.tx_buffer = data         # data should be allocated as DMA-able memory
         self.trans.user = self.spi_callbacks
-        lv.spi_device_queue_trans(self.spi, self.trans, -1)
+        esp.spi_device_queue_trans(self.spi, self.trans, -1)
 
     ######################################################
 
     def send_cmd(self, cmd):
-        lv.gpio_set_level(self.dc, 0)	    # Command mode
+        esp.gpio_set_level(self.dc, 0)	    # Command mode
         self.cmd_trans_data[0] = cmd
         self.spi_send(self.cmd_trans_data)
 
     def send_data(self, data):
-        lv.gpio_set_level(self.dc, 1)	    # Data mode
+        esp.gpio_set_level(self.dc, 1)	    # Data mode
         if len(data) > _TRANSFER_BUFFER_LENGTH: raise RuntimeError('Data too long, please use DMA!')
         trans_data = self.trans_buffer.__dereference__(len(data))
         trans_data[:] = data[:]
         self.spi_send(trans_data)
 
     def send_trans_word(self):
-        lv.gpio_set_level(self.dc, 1)	    # Data mode
+        esp.gpio_set_level(self.dc, 1)	    # Data mode
         self.spi_send(self.word_trans_data)
 
     def send_data_dma(self, data):          # data should be allocated as DMA-able memory
-        lv.gpio_set_level(self.dc, 1)      # Data mode
+        esp.gpio_set_level(self.dc, 1)      # Data mode
         self.spi_send_dma(data)
 
     ######################################################
@@ -341,28 +341,28 @@ class ili9XXX:
 
         # Initialize non-SPI GPIOs
 
-        lv.gpio_pad_select_gpio(self.dc)
-        if self.rst != -1: lv.gpio_pad_select_gpio(self.rst)
-        if self.backlight != -1: lv.gpio_pad_select_gpio(self.backlight)
-        if self.power != -1: lv.gpio_pad_select_gpio(self.power)
+        esp.gpio_pad_select_gpio(self.dc)
+        if self.rst != -1: esp.gpio_pad_select_gpio(self.rst)
+        if self.backlight != -1: esp.gpio_pad_select_gpio(self.backlight)
+        if self.power != -1: esp.gpio_pad_select_gpio(self.power)
 
-        lv.gpio_set_direction(self.dc, lv.GPIO_MODE.OUTPUT)
-        if self.rst != -1: lv.gpio_set_direction(self.rst, lv.GPIO_MODE.OUTPUT)
-        if self.backlight != -1: lv.gpio_set_direction(self.backlight, lv.GPIO_MODE.OUTPUT)
-        if self.power != -1: lv.gpio_set_direction(self.power, lv.GPIO_MODE.OUTPUT)
+        esp.gpio_set_direction(self.dc, esp.GPIO_MODE.OUTPUT)
+        if self.rst != -1: esp.gpio_set_direction(self.rst, esp.GPIO_MODE.OUTPUT)
+        if self.backlight != -1: esp.gpio_set_direction(self.backlight, esp.GPIO_MODE.OUTPUT)
+        if self.power != -1: esp.gpio_set_direction(self.power, esp.GPIO_MODE.OUTPUT)
 
         # Power the display
 
         if self.power != -1:
-            lv.gpio_set_level(self.power, self.power_on)
+            esp.gpio_set_level(self.power, self.power_on)
             await sleep_func(100)
 
         # Reset the display
 
         if self.rst != -1:
-            lv.gpio_set_level(self.rst, 0)
+            esp.gpio_set_level(self.rst, 0)
             await sleep_func(100)
-            lv.gpio_set_level(self.rst, 1)
+            esp.gpio_set_level(self.rst, 1)
             await sleep_func(100)
 
         # Send all the commands
@@ -377,7 +377,7 @@ class ili9XXX:
         # Enable backlight
 
         if self.backlight != -1:
-            lv.gpio_set_level(self.backlight, self.backlight_on)
+            esp.gpio_set_level(self.backlight, self.backlight_on)
 
     def init(self):
         import utime
@@ -396,10 +396,10 @@ class ili9XXX:
     def power_down(self):
 
         if self.power != -1:
-            lv.gpio_set_level(self.power, 1 - self.power_on)
+            esp.gpio_set_level(self.power, 1 - self.power_on)
 
         if self.backlight != -1:
-            lv.gpio_set_level(self.backlight, 1 - self.backlight_on)
+            esp.gpio_set_level(self.backlight, 1 - self.backlight_on)
 
     ######################################################
 
@@ -408,9 +408,9 @@ class ili9XXX:
         if self.end_time_ptr.int_val and self.end_time_ptr.int_val > self.start_time_ptr.int_val:
             self.flush_acc_dma_cycles +=  self.end_time_ptr.int_val - self.start_time_ptr.int_val
 
-        lv.get_ccount(self.start_time_ptr)
+        esp.get_ccount(self.start_time_ptr)
 
-        # lv.spi_device_acquire_bus(self.spi, esp.ESP.MAX_DELAY)
+        # esp.spi_device_acquire_bus(self.spi, esp.ESP.MAX_DELAY)
 
         # Column addresses
         self.send_cmd(0x2A)
@@ -445,10 +445,10 @@ class ili9XXX:
         if self.rgb565_swap_func:
             self.rgb565_swap_func(data_view, size)
 
-        lv.get_ccount(self.end_time_ptr)
+        esp.get_ccount(self.end_time_ptr)
         if self.end_time_ptr.int_val > self.start_time_ptr.int_val:
             self.flush_acc_setup_cycles += self.end_time_ptr.int_val - self.start_time_ptr.int_val
-        lv.get_ccount(self.start_time_ptr)
+        esp.get_ccount(self.start_time_ptr)
 
         self.send_data_dma(data_view)
 
@@ -495,7 +495,7 @@ class ili9341(ili9XXX):
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=lv.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=240, height=320, start_x=0, start_y=0,
+        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=240, height=320, start_x=0, start_y=0,
         colormode=COLOR_MODE_BGR, rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True,
         asynchronous=False, initialize=True, color_format=lv.COLOR_FORMAT.RGB565, swap_rgb565_bytes=True
     ):
@@ -547,7 +547,7 @@ class ili9488(ili9XXX):
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=lv.HSPI_HOST, spimode=0, mhz=40, factor=8, hybrid=True, width=320, height=480, colormode=COLOR_MODE_RGB,
+        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=8, hybrid=True, width=320, height=480, colormode=COLOR_MODE_RGB,
         rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True, asynchronous=False, initialize=True,
         color_format=lv.COLOR_FORMAT.XRGB8888, display_type=DISPLAY_TYPE_ILI9488, p16=False, swap_rgb565_bytes=False
     ):
@@ -600,7 +600,7 @@ class ili9488g(ili9488):
 
     def __init__(self,
         miso=-1, mosi=23, clk=18, cs=5, dc=27, rst=-1, power=-1, backlight=-1, backlight_on=0, power_on=0,
-        spihost=lv.VSPI_HOST, spimode=0, mhz=80, factor=8, hybrid=True, width=320, height=480,
+        spihost=esp.VSPI_HOST, spimode=0, mhz=80, factor=8, hybrid=True, width=320, height=480,
         rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True, asynchronous=False, initialize=True,
         color_format=lv.COLOR_FORMAT.XRGB8888, swap_rgb565_bytes=False
     ):
@@ -631,7 +631,7 @@ class gc9a01(ili9XXX):
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=lv.HSPI_HOST, spimode=0, mhz=60, factor=4, hybrid=True, width=240, height=240, colormode=COLOR_MODE_RGB,
+        spihost=esp.HSPI_HOST, spimode=0, mhz=60, factor=4, hybrid=True, width=240, height=240, colormode=COLOR_MODE_RGB,
         rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True, asynchronous=False, initialize=True,
         color_format=lv.COLOR_FORMAT.RGB565, swap_rgb565_bytes=True
     ):
@@ -720,7 +720,7 @@ class st7789(ili9XXX):
 
     def __init__(self,
         miso=-1, mosi=19, clk=18, cs=5, dc=16, rst=23, power=-1, backlight=4, backlight_on=1, power_on=0,
-        spihost=lv.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=320, height=240, start_x=0, start_y=0,
+        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=320, height=240, start_x=0, start_y=0,
         colormode=COLOR_MODE_BGR, rot=PORTRAIT, invert=True, double_buffer=True, half_duplex=True,
         asynchronous=False, initialize=True, color_format=lv.COLOR_FORMAT.RGB565, swap_rgb565_bytes=True):
 
@@ -772,7 +772,7 @@ class st7735(ili9XXX):
 
     def __init__(self,
         miso=-1, mosi=19, clk=18, cs=13, dc=12, rst=4, power=-1, backlight=15, backlight_on=1, power_on=0,
-        spihost=lv.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=128, height=160, start_x=0, start_y=0,
+        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=128, height=160, start_x=0, start_y=0,
         colormode=COLOR_MODE_RGB, rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True,
         asynchronous=False, initialize=True, color_format=lv.COLOR_FORMAT.RGB565, swap_rgb565_bytes=True):
 
