@@ -38,9 +38,10 @@ list(APPEND MICROPY_SOURCE_SHARED
     ${MICROPY_DIR}/shared/netutils/netutils.c
     ${MICROPY_DIR}/shared/timeutils/timeutils.c
     ${MICROPY_DIR}/shared/runtime/interrupt_char.c
+    ${MICROPY_DIR}/shared/runtime/mpirq.c
     ${MICROPY_DIR}/shared/runtime/stdout_helpers.c
     ${MICROPY_DIR}/shared/runtime/sys_stdio_mphal.c
-    # ${MICROPY_DIR}/shared/runtime/pyexec.c
+    ${MICROPY_DIR}/shared/runtime/pyexec.c
 )
 
 list(APPEND MICROPY_SOURCE_LIB
@@ -58,10 +59,41 @@ list(APPEND MICROPY_SOURCE_DRIVERS
     ${MICROPY_DIR}/drivers/dht/dht.c
 )
 
+string(CONCAT GIT_SUBMODULES "${GIT_SUBMODULES} " lib/tinyusb)
+if(MICROPY_PY_TINYUSB)
+    set(TINYUSB_SRC "${MICROPY_DIR}/lib/tinyusb/src")
+    string(TOUPPER OPT_MCU_${IDF_TARGET} tusb_mcu)
+
+    list(APPEND MICROPY_DEF_TINYUSB
+        CFG_TUSB_MCU=${tusb_mcu}
+    )
+
+    list(APPEND MICROPY_SOURCE_TINYUSB
+        ${TINYUSB_SRC}/tusb.c
+        ${TINYUSB_SRC}/common/tusb_fifo.c
+        ${TINYUSB_SRC}/device/usbd.c
+        ${TINYUSB_SRC}/device/usbd_control.c
+        ${TINYUSB_SRC}/class/cdc/cdc_device.c
+        ${TINYUSB_SRC}/portable/synopsys/dwc2/dcd_dwc2.c
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd.c
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd_cdc.c
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd_descriptor.c
+    )
+
+    list(APPEND MICROPY_INC_TINYUSB
+        ${TINYUSB_SRC}
+        ${MICROPY_DIR}/shared/tinyusb/
+    )
+
+    list(APPEND MICROPY_LINK_TINYUSB
+        -Wl,--wrap=dcd_event_handler
+    )
+endif()
+
 list(APPEND MICROPY_SOURCE_PORT
     panichandler.c
     adc.c
-    # main.c
+    main.c
     ppp_set_auth.c
     uart.c
     usb.c
@@ -82,6 +114,7 @@ list(APPEND MICROPY_SOURCE_PORT
     network_wlan.c
     mpnimbleport.c
     modsocket.c
+    lwip_patch.c
     modesp.c
     # esp32_nvs.c
     esp32_partition.c
@@ -109,6 +142,7 @@ list(APPEND MICROPY_SOURCE_QSTR
     ${MICROPY_SOURCE_LIB}
     ${MICROPY_SOURCE_PORT}
     ${MICROPY_SOURCE_BOARD}
+    ${MICROPY_SOURCE_TINYUSB}
 )
 
 list(APPEND IDF_COMPONENTS
@@ -144,6 +178,7 @@ list(APPEND IDF_COMPONENTS
     soc
     spi_flash
     ulp
+    usb
     vfs
     esp_http_client
 )
@@ -152,13 +187,6 @@ if(MPYTHON_PRO_BOARD OR LABPLUS_LEDONG_V2_BOARD)
 list(APPEND IDF_COMPONENTS esp_lcd)
 endif()
 
-# list(APPEND IDF_COMPONENTS 
-# # audio_stream
-# audio_sal
-# audio_hal
-# audio_board)
-
-MESSAGE( STATUS "IDF_COMPONENTS = ${IDF_COMPONENTS}, USE_ESP_ADF = ${USE_ESP_ADF}, MP_BOARD = ${MICROPY_BOARD}")
 # Register the main IDF component.
 idf_component_register(
     SRCS
@@ -169,9 +197,11 @@ idf_component_register(
         ${MICROPY_SOURCE_DRIVERS}
         ${MICROPY_SOURCE_PORT}
         ${MICROPY_SOURCE_BOARD}
+        ${MICROPY_SOURCE_TINYUSB}
     INCLUDE_DIRS
         ${MICROPY_INC_CORE}
         ${MICROPY_INC_USERMOD}
+        ${MICROPY_INC_TINYUSB}
         ${MICROPYTHON_PORT_DIR}
         ${MICROPY_BOARD_DIR}
         ${CMAKE_BINARY_DIR}
@@ -186,7 +216,7 @@ idf_component_register(
 set(MICROPY_TARGET ${COMPONENT_TARGET})
 
 # Define mpy-cross flags, for use with frozen code.
-if(NOT IDF_TARGET STREQUAL "esp32c3")
+if(CONFIG_IDF_TARGET_ARCH STREQUAL "xtensa")
 set(MICROPY_CROSS_FLAGS -march=xtensawin)
 endif()
 
@@ -194,6 +224,7 @@ endif()
 target_compile_definitions(${MICROPY_TARGET} PUBLIC
     ${MICROPY_DEF_CORE}
     ${MICROPY_DEF_BOARD}
+    ${MICROPY_DEF_TINYUSB}
     MICROPY_ESP_IDF_4=1
     MICROPY_VFS_FAT=1
     MICROPY_VFS_LFS2=1
@@ -207,6 +238,10 @@ target_compile_options(${MICROPY_TARGET} PUBLIC
     -Wno-clobbered
     -Wno-deprecated-declarations
     -Wno-missing-field-initializers
+)
+
+target_link_options(${MICROPY_TARGET} PUBLIC
+     ${MICROPY_LINK_TINYUSB}
 )
 
 # Additional include directories needed for private NimBLE headers.
