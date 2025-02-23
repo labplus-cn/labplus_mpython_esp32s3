@@ -35,11 +35,11 @@ function(lv_bindings)
         COMMAND_EXPAND_LISTS
     )
 
-    if(ESP_PLATFORM)
-        target_compile_options(${COMPONENT_LIB} PRIVATE ${LV_COMPILE_OPTIONS})
-    else()
+    # if(ESP_PLATFORM)
+    #     target_compile_options(${COMPONENT_LIB} PRIVATE ${LV_COMPILE_OPTIONS})
+    # else()
         target_compile_options(usermod_lv_bindings INTERFACE ${LV_COMPILE_OPTIONS})
-    endif()
+    # endif()
 
     if (DEFINED LV_FILTER)
 
@@ -68,36 +68,40 @@ function(lv_bindings)
 
     set(LV_JSON ${CMAKE_BINARY_DIR}/lvgl_all.json)
 
-    if (EXISTS ${LVGL_DIR}/scripts/gen_json/gen_json.py)
-        set(LVGL_ALL_H ${CMAKE_BINARY_DIR}/lvgl_all.h)
-        add_custom_command(
-            OUTPUT
-                ${LVGL_ALL_H}
-            COMMAND
-                echo "\"#include\"" "\"\\\"${LVGL_DIR}/lvgl.h\\\"\"" > ${LVGL_ALL_H}
-            COMMAND
-                echo "\"#include\"" "\"\\\"${LVGL_DIR}/src/lvgl_private.h\\\"\"" >> ${LVGL_ALL_H}
-            COMMAND_EXPAND_LISTS
-        )
-        add_custom_command(
-            OUTPUT
-                ${LV_JSON}
-            COMMAND
-                ${Python3_EXECUTABLE} ${LVGL_DIR}/scripts/gen_json/gen_json.py --target-header ${LVGL_ALL_H} > ${LV_JSON}
-            DEPENDS
-                ${LVGL_DIR}/scripts/gen_json/gen_json.py
-                ${LVGL_ALL_H}
-            COMMAND_EXPAND_LISTS
-        )
-    else()
-        add_custom_command(
-            OUTPUT
-                ${LV_JSON}
-            COMMAND
-                echo "{}" > ${LV_JSON}
-            COMMAND_EXPAND_LISTS
-        )
-    endif()
+    if (NOT EXISTS ${LV_JSON})
+        file(WRITE ${LV_JSON} "{}")
+    endif ()
+
+    # if (EXISTS ${LVGL_DIR}/scripts/gen_json/gen_json.py)
+    #     set(LVGL_ALL_H ${CMAKE_BINARY_DIR}/lvgl_all.h)
+    #     add_custom_command(
+    #         OUTPUT
+    #             ${LVGL_ALL_H}
+    #         COMMAND
+    #             echo "\"#include\"" "\"\\\"${LVGL_DIR}/lvgl.h\\\"\"" > ${LVGL_ALL_H}
+    #         COMMAND
+    #             echo "\"#include\"" "\"\\\"${LVGL_DIR}/src/lvgl_private.h\\\"\"" >> ${LVGL_ALL_H}
+    #         COMMAND_EXPAND_LISTS
+    #     )
+    #     add_custom_command(
+    #         OUTPUT
+    #             ${LV_JSON}
+    #         COMMAND
+    #             ${Python3_EXECUTABLE} ${LVGL_DIR}/scripts/gen_json/gen_json.py --target-header ${LVGL_ALL_H} > ${LV_JSON}
+    #         DEPENDS
+    #             ${LVGL_DIR}/scripts/gen_json/gen_json.py
+    #             ${LVGL_ALL_H}
+    #         COMMAND_EXPAND_LISTS
+    #     )
+    # else()
+    #     add_custom_command(
+    #         OUTPUT
+    #             ${LV_JSON}
+    #         COMMAND
+    #             echo "{}" > ${LV_JSON}
+    #         COMMAND_EXPAND_LISTS
+    #     )
+    # endif()
 
     add_custom_command(
         OUTPUT
@@ -162,6 +166,7 @@ function(all_lv_bindings)
                 soc/sens_struct.h
                 soc/rtc.h
                 driver/periph_ctrl.h
+                sdkconfig.h
         )
     endif(ESP_PLATFORM)
 
@@ -174,6 +179,17 @@ set(LV_INCLUDE
 )
 
 # Add sources to CMake component
+# build, so we temporarily write empty files so that IDF is happy
+if (NOT EXISTS ${LV_MP})
+    file(WRITE ${LV_MP} "")
+endif ()
+
+if(ESP_PLATFORM)
+    set(LV_ESPIDF ${CMAKE_BINARY_DIR}/lv_espidf.c)
+    if (NOT EXISTS ${LV_ESPIDF})
+        file(WRITE ${LV_ESPIDF} "")
+    endif ()    
+endif()
 
 set(LV_SRC
     ${LV_MP}
@@ -181,9 +197,9 @@ set(LV_SRC
 
 if(ESP_PLATFORM)
     LIST(APPEND LV_SRC
-        ${LV_BINDINGS_DIR}/driver/esp32/espidf.c
-        ${LV_BINDINGS_DIR}/driver/esp32/modrtch.c
-        ${LV_BINDINGS_DIR}/driver/esp32/sh2lib.c
-        ${LV_ESPIDF}
+        # ${LV_BINDINGS_DIR}/driver/esp32/espidf.c
+        # ${LV_BINDINGS_DIR}/driver/esp32/modrtch.c
+        # ${LV_BINDINGS_DIR}/driver/esp32/sh2lib.c
+        # ${LV_ESPIDF}
     )
 endif(ESP_PLATFORM)
