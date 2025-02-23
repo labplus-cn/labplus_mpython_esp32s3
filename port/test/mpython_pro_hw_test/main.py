@@ -1,122 +1,122 @@
-from mpython import *
+# from mpython import *
 
-'''
-1、按键功能测试
-说明：按A键，终端打印A，B键，打印B
-'''
+# '''
+# 1、按键功能测试
+# 说明：按A键，终端打印A，B键，打印B
+# '''
 
-# button A
-from mpython import *
+# # button A
+# from mpython import *
 
-def on_button_a_pressed(_):
-    print('A')
+# def on_button_a_pressed(_):
+#     print('A')
 
-button_a.event_pressed = on_button_a_pressed
+# button_a.event_pressed = on_button_a_pressed
 
-# button B
-def on_button_b_pressed(_):
-    print('B')
+# # button B
+# def on_button_b_pressed(_):
+#     print('B')
 
-button_b.event_pressed = on_button_b_pressed
+# button_b.event_pressed = on_button_b_pressed
 
-# #######################################################################
+# # #######################################################################
 
-'''
-2、6轴
-说明：打印6轴数据
-'''
-from mpython import *
-import time
+# '''
+# 2、6轴
+# 说明：打印6轴数据
+# '''
+# from mpython import *
+# import time
 
-while True:
-    print('加速度 x:' + str(accelerometer.get_x()))
-    print('加速度 y:' + str(accelerometer.get_y()))
-    print('加速度 z:' + str(accelerometer.get_z()))
-    print('角速度 x:' + str(gyroscope.get_x()))
-    print('角速度 y:' + str(gyroscope.get_y()))
-    print('角速度 z:' + str(gyroscope.get_z()))
-    print('-------------------------------------------------------')
-    time.sleep(1)
+# while True:
+#     print('加速度 x:' + str(accelerometer.get_x()))
+#     print('加速度 y:' + str(accelerometer.get_y()))
+#     print('加速度 z:' + str(accelerometer.get_z()))
+#     print('角速度 x:' + str(gyroscope.get_x()))
+#     print('角速度 y:' + str(gyroscope.get_y()))
+#     print('角速度 z:' + str(gyroscope.get_z()))
+#     print('-------------------------------------------------------')
+#     time.sleep(1)
     
-#########################################################################
+# #########################################################################
 
-'''
-3、磁力计
-说明：打印磁力计3轴数据
-'''
-from mpython import *
-import time
+# '''
+# 3、磁力计
+# 说明：打印磁力计3轴数据
+# '''
+# from mpython import *
+# import time
 
-while True:
-    print('磁力计 x:' + str(magnetic.get_x()))
-    print('磁力计 y:' + str(magnetic.get_y()))
-    print('磁力计 z:' + str(magnetic.get_z()))
-    print('-------------------------------------------------------')
-    time.sleep(1)
+# while True:
+#     print('磁力计 x:' + str(magnetic.get_x()))
+#     print('磁力计 y:' + str(magnetic.get_y()))
+#     print('磁力计 z:' + str(magnetic.get_z()))
+#     print('-------------------------------------------------------')
+#     time.sleep(1)
   
-#########################################################################
-'''
-4、声音触发器
-说明：打印声音采样值
-'''
-from mpython import *
-import time
+# #########################################################################
+# '''
+# 4、声音触发器
+# 说明：打印声音采样值
+# '''
+# from mpython import *
+# import time
 
-while True:
-    print(sound.read())
-    time.sleep_ms(50)
+# while True:
+#     print(sound.read())
+#     time.sleep_ms(50)
     
-#########################################################################
-'''
-5、触摸按键
-说明：打印触摸按键值
-'''
-from mpython import *
+# #########################################################################
+# '''
+# 5、触摸按键
+# 说明：打印触摸按键值
+# '''
+# from mpython import *
 
-def on_touchpad_p_pressed(_):
-    print('P')
+# def on_touchpad_p_pressed(_):
+#     print('P')
 
-touchpad_p.event_pressed = on_touchpad_p_pressed
+# touchpad_p.event_pressed = on_touchpad_p_pressed
 
-def on_touchpad_o_pressed(_):
-    print('O')
+# def on_touchpad_o_pressed(_):
+#     print('O')
 
-touchpad_o.event_pressed = on_touchpad_o_pressed
+# touchpad_o.event_pressed = on_touchpad_o_pressed
 
-def on_touchpad_y_pressed(_):
-    print('Y')
+# def on_touchpad_y_pressed(_):
+#     print('Y')
 
-touchpad_y.event_pressed = on_touchpad_y_pressed
+# touchpad_y.event_pressed = on_touchpad_y_pressed
 
-def on_touchpad_n_pressed(_):
-    print('N')
+# def on_touchpad_n_pressed(_):
+#     print('N')
 
-touchpad_n.event_pressed = on_touchpad_n_pressed
+# touchpad_n.event_pressed = on_touchpad_n_pressed
 
-def on_touchpad_t_pressed(_):
-    print('T')
+# def on_touchpad_t_pressed(_):
+#     print('T')
 
-touchpad_t.event_pressed = on_touchpad_t_pressed
+# touchpad_t.event_pressed = on_touchpad_t_pressed
 
-def on_touchpad_h_pressed(_):
-    print('H')
+# def on_touchpad_h_pressed(_):
+#     print('H')
 
-touchpad_h.event_pressed = on_touchpad_h_pressed
+# touchpad_h.event_pressed = on_touchpad_h_pressed
 
-'''
-6、金手指IO
-说明：外接LED模块，用代码测试每一个IO，效果闪灯。
-'''
-from mpython import *
+# '''
+# 6、金手指IO
+# 说明：外接LED模块，用代码测试每一个IO，效果闪灯。
+# '''
+# from mpython import *
 
-p0 = MPythonPin(0, PinMode.OUT)
+# p0 = MPythonPin(0, PinMode.OUT)
 
-import time
-while True:
-    p0.write_digital(1)
-    time.sleep(0.1)
-    p0.write_digital(0)
-    time.sleep(0.1)
+# import time
+# while True:
+#     p0.write_digital(1)
+#     time.sleep(0.1)
+#     p0.write_digital(0)
+#     time.sleep(0.1)
     
 '''
 7、
@@ -145,10 +145,10 @@ display = lvgl_esp32.Display(
     gap_x=0,
     gap_y=34,
     swap_xy=True,
-    mirror_x=False,
+    mirror_x=True,
     mirror_y=True,
-    invert=True,
-    bgr=False,
+    invert= False,
+    bgr=True,
     reset=7,
     dc=35,
     cs=34,
@@ -166,13 +166,25 @@ bl.value(1)
 wrapper = lvgl_esp32.Wrapper(display)
 wrapper.init()
 
+from port.boards.mpython_pro.modules.lv_utils import event_loop
+
 screen = lv.screen_active()
 screen.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
 
 label = lv.label(screen)
-label.set_text("Hello world from MicroPython")
+# label.set_text("Hello world from MicroPython")
 label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
-label.align(lv.ALIGN.TOP_LEFT, 0, 50)
+label.align(lv.ALIGN.CENTER, 0, 0)
+
+n = 0
+def cb():  # 每40ms被调用
+    global n
+    n = n + 1
+    if n > 10000:
+        n = 0
+    label.set_text(str(n))
+
+event = event_loop(refresh_cb = cb)
 
 # scr = lv.obj()
 # scr.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
@@ -196,5 +208,5 @@ label.align(lv.ALIGN.TOP_LEFT, 0, 50)
 # a.set_custom_exec_cb(lambda _, v: label.set_y(v))
 # a.start()
 
-while True:
-    lv.timer_handler_run_in_period(100)
+# while True:
+#     lv.timer_handler_run_in_period(100)
