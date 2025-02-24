@@ -278,6 +278,26 @@ LV_FONT_DECLARE(lv_font_unscii_8)
 LV_FONT_DECLARE(lv_font_unscii_16)
 #endif
 
+#if LV_FONT_SIYUAN_SONGTI_16
+LV_FONT_DECLARE(lv_font_siyuan_songti_16)
+#endif
+
+// #if LV_FONT_SIYUAN_SONGTI_20
+// LV_FONT_DECLARE(lv_font_siyuan_songti_20)
+// #endif
+
+// #if LV_FONT_SIYUAN_SONGTI_24
+// LV_FONT_DECLARE(lv_font_siyuan_songti_24)
+// #endif
+
+#if LV_FONT_SIYUAN_HEITI_MEDIUM_16
+LV_FONT_DECLARE(lv_font_siyuan_heiti_medium_16)
+#endif
+
+// #if LV_FONT_SIYUAN_HEITI_MEDIUM_20
+// LV_FONT_DECLARE(lv_font_siyuan_heiti_medium_20)
+// #endif
+
 /*Declare the custom (user defined) fonts*/
 #ifdef LV_FONT_CUSTOM_DECLARE
 LV_FONT_CUSTOM_DECLARE

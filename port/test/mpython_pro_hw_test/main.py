@@ -166,23 +166,25 @@ bl.value(1)
 wrapper = lvgl_esp32.Wrapper(display)
 wrapper.init()
 
-from port.boards.mpython_pro.modules.lv_utils import event_loop
+from lv_utils import event_loop
 
 screen = lv.screen_active()
-screen.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
+screen.set_style_bg_color(lv.color_hex(0x000000), lv.PART.MAIN)
 
 label = lv.label(screen)
-# label.set_text("Hello world from MicroPython")
+label.set_style_text_font(lv.font_siyuan_songti_16, 0)
+label.set_text("蒋朝辉 中华人民共和国")
 label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
 label.align(lv.ALIGN.CENTER, 0, 0)
 
 n = 0
 def cb():  # 每40ms被调用
-    global n
-    n = n + 1
-    if n > 10000:
-        n = 0
-    label.set_text(str(n))
+    # global n
+    # n = n + 1
+    # if n > 10000:
+    #     n = 0
+    # label.set_text(str(n))
+    pass
 
 event = event_loop(refresh_cb = cb)
 
