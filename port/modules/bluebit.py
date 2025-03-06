@@ -23,7 +23,7 @@
 | blue:bit modules library for mPython. 
 | more about with bluebit info browse http://wiki.labplus.cn/index.php?title=Bluebit
 """
-from mpython import i2c, sleep_ms, MPythonPin, PinMode,numberMap
+from mpython import i2c, sleep_ms, MPythonPin, PinMode, numberMap
 from micropython import const
 from machine import UART, ADC, Pin
 import framebuf
@@ -31,6 +31,8 @@ import ubinascii
 import ustruct
 import math
 from max30102 import MAX30102
+from CSK6011A import SpeechSynthesis
+from acd1200 import ACD1200
 
 # class Thermistor:
 #     """
@@ -1372,3 +1374,23 @@ class LineFollow(object):
         else:
             raise ValueError('参数错误')
                   
+''' 离线语音识别 '''
+class ASRPRO(object):
+    def __init__(self, tx=Pin.P16, rx=Pin.P15, uart_num=1):
+        self.uart = UART(uart_num, baudrate=115200, rx=rx, tx=tx)
+        self.identifying_word = -1
+
+    def any(self):
+        sleep_ms(10)
+        if(self.uart.any()):
+            self.recognition()
+            return True
+        else:
+            return False
+    
+    def recognition(self):
+        try:
+            self.identifying_word = int(self.uart.read().decode('UTF-8','ignore'))
+        except Exception as e:
+            self.identifying_word = -1
+            pass

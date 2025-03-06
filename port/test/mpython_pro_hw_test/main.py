@@ -172,10 +172,16 @@ screen = lv.screen_active()
 screen.set_style_bg_color(lv.color_hex(0x000000), lv.PART.MAIN)
 
 label = lv.label(screen)
-label.set_style_text_font(lv.font_siyuan_songti_16, 0)
-label.set_text("蒋朝辉 中华人民共和国")
+label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
+label.set_text("中华人民共和国")
 label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
 label.align(lv.ALIGN.CENTER, 0, 0)
+
+btn = lv.button(screen)
+btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
+label = lv.label(btn)
+label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
+label.set_text('盛思科教')
 
 n = 0
 def cb():  # 每40ms被调用
