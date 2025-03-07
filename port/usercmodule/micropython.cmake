@@ -3,3 +3,5 @@ include(${CMAKE_CURRENT_LIST_DIR}/lv_binding_micropython/bindings.cmake)
 
 # add lcd driver module
 include(${CMAKE_CURRENT_LIST_DIR}/lcd/micropython.cmake)
+
+include(${CMAKE_CURRENT_LIST_DIR}/tts/micropython.cmake)
