@@ -7,4 +7,4 @@ factory,  app,  factory,   0x10000, 0x800000,
 vfs,      data, spiffs,    0x810000, 0x1f0000,
 # font,     data, nvs,      0x400000, 0x200000,
 user_nvs, data, nvs,       0xafc000,  0x4000,
-
+voice_data, data, fat,       0xB00000,  0x3CC800,
