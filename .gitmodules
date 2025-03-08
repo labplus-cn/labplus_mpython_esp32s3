@@ -7,3 +7,6 @@
 [submodule "micropython"]
 	path = micropython
 	url = https://github.com/micropython/micropython.git
+[submodule "port/usercmodule/esp-who/esp-who"]
+	path = port/usercmodule/esp-who/esp-who
+	url = https://github.com/labplus-cn/esp-who.git
