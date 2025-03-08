@@ -1,3 +1,4 @@
+#include <string.h>
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "esp_tts.h"
