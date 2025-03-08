@@ -2,7 +2,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2020, Ha Thach (tinyusb.org)
- * Copyright (c) 2034, HiFiPhile
+ * Copyright (c) 2023, HiFiPhile
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,11 @@
  *
  * This file is part of the TinyUSB stack.
  */
+
+/* metadata:
+   name: STM32 G0B1 Nucleo
+   url: https://www.st.com/en/evaluation-tools/nucleo-g0b1re.html
+*/
 
 #ifndef BOARD_H_
 #define BOARD_H_
