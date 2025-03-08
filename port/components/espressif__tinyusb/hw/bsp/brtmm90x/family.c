@@ -24,7 +24,11 @@
  * This file is part of the TinyUSB stack.
  */
 
-#include "bsp/board.h"
+/* metadata:
+   manufacturer: Bridgetek
+*/
+
+#include "bsp/board_api.h"
 #include "board.h"
 
 #include <ft900.h>

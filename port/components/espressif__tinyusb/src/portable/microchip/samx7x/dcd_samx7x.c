@@ -77,7 +77,7 @@ static tusb_speed_t get_speed(void);
 static void dcd_transmit_packet(xfer_ctl_t * xfer, uint8_t ep_ix);
 
 // DMA descriptors shouldn't be placed in ITCM !
-CFG_TUSB_MEM_SECTION static dma_desc_t dma_desc[6];
+CFG_TUD_MEM_SECTION static dma_desc_t dma_desc[6];
 
 static xfer_ctl_t xfer_status[EP_MAX];
 
@@ -104,9 +104,10 @@ TU_ATTR_ALWAYS_INLINE static inline void CleanInValidateCache(uint32_t *addr, in
 //------------------------------------------------------------------
 
 // Initialize controller to device mode
-void dcd_init (uint8_t rhport)
-{
+bool dcd_init(uint8_t rhport, const tusb_rhport_init_t* rh_init) {
+  (void) rh_init;
   dcd_connect(rhport);
+  return true;
 }
 
 // Enable device interrupt
