@@ -45,10 +45,6 @@ void tts_task(void* param) {
         return;
     }
     esp_tts_handle_t* tts_handle = esp_tts_create(voice);
-    if (!tts_handle || !task_param->text) {
-        printf("Invalid TTS handle or text!\n");
-        return;
-    }
 
     if (esp_tts_parse_chinese(tts_handle, task_param->text)) {
         int len[1]={0};
