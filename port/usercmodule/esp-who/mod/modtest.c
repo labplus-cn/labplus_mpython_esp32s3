@@ -3,7 +3,7 @@
 
 // Define a Python reference to the function we'll make available.
 // See example.cpp for the definition.
-static MP_DEFINE_CONST_FUN_OBJ_0(who_init_obj, esp_who_init);
+static MP_DEFINE_CONST_FUN_OBJ_0(esp_who_test_obj, esp_who_test);
 
 // Define all attributes of the module.
 // Table entries are key/value pairs of the attribute name (a string)
@@ -12,7 +12,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(who_init_obj, esp_who_init);
 // optimized to word-sized integers by the build system (interned strings).
 static const mp_rom_map_elem_t who_test_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_who_test) },
-    { MP_ROM_QSTR(MP_QSTR_who_test), MP_ROM_PTR(&who_init_obj) },
+    { MP_ROM_QSTR(MP_QSTR_test), MP_ROM_PTR(&esp_who_test_obj) },
 };
 static MP_DEFINE_CONST_DICT(who_test_module_globals, who_test_module_globals_table);
 

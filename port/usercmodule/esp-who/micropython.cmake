@@ -8,7 +8,6 @@ add_library(usermod_expample INTERFACE)
 
 target_sources(usermod_expample INTERFACE
         ${CMAKE_CURRENT_LIST_DIR}/mod/test.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/mod/examplemodule.c
 )
 
 set(ESP_CODE_SCANNER_INCLUDEDIRS   ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp-code-scanner/include)
@@ -24,7 +23,6 @@ set(MODULES_INCLUDEDIRS
 )
 
 target_include_directories(usermod_expample INTERFACE
-        ${CMAKE_CURRENT_LIST_DIR}/mod
         ${ESP_CODE_SCANNER_INCLUDEDIRS}
         ${ESP32_CAMERA_INCLUDEDIRS}
         ${MODULES_INCLUDEDIRS}
