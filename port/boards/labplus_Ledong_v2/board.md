@@ -1,15 +1,15 @@
-新建板：labplus_Ledong_v2
+新建板：labplus_Ledong_v2(掌控板pro)
 修改本文档，记录添加板相关修改。
 
-1. port/boards下：mpython_pro到labplus_Ledong_v2，一些通用修改参阅labplus_fro_xuejing下board.md。
+1. port/boards下：复制labplus_fro_xuejing到labplus_Ledong_v2，一些通用修改参阅labplus_fro_xuejing下board.md。
 
 2. 修改bsp_audio_board.h/c文件：
     - 修改IIC IIS引脚定义
-3. 在mpython_pro目录下搜mpython_pro,替换成labplus_Ledong_v2。
-4. port下搜索CONFIG_MPYTHON_PRO_BOARD,替换为CONFIG_LABPLUS_LEDONG_V2_BOARD,用于板相关编译配置
+3. 在labplus_Ledong_v2目录下搜labplus_for_xuejing,替换成labplus_Ledong_v2。
+4. 搜索CONFIG_LABPLUS_FOR_XUEJING_BOARD,替换为CONFIG_LABPLUS_LEDONG_V2_BOARD,用于板相关编译配置
    - sdkconfig.board
    - port/drivers/audio/include/bsp_audio.h加入：
-    #elif CONFIG_LABPLUS_LEDONG_V2_BOARD
+    #elif 替换为CONFIG_LABPLUS_LEDONG_V2_BOARD
     #include "labplus_Ledong_v2/bsp_audio_board.h"
 5. 修改mpconfigboard.h
    mpconfigport.h做了些公用配置，其包含了mpconfigboard.h，用于做板级配置，修改此文件：

@@ -67,10 +67,4 @@ set(MICROPY_SOURCE_BOARD_DIR
 
 set(MPYTHON_PRO_BOARD ON)
 
-list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp-code-scanner)
-list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp-dl)
-list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/modules)
-list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/fb_gfx)
-list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp32-camera)
-
 set(MICROPY_FROZEN_MANIFEST ${MICROPY_BOARD_DIR}/manifest.py)

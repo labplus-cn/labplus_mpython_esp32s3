@@ -21,7 +21,8 @@ mp_obj_t esp_who_test(void)
     register_camera(PIXFORMAT_RGB565, FRAMESIZE_QVGA, 2, xQueueAIFrame);
     register_human_face_detection(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
     // register_cat_face_detection(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
-    register_lcd(xQueueLCDFrame, NULL, true);
+    display_init();
+    display_draw_logo();
     return mp_const_none; 
 }
 

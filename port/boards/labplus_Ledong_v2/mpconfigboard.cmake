@@ -9,7 +9,7 @@ set(SDKCONFIG_DEFAULTS
     boards/sdkconfig.240mhz
     boards/labplus_Ledong_v2/sdkconfig.spiram 
     boards/labplus_Ledong_v2/sdkconfig.board
-    boards/labplus_Ledong_v2/sdkconfig.usb
+    # boards/labplus_Ledong_v2/sdkconfig.usb
 )
 
 if(NOT MPY_PORT_DIR)
@@ -23,7 +23,7 @@ endif()
 set(ADF_COMPS ${ADF_PATH}/components)
 
 set(MICROPY_SOURCE_BOARD
-    ${MICROPY_BOARD_DIR}/main.c
+    # ${MICROPY_BOARD_DIR}/main.c
     ${MICROPY_BOARD_DIR}/bsp_audio_board.c
     ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
     ${MPY_PORT_DIR}/drivers/audio/wave_head.c
@@ -42,7 +42,7 @@ set(MICROPY_SOURCE_BOARD
     ${MPY_PORT_DIR}/drivers/startup/oled.c
     ${MPY_PORT_DIR}/drivers/startup/startup.c 
     ${MPY_PORT_DIR}/drivers/rfid/mfrc522.c
-    ${MPY_PORT_DIR}/lib/utils/pyexec.c
+    # ${MPY_PORT_DIR}/lib/utils/pyexec.c
     ${MPY_PORT_DIR}/builtins/modmusictunes.c
     ${MPY_PORT_DIR}/builtins/modmusic.c
     ${MPY_PORT_DIR}/builtins/esp32_nvs.c
@@ -66,5 +66,11 @@ set(MICROPY_SOURCE_BOARD_DIR
 )
 
 set(LABPLUS_LEDONG_V2_BOARD ON)
+
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp-code-scanner)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp-dl)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/modules)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/fb_gfx)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp32-camera)
 
 set(MICROPY_FROZEN_MANIFEST ${MICROPY_BOARD_DIR}/manifest.py)

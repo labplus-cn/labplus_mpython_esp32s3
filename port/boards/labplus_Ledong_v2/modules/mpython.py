@@ -22,7 +22,7 @@ from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
 
-i2c = I2C(0, scl=Pin(34), sda=Pin(35), freq=400000)
+i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
 if '_print' not in dir(): _print = print
 
@@ -47,161 +47,6 @@ def try_connect_wifi(_wifi, _ssid, _pass, _times):
     except:
         time.sleep(5)
         return try_connect_wifi(_wifi, _ssid, _pass, _times-1)
-
-class Font(object):
-    def __init__(self, font_address=0x400000):
-        self.font_address = font_address
-        buffer = bytearray(18)
-        esp.flash_read(self.font_address, buffer)
-        self.header, \
-            self.height, \
-            self.width, \
-            self.baseline, \
-            self.x_height, \
-            self.Y_height, \
-            self.first_char,\
-            self.last_char = ustruct.unpack('4sHHHHHHH', buffer)
-        self.first_char_info_address = self.font_address + 18
-
-    def GetCharacterData(self, c):
-        uni = ord(c)
-        # if uni not in range(self.first_char, self.last_char):
-        #     return None
-        if (uni < self.first_char or uni > self.last_char):
-            return None
-        char_info_address = self.first_char_info_address + \
-            (uni - self.first_char) * 6
-        buffer = bytearray(6)
-        esp.flash_read(char_info_address, buffer)
-        ptr_char_data, len = ustruct.unpack('IH', buffer)
-        if (ptr_char_data) == 0 or (len == 0):
-            return None
-        buffer = bytearray(len)
-        esp.flash_read(ptr_char_data + self.font_address, buffer)
-        return buffer
-
-
-class TextMode():
-    normal = 1
-    rev = 2
-    trans = 3
-    xor = 4
-
-
-class OLED(SSD1106_I2C):
-    """ 128x64 oled display """
-
-    def __init__(self):
-        super().__init__(128, 64, i2c)
-        self.f = Font()
-        if self.f is None:
-            raise Exception('font load failed')
-
-    def DispChar(self, s, x, y, mode=TextMode.normal, auto_return=False):
-            row = 0
-            str_width = 0
-            if self.f is None:
-                return
-            for c in s:
-                data = self.f.GetCharacterData(c)
-                if data is None:
-                    if auto_return is True:
-                        x = x + self.f.width
-                    else:
-                        x = x + self.width
-                    continue
-                width, bytes_per_line = ustruct.unpack('HH', data[:4])
-                # print('character [%d]: width = %d, bytes_per_line = %d' % (ord(c)
-                # , width, bytes_per_line))
-                if auto_return is True:
-                    if x > self.width - width:
-                        str_width += self.width - x
-                        x = 0
-                        row += 1
-                        y += self.f.height
-                        if y > (self.height - self.f.height)+0:
-                            y, row = 0, 0
-                for h in range(0, self.f.height):
-                    w = 0
-                    i = 0
-                    while w < width:
-                        mask = data[4 + h * bytes_per_line + i]
-                        if (width - w) >= 8:
-                            n = 8
-                        else:
-                            n = width - w
-                        py = y + h
-                        page = py >> 3
-                        bit = 0x80 >> (py % 8)
-                        for p in range(0, n):
-                            px = x + w + p
-                            c = 0
-                            if (mask & 0x80) != 0:
-                                if mode == TextMode.normal or \
-                                        mode == TextMode.trans:
-                                    c = 1
-                                if mode == TextMode.rev:
-                                    c = 0
-                                if mode == TextMode.xor:
-                                    c = self.buffer[page * (self.width if auto_return is True else 128) + px] & bit
-                                    if c != 0:
-                                        c = 0
-                                    else:
-                                        c = 1
-                                super().pixel(px, py, c)
-                            else:
-                                if mode == TextMode.normal:
-                                    c = 0
-                                    super().pixel(px, py, c)
-                                if mode == TextMode.rev:
-                                    c = 1
-                                    super().pixel(px, py, c)
-                            mask = mask << 1
-                        w = w + 8
-                        i = i + 1
-                x = x + width + 1
-                str_width += width + 1
-            return (str_width-1,(x-1, y))
-
-    def DispChar_font(self, font, s, x, y, invert=False):
-        """
-        custom font display.Ref by , https://github.com/peterhinch/micropython-font-to-py
-        :param font:  use font_to_py.py script convert to `py` from `ttf` or `otf`.
-        """
-        screen_width = self.width
-        screen_height = self.height
-        text_row = x
-        text_col = y
-        text_length = 0
-        if font.hmap():
-            font_map = framebuf.MONO_HMSB if font.reverse() else framebuf.MONO_HLSB
-        else:
-            raise ValueError('Font must be horizontally mapped.')
-        for c in s:
-            glyph, char_height, char_width = font.get_ch(c)
-            buf = bytearray(glyph)
-            if invert:
-                for i, v in enumerate(buf):
-                    buf[i] = 0xFF & ~ v
-            fbc = framebuf.FrameBuffer(buf, char_width, char_height, font_map)
-            if text_row + char_width > screen_width - 1:
-                text_length += screen_width-text_row
-                text_row = 0
-                text_col += char_height
-            if text_col + char_height > screen_height + 2:
-                text_col = 0
-
-            super().blit(fbc, text_row, text_col)
-            text_row = text_row + char_width+1
-            text_length += char_width+1
-        return (text_length-1, (text_row-1, text_col))
-
-# display
-if 60 in i2c.scan():
-    oled = OLED()
-    display = oled
-else:
-    pass
 
 class MOTION(object):
     def __init__(self):
@@ -810,22 +655,20 @@ class PinMode(object):
     PWM = 3
     ANALOG = 4
     OUT_DRAIN = 5
-# P4: light P5: A P10: sound P11: B P12: buzzer P21: RGB LED
+# P3: 阻性器件 P5: A P10: sound P11: B P12: buzzer P7: RGB LED
 #                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21    P23 P24 P25 P26 P27 P28
-#                               *  *                *  *   *                          scl  sda *       P  Y   T   H   O   N
-pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 34, 35, 33, -1, 9, 10, 11, 12, 13, 14)
+#                                  *     *          *  *   *                          scl  sda *       P  Y   T   H   O   N
+pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 43, 44,     -1, 9, 10, 11, 12, 13, 14)
 
 class MPythonPin():
     def __init__(self, pin, mode=PinMode.IN, pull=None):
         if mode not in [PinMode.IN, PinMode.OUT, PinMode.PWM, PinMode.ANALOG, PinMode.OUT_DRAIN]:
             raise TypeError("mode must be 'IN, OUT, PWM, ANALOG,OUT_DRAIN'")
-        if pin == 4:
-            raise TypeError("P4 is used for internal light sensor")
         if pin == 10:
             raise TypeError("P10 is used for internalsound sensor")
         if pin == 5 or pin == 11:
             raise TypeError("P5 or P11 is used for internal A B key.")
-        if pin == 21:
+        if pin == 7:
             raise TypeError("P21 is used for internal RGB LED.")
         if pin == 12:
             raise TypeError("P12 is used for internal buzzer.")
@@ -834,29 +677,29 @@ class MPythonPin():
         except IndexError:
             raise IndexError("Out of Pin range")
         if mode == PinMode.IN:
-            if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('IN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
         if mode == PinMode.OUT:
-            if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
-            if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
-            if pin not in [0, 1, 2, 3, 6, 7, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('PWM not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.pwm = PWM(Pin(self.id), duty=0)
         if mode == PinMode.ANALOG:
-            if pin not in [0, 1, 2, 3, 6, 7]:
+            if pin not in [0, 1, 2, 3, 4, 6, 7]:
                 raise TypeError('ANALOG not supported on P%d' % pin)
             self.adc = ADC(Pin(self.id))
             self.adc.atten(ADC.ATTN_11DB)
@@ -957,12 +800,12 @@ class wifi:
         print('disable AP WiFi...')
 
 # 3 rgb leds
-rgb = NeoPixel(Pin(33, Pin.OUT), 3, 3, 1, brightness=0.3)
+rgb = NeoPixel(Pin(8, Pin.OUT), 3, 3, 1, brightness=0.3)
 rgb.write()
 
-# light sensor
-light = ADC(Pin(5))
-light.atten(light.ATTN_11DB)
+# # light sensor
+# light = ADC(Pin(5))
+# light.atten(light.ATTN_11DB)
 
 # sound sensor
 sound = ADC(Pin(6))
@@ -1093,24 +936,24 @@ touchpad_h = touchPad_H = Touch(Pin(12))
 touchpad_o = touchPad_O = Touch(Pin(13))
 touchpad_n = touchPad_N = Touch(Pin(14))
 
-# shield 
-class Ledong_shield(object):
-    def __init__(self):
-        self.speed = 0 
-        self.i2c = i2c
-        self.i2c_addr = 17
+# # shield 
+# class Ledong_shield(object):
+#     def __init__(self):
+#         self.speed = 0 
+#         self.i2c = i2c
+#         self.i2c_addr = 17
 
-    def power_off(self):
-        self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
+#     def power_off(self):
+#         self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
 
-    def get_battery_level(self):
-        self.i2c.writeto(self.i2c_addr, b'\x03', True)
-        tmp = self.i2c.readfrom(self.i2c_addr, 2)
-        data = tmp[1] << 8 +  tmp[0]
-        data = max(min(data, 4200), 3300)
-        return data
+#     def get_battery_level(self):
+#         self.i2c.writeto(self.i2c_addr, b'\x03', True)
+#         tmp = self.i2c.readfrom(self.i2c_addr, 2)
+#         data = tmp[1] << 8 +  tmp[0]
+#         data = max(min(data, 4200), 3300)
+#         return data
 
-ledong_shield = Ledong_shield()
+# ledong_shield = Ledong_shield()
 
 from gui import *
 
