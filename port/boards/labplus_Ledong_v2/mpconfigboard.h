@@ -10,8 +10,8 @@
 #define MICROPY_HW_ENABLE_UART_REPL         (0)
 #define MICROPY_KBD_EXCEPTION               (1)
 
-#define MICROPY_HW_I2C0_SCL                 (35)
-#define MICROPY_HW_I2C0_SDA                 (34)
+#define MICROPY_HW_I2C0_SCL                 (43)
+#define MICROPY_HW_I2C0_SDA                 (44)
 
 #ifndef MICROPY_PY_ESP_MUSIC
 #define MICROPY_PY_ESP_MUSIC                   (1)
