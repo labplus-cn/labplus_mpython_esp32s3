@@ -8,3 +8,6 @@ include(${CMAKE_CURRENT_LIST_DIR}/tts/micropython.cmake)
 
 include(${CMAKE_CURRENT_LIST_DIR}/speechCommand/micropython.cmake)
 
+
+
+include(${CMAKE_CURRENT_LIST_DIR}/tts/micropython.cmake)
