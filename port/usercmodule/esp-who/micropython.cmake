@@ -3,19 +3,12 @@
 # list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules)
 # list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/fb_gfx)
 # list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera)
+add_library(usermod_display INTERFACE)
 
-add_library(usermod_expample INTERFACE)
-
-target_sources(usermod_expample INTERFACE
-        ${CMAKE_CURRENT_LIST_DIR}/mod/test.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/mod/modtest.c
+target_sources(usermod_display INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/mod/moddisplay.c
 )
 
-set(ESP_CODE_SCANNER_INCLUDEDIRS   ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp-code-scanner/include)
-set(ESP32_CAMERA_INCLUDEDIRS 
-        ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera/driver/include
-        ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera/conversions/include
-)
 set(MODULES_INCLUDEDIRS 
         ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/ai
         ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/camera
@@ -23,11 +16,30 @@ set(MODULES_INCLUDEDIRS
         ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/web
 )
 
-target_include_directories(usermod_expample INTERFACE
-        ${ESP_CODE_SCANNER_INCLUDEDIRS}
-        ${ESP32_CAMERA_INCLUDEDIRS}
-        ${MODULES_INCLUDEDIRS}
+set(ESP32_CAMERA_INCLUDEDIRS 
+        ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera/driver/include
+        ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera/conversions/include
 )
 
-target_link_libraries(usermod INTERFACE usermod_expample)
+target_include_directories(usermod_display INTERFACE
+        ${MODULES_INCLUDEDIRS}
+        ${ESP32_CAMERA_INCLUDEDIRS}
+)
+
+target_link_libraries(usermod INTERFACE usermod_display)
+
+if(LABPLUS_LEDONG_V2_BOARD)
+        add_library(usermod_sensor INTERFACE)
+
+        target_sources(usermod_sensor INTERFACE
+                ${CMAKE_CURRENT_LIST_DIR}/mod/modsensor.c
+        )
+
+        target_include_directories(usermod_sensor INTERFACE
+                ${MODULES_INCLUDEDIRS}
+                ${ESP32_CAMERA_INCLUDEDIRS}
+        )
+
+        target_link_libraries(usermod INTERFACE usermod_sensor)
+endif()
 
