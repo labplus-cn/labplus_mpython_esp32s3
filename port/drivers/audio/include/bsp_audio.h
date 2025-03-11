@@ -81,6 +81,7 @@ esp_err_t bsp_audio_play2(const int16_t *data, int length, TickType_t ticks_to_w
  *    - Others                  Fail
  */
 esp_err_t bsp_get_feed_data(bool is_get_raw_channel, int8_t *buffer, int buffer_len);
+esp_err_t bsp_get_feed_data2(bool is_get_raw_channel, int16_t *buffer, int buffer_len);
 
 int bsp_get_feed_channel(void);
 

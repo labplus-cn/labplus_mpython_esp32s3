@@ -357,6 +357,25 @@ esp_err_t bsp_get_feed_data(bool is_get_raw_channel, int8_t *buffer, int buffer_
     return ret;
 }
 
+esp_err_t bsp_get_feed_data2(bool is_get_raw_channel, int16_t *buffer, int buffer_len)
+{
+    esp_err_t ret = ESP_OK;
+    size_t bytes_read;
+    int audio_chunksize = buffer_len / (sizeof(int16_t) * ADC_I2S_CHANNEL);
+
+    ret = esp_codec_dev_read(codec_dev, (void *)buffer, buffer_len);
+    if (!is_get_raw_channel) {
+        for (int i = 0; i < audio_chunksize; i++) {
+            int16_t ref = buffer[4 * i + 0];
+            buffer[3 * i + 0] = buffer[4 * i + 1];
+            buffer[3 * i + 1] = buffer[4 * i + 3];
+            buffer[3 * i + 2] = ref;
+        }
+    }
+
+    return ret;
+}
+
 int bsp_get_feed_channel(void)
 {
     return ADC_I2S_CHANNEL;
