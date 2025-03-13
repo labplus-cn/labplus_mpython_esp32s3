@@ -10,7 +10,7 @@
 # ledong_pro 202411
 
 from machine import I2C, PWM, Pin, ADC, TouchPad
-from ssd1106 import SSD1106_I2C
+# from ssd1106 import SSD1106_I2C
 import esp, math, time, network
 import ustruct, array
 from neopixel import NeoPixel
@@ -21,6 +21,7 @@ import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
+from ltr308 import *
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
@@ -32,6 +33,11 @@ def print(_t, *args, sep=' ', end='\n'):
         _print(' ' + str(_t), *args, sep=sep, end=end)
     else:
         _print(_t, *args, sep=sep, end=end)
+
+def numberMap(inputNum, bMin, bMax, cMin, cMax):
+    outputNum = 0
+    outputNum = ((cMax - cMin) / (bMax - bMin)) * (inputNum - bMin) + cMin
+    return outputNum
 
 # my_wifi = wifi()
 #多次尝试连接wifi
@@ -803,9 +809,8 @@ class wifi:
 rgb = NeoPixel(Pin(8, Pin.OUT), 3, 3, 1, brightness=0.3)
 rgb.write()
 
-# # light sensor
-# light = ADC(Pin(5))
-# light.atten(light.ATTN_11DB)
+# light sensor LTR-308ALS 
+light = LTR_308ALS(i2c)
 
 # sound sensor
 sound = ADC(Pin(6))
@@ -957,7 +962,3 @@ touchpad_n = touchPad_N = Touch(Pin(14))
 
 from gui import *
 
-def numberMap(inputNum, bMin, bMax, cMin, cMax):
-    outputNum = 0
-    outputNum = ((cMax - cMin) / (bMax - bMin)) * (inputNum - bMin) + cMin
-    return outputNum
