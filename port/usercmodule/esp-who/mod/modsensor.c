@@ -3,14 +3,18 @@
 #include "esp_camera.h"
 
 camera_fb_t *frame = NULL;
+static mp_obj_base_t *i2c_obj = NULL;
 
-static mp_obj_t reset(void)
+static mp_obj_t reset(mp_obj_t i2c)
 {
-    camera_init(PIXFORMAT_RGB565, FRAMESIZE_240X240, 2);
+    if(!i2c_obj)
+    i2c_obj = (mp_obj_base_t *)MP_OBJ_TO_PTR(i2c);
+    
+    camera_init(PIXFORMAT_RGB565, FRAMESIZE_QVGA, 2);
 
     return mp_const_none; 
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(sensor_reset_obj, reset);
+static MP_DEFINE_CONST_FUN_OBJ_1(sensor_reset_obj, reset);
 
 static mp_obj_t snapshot(void)
 {
