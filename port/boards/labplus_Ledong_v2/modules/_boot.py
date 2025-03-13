@@ -5,6 +5,7 @@ from flashbdev import bdev
 from neopixel import NeoPixel
 import machine 
 import ubinascii
+import display
 
 # 上电后立即关闭rgb,防止随机灯亮问题
 _rgb = NeoPixel(machine.Pin(8, machine.Pin.OUT), 4, 3, 1,0.1)

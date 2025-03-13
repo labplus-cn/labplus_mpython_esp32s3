@@ -125,74 +125,74 @@
 '''
 TFT LCD
 '''
-# import lvgl_esp32
-# import os
+import lvgl_esp32
+import os
 
-# # Adapt these values for your own configuration
-# spi = lvgl_esp32.SPI(
-#     2,
-#     baudrate=80_000_000,
-#     sck=36,
-#     mosi=37,
-#     miso=8,
-# )
-# spi.init()
+# Adapt these values for your own configuration
+spi = lvgl_esp32.SPI(
+    2,
+    baudrate=80_000_000,
+    sck=36,
+    mosi=37,
+    miso=8,
+)
+spi.init()
 
-# display = lvgl_esp32.Display(
-#     spi=spi,
-#     width=320,
-#     height=172,
-#     gap_x=0,
-#     gap_y=34,
-#     swap_xy=True,
-#     mirror_x=True,
-#     mirror_y=True,
-#     invert= False,
-#     bgr=True,
-#     reset=7,
-#     dc=35,
-#     cs=34,
-#     pixel_clock=20_000_000,
-# )
-# display.init()
+display = lvgl_esp32.Display(
+    spi=spi,
+    width=320,
+    height=172,
+    gap_x=0,
+    gap_y=34,
+    swap_xy=True,
+    mirror_x=True,
+    mirror_y=True,
+    invert= False,
+    bgr=True,
+    reset=7,
+    dc=35,
+    cs=34,
+    pixel_clock=20_000_000,
+)
+display.init()
 
-# import lvgl as lv
-# import lvgl_esp32
-# from machine import Pin
+import lvgl as lv
+import lvgl_esp32
+from machine import Pin
 
-# bl = Pin(33, mode = Pin.OUT, pull = Pin.PULL_UP)
-# bl.value(1)
+bl = Pin(33, mode = Pin.OUT, pull = Pin.PULL_UP)
+bl.value(1)
 
-# wrapper = lvgl_esp32.Wrapper(display)
-# wrapper.init()
+wrapper = lvgl_esp32.Wrapper(display)
+wrapper.init()
 
-# from lv_utils import event_loop
+from lv_utils import event_loop
 
-# screen = lv.screen_active()
-# screen.set_style_bg_color(lv.color_hex(0x000000), lv.PART.MAIN)
+screen = lv.screen_active()
+screen.set_style_bg_color(lv.color_hex(0x000000), lv.PART.MAIN)
 
-# label = lv.label(screen)
-# label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
-# label.set_text("中华人民共和国")
-# label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
-# label.align(lv.ALIGN.CENTER, 0, 0)
+label = lv.label(screen)
+label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
+label.set_text("中华人民共和国")
+label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
+label.align(lv.ALIGN.CENTER, 0, 0)
 
-# btn = lv.button(screen)
-# btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
-# label = lv.label(btn)
-# label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
-# label.set_text('盛思科教')
+btn = lv.button(screen)
+btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
+label = lv.label(btn)
+label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
+label.set_text('盛思科教')
 
-# n = 0
-# def cb():  # 每40ms被调用
-#     # global n
-#     # n = n + 1
-#     # if n > 10000:
-#     #     n = 0
-#     # label.set_text(str(n))
-#     pass
+n = 0
+def cb():  # 每40ms被调用
+    # global n
+    # n = n + 1
+    # if n > 10000:
+    #     n = 0
+    # label.set_text(str(n))
+    pass
 
-# event = event_loop(refresh_cb = cb)
+event = event_loop(refresh_cb = cb)
 
 # scr = lv.obj()
 # scr.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
@@ -218,40 +218,3 @@ TFT LCD
 
 # while True:
 #     lv.timer_handler_run_in_period(100)
-
-color = [0xFE19,
-0xFDB8,
-0xF8B2,
-0x8010,
- 0x939B,
-  0x001F,
-  0xAEDC,
- 0x0019,
-0x0011,
-0x867D,
-0x07FF,
-0xE7FF,
-0x0451,
-0x0400,
-0x9772,
-0x0320,
-0xAFE5,
-0xFFFC,
-0xFFE0,
-0xFEA0,
-0xFD20,
-0xF800,
-0x8800,
-0xA145,
-0xFFFF,
- 0x8410,
-0xD69A,
-0xAD55,
-0x0000]
-
-for i in color:
-    r = (i & 0xF800) >> 11
-    g = (i & 0x7e0) >> 5
-    b = (i & 0x1f)
-    Color16 = (b << 11) | (g << 5) | r
-    print('0x%04x' %Color16)
