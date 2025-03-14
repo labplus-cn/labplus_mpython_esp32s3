@@ -961,5 +961,5 @@ touchpad_n = touchPad_N = Touch(Pin(14))
 
 # ledong_shield = Ledong_shield()
 
-from gui import *
+# from gui import *
 

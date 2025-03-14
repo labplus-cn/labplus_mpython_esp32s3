@@ -7,10 +7,10 @@
 # history:
 # V1.1 add oled draw function,add buzz.freq().  by tangliufeng
 # V1.2 add servo/ui class,by tangliufeng
-# ledong_pro 202411
+# labplus_Ledong_v2 202411
 
 from machine import I2C, PWM, Pin, ADC, TouchPad
-from ssd1106 import SSD1106_I2C
+# from ssd1106 import SSD1106_I2C
 import esp, math, time, network
 import ustruct, array
 from neopixel import NeoPixel
@@ -21,6 +21,7 @@ import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
+from ltr308 import *
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
@@ -513,12 +514,12 @@ class Magnetic(object):
             return (math.sqrt(math.pow(self.get_x(), 2) + pow(self.get_y(), 2) + pow(self.get_z(), 2)))
 
     def calibrate(self):
-        oled.fill(0)
-        oled.DispChar("步骤1:", 0,0,1)
-        oled.DispChar("如图",0,26,1)
-        oled.DispChar("转几周",0,43,1)
-        oled.bitmap(64,0,calibrate_img.rotate,64,64,1)
-        oled.show()
+        # oled.fill(0)
+        # oled.DispChar("步骤1:", 0,0,1)
+        # oled.DispChar("如图",0,26,1)
+        # oled.DispChar("转几周",0,43,1)
+        # oled.bitmap(64,0,calibrate_img.rotate,64,64,1)
+        # oled.show()
         self._get_raw()
         min_x = max_x = self.raw_x
         min_y = max_y = self.raw_y
@@ -534,12 +535,12 @@ class Magnetic(object):
         self.cali_offset_x = (max_x + min_x) / 2
         self.cali_offset_y = (max_y + min_y) / 2
         print('cali_offset_x: ' + str(self.cali_offset_x) + '  cali_offset_y: ' + str(self.cali_offset_y))
-        oled.fill(0)
-        oled.DispChar("步骤2:", 85,0,1)
-        oled.DispChar("如图",85,26,1)
-        oled.DispChar("转几周",85,43,1)
-        oled.bitmap(0,0,calibrate_img.rotate1,64,64,1)
-        oled.show()
+        # oled.fill(0)
+        # oled.DispChar("步骤2:", 85,0,1)
+        # oled.DispChar("如图",85,26,1)
+        # oled.DispChar("转几周",85,43,1)
+        # oled.bitmap(0,0,calibrate_img.rotate1,64,64,1)
+        # oled.show()
         ticks_start = time.ticks_ms()
         while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
             self._get_raw()
@@ -550,10 +551,10 @@ class Magnetic(object):
   
         print('cali_offset_z: ' + str(self.cali_offset_z))
 
-        oled.fill(0)
-        oled.DispChar("校准完成", 40,24,1)
-        oled.show()
-        oled.fill(0)
+        # oled.fill(0)
+        # oled.DispChar("校准完成", 40,24,1)
+        # oled.show()
+        # oled.fill(0)
 
     def get_heading(self):
         if(self.chip==1):
@@ -800,12 +801,12 @@ class wifi:
         print('disable AP WiFi...')
 
 # 3 rgb leds
-rgb = NeoPixel(Pin(8, Pin.OUT), 3, 3, 1, brightness=0.3)
+rgb = NeoPixel(Pin(16, Pin.OUT), 3, 3, 1, brightness=0.3)
 rgb.write()
 
-# # light sensor
-# light = ADC(Pin(5))
-# light.atten(light.ATTN_11DB)
+
+# light sensor LTR-308ALS 
+light = LTR_308ALS(i2c)
 
 # sound sensor
 sound = ADC(Pin(6))
@@ -936,26 +937,27 @@ touchpad_h = touchPad_H = Touch(Pin(12))
 touchpad_o = touchPad_O = Touch(Pin(13))
 touchpad_n = touchPad_N = Touch(Pin(14))
 
-# # shield 
-# class Ledong_shield(object):
-#     def __init__(self):
-#         self.speed = 0 
-#         self.i2c = i2c
-#         self.i2c_addr = 17
+# motor controller
 
-#     def power_off(self):
-#         self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
+class Ledong_shield(object):
+    def __init__(self):
+        self.speed = 0 
+        self.i2c = i2c
+        self.i2c_addr = 17
 
-#     def get_battery_level(self):
-#         self.i2c.writeto(self.i2c_addr, b'\x03', True)
-#         tmp = self.i2c.readfrom(self.i2c_addr, 2)
-#         data = tmp[1] << 8 +  tmp[0]
-#         data = max(min(data, 4200), 3300)
-#         return data
+    def power_off(self):
+        self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
 
-# ledong_shield = Ledong_shield()
+    def get_battery_level(self):
+        self.i2c.writeto(self.i2c_addr, b'\x03', True)
+        tmp = self.i2c.readfrom(self.i2c_addr, 2)
+        data = tmp[1] << 8 +  tmp[0]
+        data = max(min(data, 4200), 3300)
+        return data
 
-from gui import *
+ledong_shield = Ledong_shield()
+
+# from gui import *
 
 def numberMap(inputNum, bMin, bMax, cMin, cMax):
     outputNum = 0
