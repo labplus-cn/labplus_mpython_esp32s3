@@ -42,9 +42,14 @@ class LTR_308ALS:
         self._device = i2c_bus
         self._address = LTR_308ALS_ADDRESS
         self._gain = gain
+        addr = self._device.scan()
+        if LTR_308ALS_ADDRESS in addr:
+            pass
+        else:
+            raise AttributeError("LTR_308ALS01 Light sensor init error")
 
         if self._chip_id() != 0xB1:
-            raise AttributeError("Cannot find a LTR_308ALS Light sensor")
+            raise AttributeError("Cannot find a LTR_308ALS01 Light sensor")
             
         self._enable() 
         time.sleep(0.2)
@@ -55,7 +60,7 @@ class LTR_308ALS:
         self._device.writeto_mem(self._address,reg,val.to_bytes(1, 'little'))
 
 	# Read memory address
-    def _rreg(self, reg,nbytes=1):
+    def _rreg(self, reg, nbytes=1):
         return self._device.readfrom_mem(self._address, reg, nbytes)[0] if nbytes<=1 else self._device.readfrom_mem(self._address, reg, nbytes)[0:nbytes]
 
     def _chip_id(self):  
@@ -65,9 +70,12 @@ class LTR_308ALS:
         self._wreg(LTR_308ALS_REG_CTRL,LTR_308ALS_CMD_ALS_Enable)
         
     def read(self): # 单位：勒克斯
-        buffer = self._rreg(LTR_308ALS_REG_DATA,3)
-        als_data = buffer[2]<<16 | buffer[1]<<8 | buffer[0]
-        als_lux = round(float(0.6*als_data/_GAINS_X[self._gain]),2)
-        return als_lux
+        try:
+            buffer = self._rreg(LTR_308ALS_REG_DATA,3)
+            als_data = buffer[2]<<16 | buffer[1]<<8 | buffer[0]
+            als_lux = round(float(0.6*als_data/_GAINS_X[self._gain]),2)
+            return als_lux
+        except:
+            return -1
 
 

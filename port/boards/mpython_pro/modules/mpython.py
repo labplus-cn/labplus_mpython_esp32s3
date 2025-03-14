@@ -519,12 +519,12 @@ class Magnetic(object):
             return (math.sqrt(math.pow(self.get_x(), 2) + pow(self.get_y(), 2) + pow(self.get_z(), 2)))
 
     def calibrate(self):
-        oled.fill(0)
-        oled.DispChar("步骤1:", 0,0,1)
-        oled.DispChar("如图",0,26,1)
-        oled.DispChar("转几周",0,43,1)
-        oled.bitmap(64,0,calibrate_img.rotate,64,64,1)
-        oled.show()
+        # oled.fill(0)
+        # oled.DispChar("步骤1:", 0,0,1)
+        # oled.DispChar("如图",0,26,1)
+        # oled.DispChar("转几周",0,43,1)
+        # oled.bitmap(64,0,calibrate_img.rotate,64,64,1)
+        # oled.show()
         self._get_raw()
         min_x = max_x = self.raw_x
         min_y = max_y = self.raw_y
@@ -540,12 +540,12 @@ class Magnetic(object):
         self.cali_offset_x = (max_x + min_x) / 2
         self.cali_offset_y = (max_y + min_y) / 2
         print('cali_offset_x: ' + str(self.cali_offset_x) + '  cali_offset_y: ' + str(self.cali_offset_y))
-        oled.fill(0)
-        oled.DispChar("步骤2:", 85,0,1)
-        oled.DispChar("如图",85,26,1)
-        oled.DispChar("转几周",85,43,1)
-        oled.bitmap(0,0,calibrate_img.rotate1,64,64,1)
-        oled.show()
+        # oled.fill(0)
+        # oled.DispChar("步骤2:", 85,0,1)
+        # oled.DispChar("如图",85,26,1)
+        # oled.DispChar("转几周",85,43,1)
+        # oled.bitmap(0,0,calibrate_img.rotate1,64,64,1)
+        # oled.show()
         ticks_start = time.ticks_ms()
         while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
             self._get_raw()
@@ -556,10 +556,11 @@ class Magnetic(object):
   
         print('cali_offset_z: ' + str(self.cali_offset_z))
 
-        oled.fill(0)
-        oled.DispChar("校准完成", 40,24,1)
-        oled.show()
-        oled.fill(0)
+        # oled.fill(0)
+        # oled.DispChar("校准完成", 40,24,1)
+        # oled.show()
+        # oled.fill(0)
+        print("校准完成")
 
     def get_heading(self):
         if(self.chip==1):
