@@ -945,6 +945,14 @@ class Ledong_shield(object):
         self.i2c = i2c
         self.i2c_addr = 17
 
+    def set_motor(self, motor_num, speed):
+        self.speed = speed
+        if self.speed > 100:
+            self.speed = 100
+        if self.speed < -100:
+            self.speed = -100
+        self.i2c.writeto(self.i2c_addr, bytearray([motor_num, self.speed]), True)
+
     def power_off(self):
         self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
 
