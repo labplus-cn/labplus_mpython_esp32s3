@@ -160,6 +160,29 @@ static mp_obj_t draw_logo(void)
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(display_draw_logo_obj, draw_logo);
 
+static mp_obj_t draw_color(mp_obj_t color)
+{
+    int _color = mp_obj_get_int(color);
+
+    uint16_t *buffer = (uint16_t *)malloc(BOARD_LCD_H_RES * sizeof(uint16_t));
+    if (NULL == buffer){
+        ESP_LOGE(TAG, "Memory for bitmap is not enough");
+    }else{
+        for (size_t i = 0; i < BOARD_LCD_H_RES; i++){
+            buffer[i] = _color;
+        }
+
+        for (int y = 0; y < BOARD_LCD_V_RES; y++){
+            esp_lcd_panel_draw_bitmap(lcd->panel, 0, y, BOARD_LCD_H_RES, y+1, buffer);
+        }
+
+        free(buffer);
+    }
+
+    return mp_const_none; 
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(display_draw_color_obj, draw_color);
+
 static const mp_rom_map_elem_t lcd_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_lcd) },
     { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&lcd_init_obj) },
@@ -167,6 +190,39 @@ static const mp_rom_map_elem_t lcd_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&lcd_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&lcd_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_draw_logo), MP_ROM_PTR(&display_draw_logo_obj) },
+    { MP_ROM_QSTR(MP_QSTR_draw_color), MP_ROM_PTR(&display_draw_color_obj) },
+    { MP_ROM_QSTR(MP_QSTR_PINK), MP_ROM_INT(GUI_Pink) },
+    { MP_ROM_QSTR(MP_QSTR_DEEP_PINK), MP_ROM_INT(GUI_DeepPink) },
+    { MP_ROM_QSTR(MP_QSTR_PURPLE), MP_ROM_INT(GUI_Purple) },
+    { MP_ROM_QSTR(MP_QSTR_BLUE), MP_ROM_INT(GUI_Blue) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_BLUE), MP_ROM_INT(GUI_LightBLue) },
+    { MP_ROM_QSTR(MP_QSTR_MEDIUM_BLUE), MP_ROM_INT(GUI_MediumBlue) },
+    { MP_ROM_QSTR(MP_QSTR_DARK_BLUE), MP_ROM_INT(GUI_DarkBlue) },
+    { MP_ROM_QSTR(MP_QSTR_SKY_BLUE), MP_ROM_INT(GUI_SkyBlue) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_CYAN), MP_ROM_INT(GUI_LightCyan) },
+    { MP_ROM_QSTR(MP_QSTR_DARK_CYAN), MP_ROM_INT(GUI_DarkCyan) },
+    { MP_ROM_QSTR(MP_QSTR_GREEN), MP_ROM_INT(GUI_Green) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_GREEN), MP_ROM_INT(GUI_LightGreen) },
+    { MP_ROM_QSTR(MP_QSTR_DARK_GREEN), MP_ROM_INT(GUI_DarkGreen) },
+    { MP_ROM_QSTR(MP_QSTR_GREEN_YELLOW), MP_ROM_INT(GUI_GreenYellow) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_YELLOW), MP_ROM_INT(GUI_LightYellow) },
+    { MP_ROM_QSTR(MP_QSTR_YELLO), MP_ROM_INT(GUI_Yellow) },
+    { MP_ROM_QSTR(MP_QSTR_ORANGE), MP_ROM_INT(GUI_Orange) },
+    { MP_ROM_QSTR(MP_QSTR_RED), MP_ROM_INT(GUI_Red) },
+    { MP_ROM_QSTR(MP_QSTR_DARK_RED), MP_ROM_INT(GUI_DarkRed) },
+    { MP_ROM_QSTR(MP_QSTR_WHITE), MP_ROM_INT(GUI_White) },
+    { MP_ROM_QSTR(MP_QSTR_GRAY), MP_ROM_INT(GUI_Gray) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_GRAY), MP_ROM_INT(GUI_LightGray) },
+    { MP_ROM_QSTR(MP_QSTR_DARK_GRAY), MP_ROM_INT(GUI_DarkGray) },
+    { MP_ROM_QSTR(MP_QSTR_BLACK), MP_ROM_INT(GUI_Black) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_SKY_BLUE), MP_ROM_INT(GUI_LightSkyBlue) },
+    { MP_ROM_QSTR(MP_QSTR_DEEP_SKY_BLUE), MP_ROM_INT(GUI_DeepSkyBlue) },
+    { MP_ROM_QSTR(MP_QSTR_CYAN), MP_ROM_INT(GUI_Cyan) },
+    { MP_ROM_QSTR(MP_QSTR_SPRING_GREEN), MP_ROM_INT(GUI_SpringGreen) },
+    { MP_ROM_QSTR(MP_QSTR_GOLD), MP_ROM_INT(GUI_Gold) },
+    { MP_ROM_QSTR(MP_QSTR_DARK_ORANGE), MP_ROM_INT(GUI_DarkOrange) },
+    { MP_ROM_QSTR(MP_QSTR_BROWN), MP_ROM_INT(GUI_Brown) },
+    { MP_ROM_QSTR(MP_QSTR_LIGHT_GRAY), MP_ROM_INT(GUI_LightGray) },
 };
 
 static MP_DEFINE_CONST_DICT(lcd_module_globals, lcd_module_globals_table);
