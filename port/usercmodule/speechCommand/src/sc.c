@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_process_sdkconfig.h"
@@ -19,27 +20,6 @@ static esp_afe_sr_iface_t *afe_handle = NULL;
 static esp_afe_sr_data_t *afe_data = NULL;
 static volatile int task_flag = 0;
 srmodel_list_t *models = NULL;
-static int play_voice = -2;
-
-void play_music(void *arg)
-{
-    while (task_flag) {
-        switch (play_voice) {
-        case -2:
-            vTaskDelay(10);
-            break;
-        case -1:
-            wake_up_action();
-            play_voice = -2;
-            break;
-        default:
-            speech_commands_action(play_voice);
-            play_voice = -2;
-            break;
-        }
-    }
-    vTaskDelete(NULL);
-}
 
 //void feed_Task(void *arg)
 //{
@@ -151,7 +131,12 @@ void feed_Task(void *arg)
     assert(i2s_buff);
 
     while (task_flag) {
-        bsp_get_feed_data(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
+        bsp_get_feed_data2(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
+
+//        int total_samples = audio_chunksize * feed_channel;
+//        for (int i = 0; i < total_samples; i++) {
+//            printf("i2s_buff[%d] = %d\n", i, i2s_buff[i]);
+//        }
 
         afe_handle->feed(afe_data, i2s_buff);
     }
@@ -176,7 +161,7 @@ void detect_Task(void *arg)
             printf("fetch error!\n");
             break;
         }
-        // printf("vad state: %d\n", res->vad_state);
+//         printf("vad state: %d\n", res->vad_state);
 
         if (res->wakeup_state == WAKENET_DETECTED) {
             printf("wakeword detected\n");
@@ -195,7 +180,8 @@ void sc_init()
 
     models = esp_srmodel_init("sr_module");
 
-    afe_config_t *afe_config = afe_config_init("MMNR", models, AFE_TYPE_SR, AFE_MODE_LOW_COST);
+    afe_config_t *afe_config = afe_config_init("MNMN", models, AFE_TYPE_SR, SR_MODE_HIGH_PERF);
+    printf("wakenet_init: %s\n",afe_config->wakenet_init ? "true" : "false");
     afe_handle = esp_afe_handle_from_config(afe_config);
     esp_afe_sr_data_t *afe_data = afe_handle->create_from_config(afe_config);
     afe_config_free(afe_config);
