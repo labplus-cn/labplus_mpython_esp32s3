@@ -125,47 +125,17 @@
 '''
 TFT LCD
 '''
-import lvgl_esp32
 import os
-
-# Adapt these values for your own configuration
-spi = lvgl_esp32.SPI(
-    2,
-    baudrate=80_000_000,
-    sck=36,
-    mosi=37,
-    miso=8,
-)
-spi.init()
-
-display = lvgl_esp32.Display(
-    spi=spi,
-    width=320,
-    height=172,
-    gap_x=0,
-    gap_y=34,
-    swap_xy=True,
-    mirror_x=True,
-    mirror_y=True,
-    invert= False,
-    bgr=True,
-    reset=7,
-    dc=35,
-    cs=34,
-    pixel_clock=20_000_000,
-)
-display.init()
-
 import lvgl as lv
-import lvgl_esp32
+import lcd
+import lv_displayer
 from machine import Pin
 
 bl = Pin(33, mode = Pin.OUT, pull = Pin.PULL_UP)
 bl.value(1)
 
-wrapper = lvgl_esp32.Wrapper(display)
-wrapper.init()
-
+lcd.init()
+lv_displayer.init()
 from lv_utils import event_loop
 
 screen = lv.screen_active()

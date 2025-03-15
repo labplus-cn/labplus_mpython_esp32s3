@@ -1,16 +1,14 @@
-add_library(usermod_lcd INTERFACE)
+add_library(usermod_display INTERFACE)
 
-target_sources(usermod_lcd INTERFACE
-        ${CMAKE_CURRENT_LIST_DIR}/src/spi.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/display.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/wrapper.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/module.c
+target_sources(usermod_display INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/modlcd.c
+        ${CMAKE_CURRENT_LIST_DIR}/modlvdisplayer.c
 )
 
-target_include_directories(usermod_lcd INTERFACE
+target_include_directories(usermod_display INTERFACE
         ${IDF_PATH}/components/esp_lcd/include/
         ${CMAKE_CURRENT_LIST_DIR}/../lv_binding_micropython/lvgl
         ${CMAKE_CURRENT_LIST_DIR}/../lv_binding_micropython/lvgl/src
 )
 
-target_link_libraries(usermod INTERFACE usermod_lcd)
+target_link_libraries(usermod INTERFACE usermod_display)
