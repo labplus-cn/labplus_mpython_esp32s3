@@ -194,6 +194,7 @@ import sensor
 import lvgl as lv
 import lcd
 import lv_displayer
+import time
 
 from lv_utils import event_loop
 def cb():  # 每40ms被调用
@@ -209,15 +210,25 @@ event = event_loop(refresh_cb = cb)
 sensor.reset(i2c)
 t = sensor.snapshot()
 
-img = lv.image_dsc_t({
-  'data_size': t[0]*t[1]*2,
-  'data': t[2]
-})
+# img = lv.image_dsc_t({
+#   'data_size': t[0]*t[1]*2,
+#   'data': t[2]
+# })
 
 scr = lv.obj()
 img1 = lv.image(scr)
-img1.set_src(img)
+# img1.set_src(img)
 lv.screen_load(scr)
+
+while True:
+    t = sensor.snapshot()
+    img = lv.image_dsc_t({
+      'data_size': t[0]*t[1]*2,
+      'data': t[2]
+    })
+    img1.set_src(img)
+    sensor.free_fb()
+    time.sleep_ms(100)
 
 
 
