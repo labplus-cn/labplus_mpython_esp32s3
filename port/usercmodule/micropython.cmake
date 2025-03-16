@@ -7,5 +7,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/lcd/micropython.cmake)
 
 # add esp-who module
 include(${CMAKE_CURRENT_LIST_DIR}/esp-who/micropython.cmake)
-# include(${CMAKE_CURRENT_LIST_DIR}/cppexample/micropython.cmake)
+if(LABPLUS_LEDONG_V2_BOARD)
+include(${CMAKE_CURRENT_LIST_DIR}/touchpad/micropython.cmake)
+endif()
 endif()
