@@ -1,14 +1,33 @@
 #include "py/runtime.h"
 #include "who_camera.h"
 #include "esp_camera.h"
+#include "esp_log.h"
+#include "driver/gpio.h"
+#include "driver/i2c.h"
 
-camera_fb_t *frame = NULL;
-static mp_obj_base_t *i2c_obj = NULL;
+// camera_fb_t *frame = NULL;
+typedef struct _machine_hw_i2c_obj_t {
+    mp_obj_base_t base;
+    i2c_port_t port : 8;
+    gpio_num_t scl : 8;
+    gpio_num_t sda : 8;
+} machine_hw_i2c_obj_t;
+static machine_hw_i2c_obj_t *i2c_obj = NULL;
+
+typedef struct _camera_fb_obj_t
+{
+    mp_obj_base_t base;
+    camera_fb_t *frame;
+}camera_fb_obj_t;
+
+camera_fb_obj_t *camera_fb_obj;
 
 static mp_obj_t reset(mp_obj_t i2c)
 {
-    if(!i2c_obj)
-    i2c_obj = (mp_obj_base_t *)MP_OBJ_TO_PTR(i2c);
+    if(!i2c_obj){
+        i2c_obj = (machine_hw_i2c_obj_t *)MP_OBJ_TO_PTR(i2c);
+    }
+    
     
     camera_init(PIXFORMAT_RGB565, FRAMESIZE_QVGA, 2);
 
@@ -18,22 +37,48 @@ static MP_DEFINE_CONST_FUN_OBJ_1(sensor_reset_obj, reset);
 
 static mp_obj_t snapshot(void)
 {
-    frame = esp_camera_fb_get();
+    camera_fb_obj->frame = esp_camera_fb_get();
+    ESP_LOGI("tag", "frame addr: %p", &camera_fb_obj);
 
-    return MP_OBJ_FROM_PTR(frame);
+    mp_obj_t items[] = {MP_OBJ_NEW_SMALL_INT(camera_fb_obj->frame->width), 
+                        MP_OBJ_NEW_SMALL_INT(camera_fb_obj->frame->height),
+                        mp_obj_new_bytes(camera_fb_obj->frame->buf, camera_fb_obj->frame->len) };
+    return mp_obj_new_tuple(3, items);
+    return MP_OBJ_FROM_PTR(camera_fb_obj);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sensor_snapshot_obj, snapshot);
 
 static mp_obj_t free_fb(void)
 {
-    esp_camera_fb_return(frame);
+    esp_camera_fb_return(camera_fb_obj->frame);
 
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sensor_free_fb_obj, free_fb);
 
+mp_obj_t sensor_init(void)
+{
+    if(!camera_fb_obj){
+        camera_fb_obj = calloc(1, sizeof(camera_fb_obj_t));
+    }
+    return mp_obj_new_int_from_uint(0);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(sensor_init_obj, sensor_init);
+
+mp_obj_t sensor_deinit(void)
+{
+    if(!camera_fb_obj){
+        free(camera_fb_obj);
+    }
+    return mp_obj_new_int_from_uint(0);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(sensor_deinit_obj, sensor_deinit);
+
 static const mp_rom_map_elem_t sensor_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sensor) },
+    { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&sensor_init_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&sensor_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&sensor_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&sensor_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&sensor_snapshot_obj) },
     { MP_ROM_QSTR(MP_QSTR_free_fb), MP_ROM_PTR(&sensor_free_fb_obj) },

@@ -188,3 +188,36 @@ event = event_loop(refresh_cb = cb)
 
 # while True:
 #     lv.timer_handler_run_in_period(100)
+
+from mpython import i2c
+import sensor
+import lvgl as lv
+import lcd
+import lv_displayer
+
+from lv_utils import event_loop
+def cb():  # 每40ms被调用
+    # global n
+    # n = n + 1
+    # if n > 10000:
+    #     n = 0
+    # label.set_text(str(n))
+    pass
+
+event = event_loop(refresh_cb = cb)
+
+sensor.reset(i2c)
+t = sensor.snapshot()
+
+img = lv.image_dsc_t({
+  'data_size': t[0]*t[1]*2,
+  'data': t[2]
+})
+
+scr = lv.obj()
+img1 = lv.image(scr)
+img1.set_src(img)
+lv.screen_load(scr)
+
+
+
