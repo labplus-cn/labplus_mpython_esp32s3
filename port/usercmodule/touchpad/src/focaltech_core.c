@@ -37,45 +37,6 @@
 /*****************************************************************************
  * Private constant and macro definitions using #define
  *****************************************************************************/
-#define FTS_CMD_START_DELAY 12
-
-/* register address */
-#define FTS_REG_WORKMODE 0x00
-#define FTS_REG_WORKMODE_FACTORY_VALUE 0x40
-#define FTS_REG_WORKMODE_SCAN_VALUE 0xC0
-#define FTS_REG_FLOW_WORK_CNT 0x91
-#define FTS_REG_POWER_MODE 0xA5
-#define FTS_REG_GESTURE_EN 0xD0
-#define FTS_REG_GESTURE_ENABLE 0x01
-#define FTS_REG_GESTURE_OUTPUT_ADDRESS 0xD3
-
-/*Max point numbers of gesture trace*/
-#define MAX_POINTS_GESTURE_TRACE 6
-/*Length of gesture information*/
-#define MAX_LEN_GESTURE_INFO (MAX_POINTS_GESTURE_TRACE * 4 + 2)
-
-/*Max point numbers of touch trace*/
-#define MAX_POINTS_TOUCH_TRACE 2
-/*Length of touch information*/
-#define MAX_LEN_TOUCH_INFO (MAX_POINTS_TOUCH_TRACE * 6 + 2)
-
-/*Max touch points that touch controller supports*/
-#define FTS_MAX_POINTS_SUPPORT 10
-
-
-
-#define	INT_PIN						                45
-#define	RST_PIN						                -1
-
-#define I2C_MASTER_SCL_IO           43                         /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           44                         /*!< GPIO number used for I2C master data  */
-#define I2C_MASTER_NUM              0                          /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
-#define I2C_MASTER_FREQ_HZ          200000                     /*!< I2C master clock frequency */
-#define I2C_MASTER_TX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_TIMEOUT_MS       1000
-
-#define I2C_PEER_ADDR      0x38
 static QueueHandle_t gpio_evt_queue = NULL;
 
 
@@ -529,7 +490,7 @@ static int fts_gesture_process(uint8_t *buf)
  * Return:
  *   return 0 if getting and parsing touch points successfully, otherwise error code.
  *****************************************************************************/
-int fts_touch_process()
+int fts_touch_process(keys_state_t *key_state)
 {
     int ret = 0;
     uint8_t i = 0;
@@ -539,6 +500,7 @@ int fts_touch_process()
     uint8_t point_id = 0;
     uint8_t buf[100];
     struct fts_ts_event events[MAX_POINTS_TOUCH_TRACE];
+    static uint8_t type_before[MAX_POINTS_TOUCH_TRACE] = {0, 0};
 
     g_touch_event_nums = 0;
     /*read touch information from reg0x01*/
@@ -606,12 +568,26 @@ int fts_touch_process()
             /* The event of point(point id is events[i].id) is down event, the finger of this id stands for is
              * pressing on the screen.*/
             /*TODO...(down event)*/
-            printf(">%d down event x:%d, y:%d\n", i, events[i].x, events[i].y);
+            // printf(">%d down event x:%d, y:%d\n", i, events[i].x, events[i].y);
+            if(type_before[i] == 0){
+                key_state[i].type = 1;
+                key_state[i].key_id = events[i].y - 4000;
+                type_before[i] = 1;
+            }else{
+                key_state[i].type =3;
+            }
         }
         else
         {
             /*TODO...(up event)*/
-            printf(">%d up event x:%d, y:%d\n", i, events[i].x, events[i].y);
+            // printf(">%d up event x:%d, y:%d\n", i, events[i].x, events[i].y);
+            if(type_before[i] == 1){
+                key_state[i].type = 2;
+                key_state[i].key_id = events[i].y - 4000;
+                type_before[i] = 0;
+            }else{
+                key_state[i].type =3;
+            }
         }
     }
 
@@ -622,26 +598,26 @@ int fts_touch_process()
  * An interrupt handler, will be called while the voltage of INT Port changes from high to low(falling-edge trigger mode).
  * The program reads touch data or gesture data from TP controller, and then sends it into system.
  *****************************************************************************/
-int fts_gpio_interrupt_handler(struct fts_ts_event *ts_event, uint8_t *touch_buf)
-{
-    int ret = 0;
+// int fts_gpio_interrupt_handler(struct fts_ts_event *ts_event, uint8_t *touch_buf)
+// {
+//     int ret = 0;
 
-    if (fts_data->gesture_support && fts_data->suspended)
-    {
-        /*if gesture is enabled, interrupt handler should process gesture at first*/
-        ret = fts_gesture_process(touch_buf);
-        if (ret == 0)
-        {
-            FTS_DEBUG("success to process gesture.");
-            return 1;
-        }
-    }
+//     if (fts_data->gesture_support && fts_data->suspended)
+//     {
+//         /*if gesture is enabled, interrupt handler should process gesture at first*/
+//         ret = fts_gesture_process(touch_buf);
+//         if (ret == 0)
+//         {
+//             FTS_DEBUG("success to process gesture.");
+//             return 1;
+//         }
+//     }
 
-    /*if gesture isn't enabled, the handler should process touch points*/
-    fts_touch_process(ts_event, touch_buf);
+//     /*if gesture isn't enabled, the handler should process touch points*/
+//     fts_touch_process(ts_event, touch_buf);
 
-    return 0;
-}
+//     return 0;
+// }
 
 /*****************************************************************************
  *  Name: fts_suspend
@@ -713,18 +689,18 @@ int fts_ts_resume(void)
 
     return 0;
 }
-static void gpio_task_example(void* arg)
-{
-    uint32_t io_num;
-    for (;;) {
-        if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            fts_touch_process();
-            xQueueReset(gpio_evt_queue);
-        }
-        // vTaskDelay(100 / portTICK_PERIOD_MS);
+// static void gpio_task_example(void* arg)
+// {
+//     uint32_t io_num;
+//     for (;;) {
+//         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+//             fts_touch_process();
+//             xQueueReset(gpio_evt_queue);
+//         }
+//         // vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    }
-}
+//     }
+// }
 /*****************************************************************************
  * Name: fts_init
  * Brief:

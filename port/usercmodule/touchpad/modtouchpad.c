@@ -32,6 +32,7 @@
 #include "freertos/task.h"
 #include "focaltech_core.h"
 #include "py/obj.h"
+#include "esp_log.h"
 
 #define TOUCHPAD_NUM     6
 typedef enum{
@@ -43,6 +44,8 @@ typedef enum{
     PAD_N,
 }tp_id_t;
 
+static keys_state_t key_state_array[MAX_POINTS_TOUCH_TRACE];
+
 static QueueHandle_t touchpad_gpio_evt_queue = NULL;;
 extern int fts_fwupg_auto_upgrade(void);
 
@@ -51,14 +54,21 @@ typedef struct _mtp_obj_t {
     tp_id_t tp_num;
 } mtp_obj_t;
 
-const mp_obj_type_t touchpad_type;
+typedef struct _key_state_t{
+    bool was_pressed;  
+    bool was_released;
+}key_state_t;
+
+key_state_t key_status_array[6];
+
+extern const mp_obj_type_t machine_touchpad_type;
 static const mtp_obj_t touchpad_obj[] = {
-    {{&touchpad_type}, PAD_P}, 
-    {{&touchpad_type}, PAD_Y},
-    {{&touchpad_type}, PAD_T},
-    {{&touchpad_type}, PAD_H},
-    {{&touchpad_type}, PAD_O},
-    {{&touchpad_type}, PAD_N},
+    {{&machine_touchpad_type}, PAD_P}, 
+    {{&machine_touchpad_type}, PAD_Y},
+    {{&machine_touchpad_type}, PAD_T},
+    {{&machine_touchpad_type}, PAD_H},
+    {{&machine_touchpad_type}, PAD_O},
+    {{&machine_touchpad_type}, PAD_N},
 };
 
 static void int_pin_isr_handler(void *arg)
@@ -70,10 +80,20 @@ static void int_pin_isr_handler(void *arg)
 static void touchpad_task(void* arg)
 {
     uint32_t io_num;
+    int type;
+    int keyid;
     for (;;) {
         if (xQueueReceive(touchpad_gpio_evt_queue, &io_num, portMAX_DELAY)) {
             // if(io_num == 45){
-                fts_touch_process();
+                fts_touch_process(key_state_array);
+
+                if(key_state_array[0].type == 1){
+                    ESP_LOGI("touchpad:", "key press. key_id %d\r\n", key_state_array[0].key_id);
+                    key_status_array[key_state_array[0].key_id].was_pressed = true;
+                }else if(key_state_array[0].type == 2){
+                    ESP_LOGI("touchpad:", "key releasekey_id %d\r\n", key_state_array[0].key_id);
+                    key_status_array[key_state_array[0].key_id].was_released = true;
+                }
             // }
             xQueueReset(touchpad_gpio_evt_queue);
         }
@@ -116,7 +136,7 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
         gpio_install_isr_service(0);
         gpio_isr_handler_add(45, int_pin_isr_handler, (void*) NULL);  
     
-        touchpad_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+        touchpad_gpio_evt_queue = xQueueCreate(5, sizeof(uint32_t));
         xTaskCreatePinnedToCore(touchpad_task, "touchpad_task", 3 * 1024, NULL, 5, NULL, 1);
 
         initialized = 1;
@@ -127,7 +147,8 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
 
 static const mp_rom_map_elem_t mtp_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_TouchPad) },
-    // { MP_ROM_QSTR(MP_QSTR_config), MP_ROM_PTR(&mtp_config_obj) },
+    // { MP_ROM_QSTR(MP_QSTR_get_key_state), MP_ROM_PTR(&get_key_state_obj) },
+    // { MP_ROM_QSTR(MP_QSTR_clear_key_state), MP_ROM_PTR(&clear_key_state_obj) },
     // { MP_ROM_QSTR(MP_QSTR_read), MP_ROM_PTR(&mtp_read_obj) },
     // { MP_ROM_QSTR(MP_QSTR_irq), MP_ROM_PTR(&machine_touchpad_irq_obj)},
 };
@@ -135,7 +156,7 @@ static const mp_rom_map_elem_t mtp_locals_dict_table[] = {
 static MP_DEFINE_CONST_DICT(mtp_locals_dict, mtp_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
-    touchpad_type,
+    machine_touchpad_type,
     MP_QSTR_TouchPad,
     MP_TYPE_FLAG_NONE,
     make_new, mtp_make_new,
@@ -146,7 +167,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t toupad_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_touchpad) },
-    { MP_ROM_QSTR(MP_QSTR_TouchPad), MP_ROM_PTR(&touchpad_type) },
+    { MP_ROM_QSTR(MP_QSTR_TouchPad), MP_ROM_PTR(&machine_touchpad_type) },
 };
 static MP_DEFINE_CONST_DICT(toupad_locals_dict, toupad_locals_dict_table);
 

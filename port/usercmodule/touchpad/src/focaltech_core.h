@@ -28,9 +28,15 @@
 *****************************************************************************/
 #define HOST_MCU_DRIVER_VERSION                  	"FocalTech MCU V1.0 20220610"
 
+#ifdef DEBUG
 #define FTS_INFO(fmt, ...)							printf("[FTS/I]%s:"fmt"\r\n", __func__, ##__VA_ARGS__)
 #define FTS_ERROR(fmt, ...)							printf("[FTS/E]%s:"fmt"\r\n", __func__, ##__VA_ARGS__)
 #define FTS_DEBUG(fmt, ...)	    					printf("[FTS/D]%s:"fmt"\r\n", __func__, ##__VA_ARGS__)
+#else
+#define FTS_INFO(fmt, ...)							
+#define FTS_ERROR(fmt, ...)							
+#define FTS_DEBUG(fmt, ...)	   
+#endif 					
 
 
 #define INTERVAL_READ_REG                   		200  /* unit:ms */
@@ -58,6 +64,46 @@
 #define TRIGGER_PORT HW_GPIO_PORT_0
 #define TOUCH_RESET_PORT   HW_GPIO_PORT_1
 #define TOUCH_RESET_PIN    HW_GPIO_PIN_1
+
+#define FTS_CMD_START_DELAY 12
+
+/* register address */
+#define FTS_REG_WORKMODE 0x00
+#define FTS_REG_WORKMODE_FACTORY_VALUE 0x40
+#define FTS_REG_WORKMODE_SCAN_VALUE 0xC0
+#define FTS_REG_FLOW_WORK_CNT 0x91
+#define FTS_REG_POWER_MODE 0xA5
+#define FTS_REG_GESTURE_EN 0xD0
+#define FTS_REG_GESTURE_ENABLE 0x01
+#define FTS_REG_GESTURE_OUTPUT_ADDRESS 0xD3
+
+/*Max point numbers of gesture trace*/
+#define MAX_POINTS_GESTURE_TRACE 6
+/*Length of gesture information*/
+#define MAX_LEN_GESTURE_INFO (MAX_POINTS_GESTURE_TRACE * 4 + 2)
+
+/*Max point numbers of touch trace*/
+#define MAX_POINTS_TOUCH_TRACE 2
+/*Length of touch information*/
+#define MAX_LEN_TOUCH_INFO (MAX_POINTS_TOUCH_TRACE * 6 + 2)
+
+/*Max touch points that touch controller supports*/
+#define FTS_MAX_POINTS_SUPPORT 10
+
+
+
+#define	INT_PIN						                45
+#define	RST_PIN						                -1
+
+#define I2C_MASTER_SCL_IO           43                         /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           44                         /*!< GPIO number used for I2C master data  */
+#define I2C_MASTER_NUM              0                          /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
+#define I2C_MASTER_FREQ_HZ          200000                     /*!< I2C master clock frequency */
+#define I2C_MASTER_TX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
+#define I2C_MASTER_RX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
+#define I2C_MASTER_TIMEOUT_MS       1000
+
+#define I2C_PEER_ADDR      0x38
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef
 *****************************************************************************/
@@ -89,6 +135,11 @@ struct fts_ts_data {
     int gesture_support;   /* gesture enable or disable, default: disable */
 };
 
+typedef struct _keys_state_t{
+    uint8_t type;
+    uint16_t key_id;
+}keys_state_t;
+
 extern uint8_t g_touch_event_nums;
 
 /*****************************************************************************
@@ -108,7 +159,7 @@ int fts_ts_init(void);
 int fts_ts_suspend(void);
 int fts_ts_resume(void);
 
-int fts_touch_process();
+int fts_touch_process(keys_state_t *key_state);
 int fts_check_id1(void);
 
 void fts_esdcheck_process(void);
