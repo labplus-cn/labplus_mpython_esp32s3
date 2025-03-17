@@ -114,6 +114,15 @@ mp_obj_t lcd_init(void)
         ESP_ERROR_CHECK(esp_lcd_panel_set_gap(lcd->panel, BOARD_LCD_GAP_X, BOARD_LCD_GAP_Y));
     
         clear();
+
+        if (BOARD_LCD_BL >= 0) {
+            gpio_config_t io_conf = {
+                .mode = GPIO_MODE_OUTPUT,
+                .pin_bit_mask = 1ULL << BOARD_LCD_BL,
+            };
+            gpio_config(&io_conf);
+            gpio_set_level(BOARD_LCD_BL, 1);
+        }
     
         ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(lcd->panel, true));
     }
@@ -138,6 +147,10 @@ static mp_obj_t lcd_deinit(void)
         }
 
         free(lcd);
+
+        if (BOARD_LCD_BL >= 0) {
+            gpio_set_level(BOARD_LCD_BL, 0);
+        }
     }
 
     return mp_obj_new_int_from_uint(0);

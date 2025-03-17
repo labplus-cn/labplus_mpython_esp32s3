@@ -8,10 +8,16 @@ choice MPYTHON_BOARD
 config AUDIO_BOARD_CUSTOM
     bool "Custom mpython board"
 config LABPLUS_LEDONG_PRO_BOARD
-    bool "labplus Ledong pro"
+    bool "labplus Ledong pro board"
     depends on IDF_TARGET_ESP32S3
 config LABPLUS_FOR_XUEJING_BOARD
-    bool "labplus for xuejing"
+    bool "labplus for xuejing board"
+    depends on IDF_TARGET_ESP32S3
+config MPYTHON_PRO_BOARD
+    bool "mpython pro board"
+    depends on IDF_TARGET_ESP32S3
+config LABPLUS_LEDONG_V2_BOARD
+    bool "labplus Ledong v2 board"
     depends on IDF_TARGET_ESP32S3
 
 endchoice
