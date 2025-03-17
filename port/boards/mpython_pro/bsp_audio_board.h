@@ -49,7 +49,7 @@
 #define GPIO_I2S_SDIN       (GPIO_NUM_40)
 #define GPIO_I2S_DOUT       (GPIO_NUM_38)
 
-#define RECORD_VOLUME   (35.0)
+#define RECORD_VOLUME   (60.0)
 /**
  * @brief player configurations
  *

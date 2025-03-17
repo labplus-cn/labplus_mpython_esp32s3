@@ -141,9 +141,9 @@ for part in partition_table:
     elif part.type == gen_esp32part.APP_TYPE and offset_application == 0:
         offset_application = part.offset
         max_size_application = part.size
-    elif part.name == "voice_data":
-        offset_voice_data = part.offset
-        max_size_voice_data = part.size
+    # elif part.name == "voice_data":
+    #     offset_voice_data = part.offset
+    #     max_size_voice_data = part.size
     elif part.name == "sr_module":
         offset_sr = part.offset
         max_size_sr = part.size
@@ -154,7 +154,7 @@ files_in = [
     ("partitions", offset_partitions, max_size_partitions, arg_partitions_bin),
     ("application", offset_application, max_size_application, arg_application_bin),
     # ("font", offset_font, max_size_font, arg_font_bin),
-    ("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin),
+    # ("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin),
     ("sr_module", offset_sr, max_size_sr, arg_sr_bin),
 ]
 file_out = arg_output_bin
