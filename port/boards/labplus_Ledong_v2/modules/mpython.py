@@ -34,6 +34,11 @@ def print(_t, *args, sep=' ', end='\n'):
     else:
         _print(_t, *args, sep=sep, end=end)
 
+def numberMap(inputNum, bMin, bMax, cMin, cMax):
+    outputNum = 0
+    outputNum = ((cMax - cMin) / (bMax - bMin)) * (inputNum - bMin) + cMin
+    return outputNum
+
 # my_wifi = wifi()
 #多次尝试连接wifi
 def try_connect_wifi(_wifi, _ssid, _pass, _times):
@@ -104,7 +109,7 @@ class MOTION(object):
             except:
                 pass
             self.set_range(MOTION.Accelerometer.RANGE_2G) #设置默认分辨率+-2g
-            self.int = Pin(37, Pin.IN)
+            self.int = Pin(45, Pin.IN)
             self.int.irq(trigger=Pin.IRQ_FALLING, handler=self.irq)
             # event handler 
             self.wom = None
@@ -967,7 +972,3 @@ ledong_shield = Ledong_shield()
 
 # from gui import *
 
-def numberMap(inputNum, bMin, bMax, cMin, cMax):
-    outputNum = 0
-    outputNum = ((cMax - cMin) / (bMax - bMin)) * (inputNum - bMin) + cMin
-    return outputNum

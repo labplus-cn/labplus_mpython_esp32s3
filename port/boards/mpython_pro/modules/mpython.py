@@ -17,7 +17,7 @@ from neopixel import NeoPixel
 # from esp import dht_readinto
 from time import sleep_ms, sleep_us, sleep
 import framebuf 
-import calibrate_img
+# import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
@@ -109,7 +109,7 @@ class MOTION(object):
             except:
                 pass
             self.set_range(MOTION.Accelerometer.RANGE_2G) #设置默认分辨率+-2g
-            self.int = Pin(37, Pin.IN)
+            self.int = Pin(45, Pin.IN)
             self.int.irq(trigger=Pin.IRQ_FALLING, handler=self.irq)
             # event handler 
             self.wom = None
@@ -885,7 +885,6 @@ button_a = Button(0)
 button_b = Button(46)
 
 class Touch:
-
     def __init__(self, pin):
         self.__touch_pad = TouchPad(pin)
         self.__touch_pad.config(30000)
