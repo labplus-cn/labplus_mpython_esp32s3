@@ -25,7 +25,7 @@ for count in range(3):
 
 
 # mac地址
-mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
-print(mac)
+# mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
+# print(mac)
 
 gc.collect()
