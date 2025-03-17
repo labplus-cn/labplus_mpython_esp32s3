@@ -360,7 +360,7 @@ esp_err_t bsp_get_feed_data(bool is_get_raw_channel, int8_t *buffer, int buffer_
 esp_err_t bsp_get_feed_data2(bool is_get_raw_channel, int16_t *buffer, int buffer_len)
 {
     esp_err_t ret = ESP_OK;
-    size_t bytes_read;
+
     int audio_chunksize = buffer_len / (sizeof(int16_t) * ADC_I2S_CHANNEL);
 
     ret = esp_codec_dev_read(codec_dev, (void *)buffer, buffer_len);
