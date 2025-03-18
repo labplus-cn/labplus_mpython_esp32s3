@@ -52,23 +52,19 @@ extern int fts_fwupg_auto_upgrade(void);
 typedef struct _mtp_obj_t {
     mp_obj_base_t base;
     tp_id_t tp_num;
+    bool was_pressed;  
+    bool is_released;
+    uint8_t pressed_cnt;
 } mtp_obj_t;
 
-typedef struct _key_state_t{
-    bool was_pressed;  
-    bool was_released;
-}key_state_t;
-
-key_state_t key_status_array[6];
-
 extern const mp_obj_type_t machine_touchpad_type;
-static const mtp_obj_t touchpad_obj[] = {
-    {{&machine_touchpad_type}, PAD_P}, 
-    {{&machine_touchpad_type}, PAD_Y},
-    {{&machine_touchpad_type}, PAD_T},
-    {{&machine_touchpad_type}, PAD_H},
-    {{&machine_touchpad_type}, PAD_O},
-    {{&machine_touchpad_type}, PAD_N},
+mtp_obj_t touchpad_obj[6] = {
+    {{&machine_touchpad_type}, PAD_P, false, false, 0}, 
+    {{&machine_touchpad_type}, PAD_Y, false, false, 0},
+    {{&machine_touchpad_type}, PAD_T, false, false, 0},
+    {{&machine_touchpad_type}, PAD_H, false, false, 0},
+    {{&machine_touchpad_type}, PAD_O, false, false, 0},
+    {{&machine_touchpad_type}, PAD_N, false, false, 0},
 };
 
 static void int_pin_isr_handler(void *arg)
@@ -82,6 +78,7 @@ static void touchpad_task(void* arg)
     uint32_t io_num;
     int type;
     int keyid;
+    mp_obj_t event_cb = NULL;
     for (;;) {
         if (xQueueReceive(touchpad_gpio_evt_queue, &io_num, portMAX_DELAY)) {
             // if(io_num == 45){
@@ -89,10 +86,21 @@ static void touchpad_task(void* arg)
 
                 if(key_state_array[0].type == 1){
                     ESP_LOGI("touchpad:", "key press. key_id %d\r\n", key_state_array[0].key_id);
-                    key_status_array[key_state_array[0].key_id].was_pressed = true;
+                    touchpad_obj[key_state_array[0].key_id].was_pressed = true;
+                    touchpad_obj[key_state_array[0].key_id].is_released = true;
+                    touchpad_obj[key_state_array[0].key_id].pressed_cnt++;
+                    event_cb = MP_STATE_PORT(mtp_etent_cb_array)[key_state_array[0].key_id];
+                    if(event_cb){
+                        mp_sched_schedule(event_cb, mp_obj_new_int(1));
+                    }
+
                 }else if(key_state_array[0].type == 2){
                     ESP_LOGI("touchpad:", "key releasekey_id %d\r\n", key_state_array[0].key_id);
-                    key_status_array[key_state_array[0].key_id].was_released = true;
+                    touchpad_obj[key_state_array[0].key_id].is_released = false;
+                    event_cb = MP_STATE_PORT(mtp_etent_cb_array)[key_state_array[0].key_id];
+                    if(event_cb){
+                        mp_sched_schedule(event_cb, mp_obj_new_int(0));
+                    }
                 }
             // }
             xQueueReset(touchpad_gpio_evt_queue);
@@ -100,6 +108,45 @@ static void touchpad_task(void* arg)
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
+
+static mp_obj_t set_enent_cb(mp_obj_t self_in, mp_obj_t event_cb)
+{
+    mtp_obj_t *self = self_in;
+    MP_STATE_PORT(mtp_etent_cb_array)[self->tp_num] = event_cb;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(set_enent_cb_obj, set_enent_cb);
+
+static mp_obj_t is_pressed(mp_obj_t self_in)
+{
+    mtp_obj_t *self = self_in;
+    return mp_obj_new_bool(self->is_released);
+
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(is_pressed_obj, is_pressed);
+
+static mp_obj_t was_pressed(mp_obj_t self_in)
+{
+    mtp_obj_t *self = self_in;
+    mp_obj_t _was_pressed = mp_obj_new_bool(self->was_pressed);
+    self->was_pressed = false;
+
+    return _was_pressed;
+
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(was_pressed_obj, was_pressed);
+
+static mp_obj_t get_presses(mp_obj_t self_in)
+{
+    mtp_obj_t *self = self_in;
+    mp_obj_t _pressed_cnt = MP_OBJ_NEW_SMALL_INT(self->pressed_cnt);
+    self->pressed_cnt = 0;
+
+    return _pressed_cnt;
+
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(get_presses_obj, get_presses);
+
 static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw,
     const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, true);
@@ -147,10 +194,10 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
 
 static const mp_rom_map_elem_t mtp_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_TouchPad) },
-    // { MP_ROM_QSTR(MP_QSTR_get_key_state), MP_ROM_PTR(&get_key_state_obj) },
-    // { MP_ROM_QSTR(MP_QSTR_clear_key_state), MP_ROM_PTR(&clear_key_state_obj) },
-    // { MP_ROM_QSTR(MP_QSTR_read), MP_ROM_PTR(&mtp_read_obj) },
-    // { MP_ROM_QSTR(MP_QSTR_irq), MP_ROM_PTR(&machine_touchpad_irq_obj)},
+    { MP_ROM_QSTR(MP_QSTR_set_enent_cb), MP_ROM_PTR(&set_enent_cb_obj) },
+    { MP_ROM_QSTR(MP_QSTR_is_pressed), MP_ROM_PTR(&is_pressed_obj) },
+    { MP_ROM_QSTR(MP_QSTR_was_pressed), MP_ROM_PTR(&was_pressed_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_presses), MP_ROM_PTR(&get_presses_obj) },
 };
 
 static MP_DEFINE_CONST_DICT(mtp_locals_dict, mtp_locals_dict_table);
@@ -163,7 +210,6 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &mtp_locals_dict
     );
 
-// MP_REGISTER_ROOT_POINTER(mp_obj_t *machine_touchpad_irq_handler[TOUCHPAD_NUM]);
 
 static const mp_rom_map_elem_t toupad_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_touchpad) },
@@ -177,4 +223,4 @@ const mp_obj_module_t touchpad_module = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_touchpad, touchpad_module);
-
+MP_REGISTER_ROOT_POINTER(mp_obj_t *mtp_etent_cb_array[TOUCHPAD_NUM]);
