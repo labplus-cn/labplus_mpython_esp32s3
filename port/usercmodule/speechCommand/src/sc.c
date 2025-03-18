@@ -13,33 +13,14 @@
 #include "model_path.h"
 #include "esp_afe_config.h"
 #include "bsp_audio.h"
+#include "esp_mn_speech_commands.h"
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
 static esp_afe_sr_data_t *afe_data = NULL;
 static volatile int task_flag = 0;
 srmodel_list_t *models = NULL;
-static int play_voice = -2;
 
-void play_music(void *arg)
-{
-    while (task_flag) {
-        switch (play_voice) {
-        case -2:
-            vTaskDelay(10);
-            break;
-        case -1:
-            wake_up_action();
-            play_voice = -2;
-            break;
-        default:
-            speech_commands_action(play_voice);
-            play_voice = -2;
-            break;
-        }
-    }
-    vTaskDelete(NULL);
-}
 
 void feed_Task(void *arg)
 {
@@ -52,7 +33,7 @@ void feed_Task(void *arg)
     assert(i2s_buff);
 
     while (task_flag) {
-        bsp_get_feed_data2(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
+        bsp_get_feed_data(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
 
         afe_handle->feed(afe_data, i2s_buff);
     }
@@ -77,16 +58,19 @@ void detect_Task(void *arg)
     assert(mu_chunksize == afe_chunksize);
 
     //print active speech commands
+    esp_mn_commands_clear();
+    esp_mn_commands_add(1,"guan bi kong tiao");
+    esp_mn_commands_update();
     multinet->print_active_speech_commands(model_data);
+
     printf("------------detect start------------\n");
-    // FILE *fp = fopen("/sdcard/out1", "w");
-    // if (fp == NULL) printf("can not open file\n");
     while (task_flag) {
-        afe_fetch_result_t* res = afe_handle->fetch(afe_data);
+        afe_fetch_result_t *res = afe_handle->fetch(afe_data);
         if (!res || res->ret_value == ESP_FAIL) {
             printf("fetch error!\n");
             break;
         }
+
         if (res->wakeup_state == WAKENET_DETECTED) {
             printf("WAKEWORD DETECTED\n");
 	        multinet->clean(model_data);
@@ -143,7 +127,10 @@ void sc_init()
     afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
 //    afe_config_print(afe_config);
     afe_handle = esp_afe_handle_from_config(afe_config);
+
     esp_afe_sr_data_t *afe_data = afe_handle->create_from_config(afe_config);
+    afe_handle->disable_vad(afe_data);
+    afe_handle->disable_aec(afe_data);
     afe_config_free(afe_config);
 
     task_flag = 1;
