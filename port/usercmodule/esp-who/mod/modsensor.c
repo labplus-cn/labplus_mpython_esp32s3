@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
+#include "lcd.h"
 
 // camera_fb_t *frame = NULL;
 typedef struct _machine_hw_i2c_obj_t {
@@ -44,14 +45,16 @@ static MP_DEFINE_CONST_FUN_OBJ_0(get_frame_height_obj, get_frame_height);
 static mp_obj_t snapshot(void)
 {
     frame = esp_camera_fb_get();
-    ESP_LOGI("tag", "frame addr: %p", &(frame));
+    display_draw_image(0, 0, frame->width, frame->height, (void *)(frame->buf));
+    // ESP_LOGI("tag", "frame addr: %p", &(frame));
 
-    mp_obj_t items[] = {MP_OBJ_NEW_SMALL_INT(frame->width), 
-                        MP_OBJ_NEW_SMALL_INT(frame->height),
-                        mp_obj_new_bytes(frame->buf, frame->len) };
-    return mp_obj_new_tuple(3, items);
+    // mp_obj_t items[] = {MP_OBJ_NEW_SMALL_INT(frame->width), 
+    //                     MP_OBJ_NEW_SMALL_INT(frame->height),
+    //                     mp_obj_new_bytes(frame->buf, frame->len) };
+    // return mp_obj_new_tuple(3, items);
 
     // return mp_obj_new_bytes(frame->buf, frame->len);
+    return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sensor_snapshot_obj, snapshot);
 

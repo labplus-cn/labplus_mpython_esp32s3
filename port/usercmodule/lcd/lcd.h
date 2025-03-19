@@ -107,6 +107,7 @@ void lvgl_esp32_Display_draw_bitmap(
 );
 
 mp_obj_t lcd_init(void);
+void display_draw_image(int x, int y, int width, int height, const void *data);
 
 extern lcd_t *lcd;
 #endif /* __LVGL_ESP32_LCD_H__ */

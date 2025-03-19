@@ -173,6 +173,11 @@ static mp_obj_t draw_logo(void)
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(display_draw_logo_obj, draw_logo);
 
+void display_draw_image(int x, int y, int width, int height, const void *data)
+{
+    esp_lcd_panel_draw_bitmap(lcd->panel, x, y, width, height, (uint16_t *)data);
+}
+
 static mp_obj_t draw_color(mp_obj_t color)
 {
     int _color = mp_obj_get_int(color);

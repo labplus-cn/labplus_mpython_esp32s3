@@ -19,6 +19,7 @@ set(MODULES_INCLUDEDIRS
 set(ESP32_CAMERA_INCLUDEDIRS 
         ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera/driver/include
         ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera/conversions/include
+        ${CMAKE_CURRENT_LIST_DIR}/../lcd
 )
 
 # target_include_directories(usermod_display INTERFACE

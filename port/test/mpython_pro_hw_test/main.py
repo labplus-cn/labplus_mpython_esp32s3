@@ -126,37 +126,84 @@
 TFT LCD
 '''
 import os
+import time
 import lvgl as lv
 import lcd
 import lv_displayer
+import sensor
+from machine import I2C, Pin
+
+i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
+sensor.reset(i2c)
 
 from lv_utils import event_loop
 
-screen = lv.screen_active()
-screen.set_style_bg_color(lv.color_hex(0x000000), lv.PART.MAIN)
-
-label = lv.label(screen)
-label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
-label.set_text("中华人民共和国")
-label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
-label.align(lv.ALIGN.CENTER, 0, 0)
-
-btn = lv.button(screen)
-btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
-label = lv.label(btn)
-label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
-label.set_text('盛思科教')
-
-n = 0
 def cb():  # 每40ms被调用
-    # global n
-    # n = n + 1
-    # if n > 10000:
-    #     n = 0
-    # label.set_text(str(n))
+    # label.set_text("hello,world")
     pass
 
 event = event_loop(refresh_cb = cb)
+img_obj = lv.image(lv.screen_active())
+
+while True:
+    t = sensor.snapshot()
+
+    # img_src = lv.image_dsc_t({
+    #     'header':{'magic': lv.IMAGE_HEADER_MAGIC, 'cf': lv.COLOR_FORMAT.RGB565, 'flags': 0, 'w': 320, 'h': 240, 'stride': lv.STRIDE_AUTO},
+    #     'data_size': 320*240 *2,
+    #     'data': t
+    # })
+
+    # # img_src = lv.image_dsc_t({
+    # #     'header':{'magic': lv.IMAGE_HEADER_MAGIC, 'cf': lv.COLOR_FORMAT.RGB565, 'flags': 0, 'w': 320, 'h': 240},
+    # #     'data_size': t[0] * t[1] *2,
+    # #     'data': t[2]
+    # # })
+
+    # img_obj.set_src(img_src)
+
+    sensor.free_fb()
+    # time.sleep_ms(10)
+
+while True:
+    # t = sensor.snapshot()
+    img_src = lv.image_dsc_t({
+        'header':{'magic': lv.IMAGE_HEADER_MAGIC, 'cf': lv.COLOR_FORMAT.RGB565, 'flags': 0, 'w': 320, 'h': 240},
+        'data_size': t[0] * t[1] *2,
+        'data': t[2]
+    })
+
+    # sensor.free_fb()
+
+
+while True:
+    t = sensor.snapshot()
+
+    # img_src = lv.image_dsc_t({
+    #     'header':{'magic': lv.IMAGE_HEADER_MAGIC, 'cf': lv.COLOR_FORMAT.RGB565, 'flags': 0, 'w': 320, 'h': 240},
+    #     'data_size': t[0] * t[1] *2,
+    #     'data': t[2]
+    # })
+
+    # img_obj = lv.image(lv.screen_active())
+    # img_obj.set_src(img_src)
+    sensor.free_fb()
+
+# screen = lv.screen_active()
+# screen.set_style_bg_color(lv.color_hex(0x000000), lv.PART.MAIN)
+
+# label = lv.label(screen)
+# label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
+# label.set_text("中华人民共和国")
+# label.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
+# label.align(lv.ALIGN.CENTER, 0, 0)
+
+# btn = lv.button(screen)
+# btn.align(lv.ALIGN.TOP_LEFT, 20, 20)
+# label = lv.label(btn)
+# label.set_style_text_font(lv.font_siyuan_heiti_medium_16, 0)
+# label.set_text('盛思科教')
+
 
 # scr = lv.obj()
 # scr.set_style_bg_color(lv.color_hex(0xff0000), lv.PART.MAIN)
@@ -183,60 +230,60 @@ event = event_loop(refresh_cb = cb)
 # while True:
 #     lv.timer_handler_run_in_period(100)
 
-'''
-乐动掌控V2 触摸按键示例
-'''
-from touchpad import TouchPad
+# '''
+# 触摸按键示例
+# '''
+# from touchpad import TouchPad
 
-P = TouchPad(5)
-Y = TouchPad(4)
-T = TouchPad(3)
-H = TouchPad(2)
-O = TouchPad(1)
-N = TouchPad(0)
+# P = TouchPad(5)
+# Y = TouchPad(4)
+# T = TouchPad(3)
+# H = TouchPad(2)
+# O = TouchPad(1)
+# N = TouchPad(0)
 
-def TouchPad_P_cb(val):
-    if val == 1:
-        print("P pressed")
-    elif val == 0:
-        print("P released")
+# def TouchPad_P_cb(val):
+#     if val == 1:
+#         print("P pressed")
+#     elif val == 0:
+#         print("P released")
 
-def TouchPad_Y_cb(val):
-    if val == 1:
-        print("Y pressed")
-    elif val == 0:
-        print("Y released")
+# def TouchPad_Y_cb(val):
+#     if val == 1:
+#         print("Y pressed")
+#     elif val == 0:
+#         print("Y released")
 
-def TouchPad_T_cb(val):
-    if val == 1:
-        print("T pressed")
-    elif val == 0:
-        print("T released")
+# def TouchPad_T_cb(val):
+#     if val == 1:
+#         print("T pressed")
+#     elif val == 0:
+#         print("T released")
 
-def TouchPad_H_cb(val):
-    if val == 1:
-        print("H pressed")
-    elif val == 0:
-        print("H released")
+# def TouchPad_H_cb(val):
+#     if val == 1:
+#         print("H pressed")
+#     elif val == 0:
+#         print("H released")
 
-def TouchPad_O_cb(val):
-    if val == 1:
-        print("O pressed")
-    elif val == 0:
-        print("O released")
+# def TouchPad_O_cb(val):
+#     if val == 1:
+#         print("O pressed")
+#     elif val == 0:
+#         print("O released")
 
-def TouchPad_N_cb(val):
-    if val == 1:
-        print("N pressed")
-    elif val == 0:
-        print("N released")
+# def TouchPad_N_cb(val):
+#     if val == 1:
+#         print("N pressed")
+#     elif val == 0:
+#         print("N released")
 
-P.set_event_cb(TouchPad_P_cb)
-Y.set_event_cb(TouchPad_Y_cb)
-T.set_event_cb(TouchPad_T_cb)
-H.set_event_cb(TouchPad_H_cb)
-O.set_event_cb(TouchPad_O_cb)
-N.set_event_cb(TouchPad_N_cb)
+# P.set_event_cb(TouchPad_P_cb)
+# Y.set_event_cb(TouchPad_Y_cb)
+# T.set_event_cb(TouchPad_T_cb)
+# H.set_event_cb(TouchPad_H_cb)
+# O.set_event_cb(TouchPad_O_cb)
+# N.set_event_cb(TouchPad_N_cb)
 
 
 
