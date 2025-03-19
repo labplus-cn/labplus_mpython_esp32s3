@@ -129,13 +129,7 @@ import os
 import lvgl as lv
 import lcd
 import lv_displayer
-from machine import Pin
 
-bl = Pin(33, mode = Pin.OUT, pull = Pin.PULL_UP)
-bl.value(1)
-
-lcd.init()
-lv_displayer.init()
 from lv_utils import event_loop
 
 screen = lv.screen_active()
@@ -189,46 +183,64 @@ event = event_loop(refresh_cb = cb)
 # while True:
 #     lv.timer_handler_run_in_period(100)
 
-from mpython import i2c
-import sensor
-import lvgl as lv
-import lcd
-import lv_displayer
-import time
+'''
+触摸按键示例
+'''
+from touchpad import TouchPad
 
-from lv_utils import event_loop
-def cb():  # 每40ms被调用
-    # global n
-    # n = n + 1
-    # if n > 10000:
-    #     n = 0
-    # label.set_text(str(n))
-    pass
+P = TouchPad(5)
+Y = TouchPad(4)
+T = TouchPad(3)
+H = TouchPad(2)
+O = TouchPad(1)
+N = TouchPad(0)
 
-event = event_loop(refresh_cb = cb)
+def TouchPad_P_cb(val):
+    if val == 1:
+        print("P pressed")
+    elif val == 0:
+        print("P released")
 
-sensor.reset(i2c)
-t = sensor.snapshot()
+def TouchPad_Y_cb(val):
+    if val == 1:
+        print("Y pressed")
+    elif val == 0:
+        print("Y released")
 
-# img = lv.image_dsc_t({
-#   'data_size': t[0]*t[1]*2,
-#   'data': t[2]
-# })
+def TouchPad_T_cb(val):
+    if val == 1:
+        print("T pressed")
+    elif val == 0:
+        print("T released")
 
-scr = lv.obj()
-img1 = lv.image(scr)
-# img1.set_src(img)
-lv.screen_load(scr)
+def TouchPad_H_cb(val):
+    if val == 1:
+        print("H pressed")
+    elif val == 0:
+        print("H released")
 
-while True:
-    t = sensor.snapshot()
-    img = lv.image_dsc_t({
-      'data_size': t[0]*t[1]*2,
-      'data': t[2]
-    })
-    img1.set_src(img)
-    sensor.free_fb()
-    time.sleep_ms(100)
+def TouchPad_O_cb(val):
+    if val == 1:
+        print("O pressed")
+    elif val == 0:
+        print("O released")
+
+def TouchPad_N_cb(val):
+    if val == 1:
+        print("N pressed")
+    elif val == 0:
+        print("N released")
+
+P.set_event_cb(TouchPad_P_cb)
+Y.set_event_cb(TouchPad_Y_cb)
+T.set_event_cb(TouchPad_T_cb)
+H.set_event_cb(TouchPad_H_cb)
+O.set_event_cb(TouchPad_O_cb)
+N.set_event_cb(TouchPad_N_cb)
+
+
+
+
 
 
 

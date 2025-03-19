@@ -85,7 +85,7 @@ static void touchpad_task(void* arg)
                 fts_touch_process(key_state_array);
 
                 if(key_state_array[0].type == 1){
-                    ESP_LOGI("touchpad:", "key press. key_id %d\r\n", key_state_array[0].key_id);
+                    // ESP_LOGI("touchpad:", "key press. key_id %d\r\n", key_state_array[0].key_id);
                     touchpad_obj[key_state_array[0].key_id].was_pressed = true;
                     touchpad_obj[key_state_array[0].key_id].is_released = true;
                     touchpad_obj[key_state_array[0].key_id].pressed_cnt++;
@@ -95,7 +95,7 @@ static void touchpad_task(void* arg)
                     }
 
                 }else if(key_state_array[0].type == 2){
-                    ESP_LOGI("touchpad:", "key releasekey_id %d\r\n", key_state_array[0].key_id);
+                    // ESP_LOGI("touchpad:", "key releasekey_id %d\r\n", key_state_array[0].key_id);
                     touchpad_obj[key_state_array[0].key_id].is_released = false;
                     event_cb = MP_STATE_PORT(mtp_etent_cb_array)[key_state_array[0].key_id];
                     if(event_cb){
@@ -109,13 +109,13 @@ static void touchpad_task(void* arg)
     }
 }
 
-static mp_obj_t set_enent_cb(mp_obj_t self_in, mp_obj_t event_cb)
+static mp_obj_t set_event_cb(mp_obj_t self_in, mp_obj_t event_cb)
 {
     mtp_obj_t *self = self_in;
     MP_STATE_PORT(mtp_etent_cb_array)[self->tp_num] = event_cb;
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(set_enent_cb_obj, set_enent_cb);
+static MP_DEFINE_CONST_FUN_OBJ_2(set_event_cb_obj, set_event_cb);
 
 static mp_obj_t is_pressed(mp_obj_t self_in)
 {
@@ -189,12 +189,12 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
         initialized = 1;
     }
 
-    return mp_const_none;
+    return MP_OBJ_FROM_PTR(self);
 }
 
 static const mp_rom_map_elem_t mtp_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_TouchPad) },
-    { MP_ROM_QSTR(MP_QSTR_set_enent_cb), MP_ROM_PTR(&set_enent_cb_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_event_cb), MP_ROM_PTR(&set_event_cb_obj) },
     { MP_ROM_QSTR(MP_QSTR_is_pressed), MP_ROM_PTR(&is_pressed_obj) },
     { MP_ROM_QSTR(MP_QSTR_was_pressed), MP_ROM_PTR(&was_pressed_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_presses), MP_ROM_PTR(&get_presses_obj) },
