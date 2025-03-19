@@ -59,9 +59,8 @@ void detect_Task(void *arg)
 
     //print active speech commands
     esp_mn_commands_clear();
-    esp_mn_commands_add(1,"guan bi kong tiao");
     esp_mn_commands_update();
-    multinet->print_active_speech_commands(model_data);
+//    multinet->print_active_speech_commands(model_data);
 
     printf("------------detect start------------\n");
     while (task_flag) {
