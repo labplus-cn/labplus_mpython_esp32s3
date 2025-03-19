@@ -24,7 +24,7 @@ static mp_obj_t reset(mp_obj_t i2c)
     }
     
     
-    camera_init(PIXFORMAT_RGB565, FRAMESIZE_QVGA, 2);
+    camera_init(PIXFORMAT_RGB565, FRAMESIZE_320X172, 2);
 
     return mp_const_none; 
 }

@@ -136,14 +136,14 @@ from machine import I2C, Pin
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 sensor.reset(i2c)
 
-from lv_utils import event_loop
+# from lv_utils import event_loop
 
-def cb():  # 每40ms被调用
-    # label.set_text("hello,world")
-    pass
+# def cb():  # 每40ms被调用
+#     # label.set_text("hello,world")
+#     pass
 
-event = event_loop(refresh_cb = cb)
-img_obj = lv.image(lv.screen_active())
+# event = event_loop(refresh_cb = cb)
+# img_obj = lv.image(lv.screen_active())
 
 while True:
     t = sensor.snapshot()
