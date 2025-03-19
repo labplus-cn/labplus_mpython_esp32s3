@@ -14,11 +14,13 @@
 #include "esp_afe_config.h"
 #include "bsp_audio.h"
 #include "esp_mn_speech_commands.h"
+#include "sc_module.h"
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
 static esp_afe_sr_data_t *afe_data = NULL;
 static volatile int task_flag = 0;
+volatile int latest_command_id = -1;
 srmodel_list_t *models = NULL;
 
 
@@ -96,7 +98,14 @@ void detect_Task(void *arg)
                     printf("TOP %d, command_id: %d, phrase_id: %d, string:%s prob: %f\n",
                     i+1, mn_result->command_id[i], mn_result->phrase_id[i], mn_result->string, mn_result->prob[i]);
                 }
-                printf("\n-----------listening-----------\n");
+                if (mn_result->num > 0) {
+                    latest_command_id = mn_result->command_id[0];
+                    afe_handle->enable_wakenet(afe_data);
+                    wakeup_flag=0;
+                    printf("\n-----------awaits to be waken up-----------\n");
+                    continue;
+                }
+//                printf("\n-----------listening-----------\n");
             }
 
             if (mn_state == ESP_MN_STATE_TIMEOUT) {
@@ -136,4 +145,11 @@ void sc_init()
 
     xTaskCreatePinnedToCore(&detect_Task, "detect", 8 * 1024, (void*)afe_data, 5, NULL, 1);
     xTaskCreatePinnedToCore(&feed_Task, "feed", 8 * 1024, (void*)afe_data, 5, NULL, 0);
+}
+int get_latest_command_id(void) {
+    return latest_command_id;
+}
+
+void reset_latest_command_id(void) {
+    latest_command_id = -1;
 }

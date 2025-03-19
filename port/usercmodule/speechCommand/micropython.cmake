@@ -7,7 +7,7 @@ target_sources(usermod_sr INTERFACE
 )
 
 target_include_directories(usermod_sr INTERFACE
-        ${CMAKE_CURRENT_LIST_DIR}/../tts/src
+        ${CMAKE_CURRENT_LIST_DIR}/src
 )
 
 target_link_libraries(usermod INTERFACE usermod_sr)
