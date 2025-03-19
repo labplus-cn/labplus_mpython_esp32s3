@@ -108,6 +108,7 @@ class SHT20(object):
 
         :return: 温度,单位摄氏度
         """
+        sleep_ms(10)
         try:
             self.i2c.writeto(0x40, b'\xf3')
             sleep_ms(70)
@@ -122,6 +123,7 @@ class SHT20(object):
 
         :return: 湿度,单位%
         """
+        sleep_ms(10)
         try:
             self.i2c.writeto(0x40, b'\xf5')
             sleep_ms(25)
@@ -199,7 +201,6 @@ class AmbientLight(object):
 
     :param i2c: I2C实例对象,默认i2c=i2c.
     """
-
     def __init__(self, i2c=i2c):
         self.i2c = i2c
 
@@ -209,11 +210,14 @@ class AmbientLight(object):
 
         :return: 返回光线值,单位lux
         """
-        self.i2c.writeto(0x23, bytearray([0x10]))
-        sleep_ms(120)
-        t = self.i2c.readfrom(0x23, 2)
-        sleep_ms(10)
-        return int((t[0] * 256 + t[1]) / 1.2)
+        try:
+            self.i2c.writeto(0x23, bytearray([0x10]))
+            sleep_ms(120)
+            t = self.i2c.readfrom(0x23, 2)
+            sleep_ms(10)
+            return int((t[0] * 256 + t[1]) / 1.2)
+        except Exception as e:
+            return -1
 
 
 class Ultrasonic(object):
@@ -626,111 +630,111 @@ class Ultrasonic(object):
 #         var = bytearray([0xFF, 0x06, 0x0C, 0x00, 0x00, 0x00])
 #         self._cmdWrite(var)
 
-# class MP3_(object):
-#     """
-#     MP3模块
-#     WT2003H4-16S
-#     2022.02.12
-#     """
-#     def __init__(self, tx=-1, rx=-1, uart_num=1):
-#         self.uart = UART(uart_num, 9600, stop=2, tx=tx, rx=rx)
-#         self._vol = 15
-#         self.is_paused = False
-#         self.set_output_mode(1)
-#         self.volume(15)
+class MP3_(object):
+    """
+    MP3模块
+    WT2003H4-16S
+    2022.02.12
+    """
+    def __init__(self, tx=-1, rx=0, uart_num=1):
+        self.uart = UART(uart_num, 9600, stop=2, tx=tx, rx=rx)
+        self._vol = 15
+        self.is_paused = False
+        self.set_output_mode(1)
+        self.volume(15)
 
-#     def _cmdWrite(self, cmd):
-#         sum = 0
-#         len = 0
-#         for i in cmd:
-#             sum += i
-#             len += 1
+    def _cmdWrite(self, cmd):
+        sum = 0
+        len = 0
+        for i in cmd:
+            sum += i
+            len += 1
 
-#         len += 2
-#         sum += len
-#         sum = sum & 0xff
+        len += 2
+        sum += len
+        sum = sum & 0xff
 
-#         pakage = [0x7E, len]
-#         pakage += cmd
-#         pakage += ([sum, 0xEF])
-#         self.uart.write(bytearray(pakage))
-#         # print(len)
-#         # print(pakage)
-#         sleep_ms(100)
+        pakage = [0x7E, len]
+        pakage += cmd
+        pakage += ([sum, 0xEF])
+        self.uart.write(bytearray(pakage))
+        # print(len)
+        # print(pakage)
+        sleep_ms(100)
 
-#     def play_song(self, num):
-#         """
-#         播放歌曲
-#         :param int num: 歌曲编号,类型为数字
-#         """
-#         var = [0xA2, (num >> 8) & 0xff, num & 0xff]
-#         self._cmdWrite(var)
+    def play_song(self, num):
+        """
+        播放歌曲
+        :param int num: 歌曲编号,类型为数字
+        """
+        var = [0xA2, (num >> 8) & 0xff, num & 0xff]
+        self._cmdWrite(var)
 
-#     def set_output_mode(self, mode):
-#         """设置音频输出模式：0：speaker 1: DAC"""
-#         var = [0xB6, mode]
-#         self._cmdWrite(var)  
+    def set_output_mode(self, mode):
+        """设置音频输出模式：0：speaker 1: DAC"""
+        var = [0xB6, mode]
+        self._cmdWrite(var)  
     
-#     def set_play_mode(self, mode):
-#         """指定播放模式"""
-#         var = [0xAF, mode]
-#         self._cmdWrite(var)
+    def set_play_mode(self, mode):
+        """指定播放模式"""
+        var = [0xAF, mode]
+        self._cmdWrite(var)
 
-#     def pause(self):
-#         """暂停播放"""
-#         if self.is_paused == False:
-#             self.is_paused = True
-#             var = [0xAA]
-#             self._cmdWrite(var)
+    def pause(self):
+        """暂停播放"""
+        if self.is_paused == False:
+            self.is_paused = True
+            var = [0xAA]
+            self._cmdWrite(var)
 
-#     def stop(self):
-#         """停止播放"""
-#         var = [0xAB]
-#         self._cmdWrite(var)
+    def stop(self):
+        """停止播放"""
+        var = [0xAB]
+        self._cmdWrite(var)
 
-#     def play(self):
-#         """
-#         播放,用于暂停后的继续播放
-#         """
-#         if self.is_paused:
-#             self.is_paused = False
-#             var = [0xAA]
-#             self._cmdWrite(var)
+    def play(self):
+        """
+        播放,用于暂停后的继续播放
+        """
+        if self.is_paused:
+            self.is_paused = False
+            var = [0xAA]
+            self._cmdWrite(var)
 
-#     def playNext(self):
-#         """播下一首"""
-#         var = [0xAC]
-#         self._cmdWrite(var)
+    def playNext(self):
+        """播下一首"""
+        var = [0xAC]
+        self._cmdWrite(var)
 
-#     def playPrev(self):
-#         """播上一首"""
-#         var = [0xAD]
-#         self._cmdWrite(var)
+    def playPrev(self):
+        """播上一首"""
+        var = [0xAD]
+        self._cmdWrite(var)
 
-#     def volume(self, vol):
-#         """设置音量 0~30"""
-#         self._vol = vol
-#         var = [0xAE, vol]
-#         self._cmdWrite(var)
-#         sleep_ms(50)
-#         # while True:
-#         #     if(self.uart.any()):
-#         #         buff = self.uart.read(2)
-#                 # print(buff)
-#                 # break
+    def volume(self, vol):
+        """设置音量 0~30"""
+        self._vol = vol
+        var = [0xAE, vol]
+        self._cmdWrite(var)
+        sleep_ms(50)
+        # while True:
+        #     if(self.uart.any()):
+        #         buff = self.uart.read(2)
+                # print(buff)
+                # break
     
-#     def song_num(self):
-#         """查询 SD 卡内音乐文件总数"""
-#         var = [0xC5]
-#         self._cmdWrite(var)
-#         while True:
-#             if(self.uart.any()):
-#                 buff = self.uart.read(3)
-#                 num = (buff[1] << 8) + buff[2]
-#                 if(buff[0]==197):
-#                     return num
-#                 else:
-#                     return 0
+    # def song_num(self):
+    #     """查询 SD 卡内音乐文件总数"""
+    #     var = [0xC5]
+    #     self._cmdWrite(var)
+    #     while True:
+    #         if(self.uart.any()):
+    #             buff = self.uart.read(3)
+    #             num = (buff[1] << 8) + buff[2]
+    #             if(buff[0]==197):
+    #                 return num
+    #             else:
+    #                 return 0
 
 class IRRecv(object):
     """
@@ -739,9 +743,7 @@ class IRRecv(object):
     :param rx: 接收引脚设置
     :param uart_id: 串口号:1、2
     """
-
     def __init__(self, rx, uart_id=1):
-
         self.uart = UART(uart_id, baudrate=115200, rx=rx)
 
     def recv(self):
@@ -796,21 +798,26 @@ class DelveBit(object):
 
         :return int: 返回传感器测量值,单位:电压(V)、电流(A)、磁场(mT)、电导率(uS/cm)、PH(pH)、光电门(s)、气压(kPa)、力传感器(N)
         """
-
-        self.i2c.scan()
-        temp = self.i2c.readfrom(self.address, 2)
-        data = ustruct.unpack(">h", temp)
-        sleep_ms(20)
-        return round(data[0] / 100, 2)
+        try:
+            self.i2c.scan()
+            temp = self.i2c.readfrom(self.address, 2)
+            data = ustruct.unpack(">h", temp)
+            sleep_ms(20)
+            return round(data[0] / 100, 2)
+        except Exception as e:
+            return -1
 
     def _trigger_receive(self):
-        self.i2c.scan()
-        temp = self.i2c.readfrom(self.address, 5, True)
-        if temp[0] in [0, 1]:
-            return temp
-        else:
-            temp = b'\xff'
-            return temp
+        try:
+            self.i2c.scan()
+            temp = self.i2c.readfrom(self.address, 5, True)
+            if temp[0] in [0, 1]:
+                return temp
+            else:
+                temp = b'\xff'
+                return temp
+        except Exception as e:
+            return -1
 
     def photo_gate(self):
         """
@@ -930,7 +937,6 @@ class Rfid():
     :param serial_number: RFID卡序列号
 
     """
-
     import rfid
 
     def __init__(self, i2c, serial_number):
@@ -1289,7 +1295,7 @@ class EncoderMotor(object):
                 else:
                     break
         elif (self.batch == 0):
-            print('新编码电机才支持')
+            print('编码电机才支持')
             return
 
     def set_correct(self, correct):
@@ -1313,7 +1319,7 @@ class EncoderMotor(object):
                 else:
                     break
         elif (self.batch == 0):
-            print('新编码电机才支持')
+            print('编码电机才支持')
             return
         
     def motor_run(self,num,speed):

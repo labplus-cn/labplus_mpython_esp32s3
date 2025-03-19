@@ -9,7 +9,7 @@
 # V1.2 add servo/ui class,by tangliufeng
 # labplus_Ledong_v2 202411
 
-from machine import I2C, PWM, Pin, ADC, TouchPad
+from machine import I2C, PWM, Pin, ADC
 # from ssd1106 import SSD1106_I2C
 import esp, math, time, network
 import ustruct, array
@@ -884,63 +884,64 @@ class Button:
 button_a = Button(0)
 button_b = Button(46)
 
-class Touch:
+# class Touch:
+#     def __init__(self, pin):
+#         self.__touch_pad = TouchPad(pin)
+#         self.__touch_pad.config(30000)
+#         self.__touch_pad.irq(self.__irq_handler)
+#         self.event_pressed = None
+#         self.event_released = None
+#         self.__pressed_count = 0
+#         self.__was_pressed = False
+#         self.__value = 0
 
-    def __init__(self, pin):
-        self.__touch_pad = TouchPad(pin)
-        self.__touch_pad.config(30000)
-        self.__touch_pad.irq(self.__irq_handler)
-        self.event_pressed = None
-        self.event_released = None
-        self.__pressed_count = 0
-        self.__was_pressed = False
-        self.__value = 0
-
-    def __irq_handler(self, value):
-        # when pressed
-        # print("%d" % value)
-        if value == 1:
-            if self.event_pressed is not None:
-                self.event_pressed(value)
-            self.__was_pressed = True
-            self.__value = 1
-            if (self.__pressed_count < 100):
-                self.__pressed_count = self.__pressed_count + 1
-        # when released
-        else:
-            self.__value = 0
-            if self.event_released is not None:
-                self.event_released(value)
+#     def __irq_handler(self, value):
+#         # when pressed
+#         # print("%d" % value)
+#         if value == 1:
+#             if self.event_pressed is not None:
+#                 self.event_pressed(value)
+#             self.__was_pressed = True
+#             self.__value = 1
+#             if (self.__pressed_count < 100):
+#                 self.__pressed_count = self.__pressed_count + 1
+#         # when released
+#         else:
+#             self.__value = 0
+#             if self.event_released is not None:
+#                 self.event_released(value)
             
-    def config(self, threshold):
-        self.__touch_pad.config(threshold)
+#     def config(self, threshold):
+#         self.__touch_pad.config(threshold)
 
-    def is_pressed(self):
-        if self.__value:
-            return True
-        else:
-            return False
+#     def is_pressed(self):
+#         if self.__value:
+#             return True
+#         else:
+#             return False
 
-    def was_pressed(self):
-        r = self.__was_pressed
-        self.__was_pressed = False
-        return r
+#     def was_pressed(self):
+#         r = self.__was_pressed
+#         self.__was_pressed = False
+#         return r
 
-    def get_presses(self):
-        r = self.__pressed_count
-        self.__pressed_count = 0
-        return r
+#     def get_presses(self):
+#         r = self.__pressed_count
+#         self.__pressed_count = 0
+#         return r
 
-    def read(self):
-        return self.__touch_pad.read()
+#     def read(self):
+#         return self.__touch_pad.read()
     
+from touchpad import TouchPad
+
 # touchpad
-touchpad_p = touchPad_P = Touch(Pin(9))
-touchpad_y = touchPad_Y = Touch(Pin(10))
-touchpad_t = touchPad_T = Touch(Pin(11))
-touchpad_h = touchPad_H = Touch(Pin(12))
-touchpad_o = touchPad_O = Touch(Pin(13))
-touchpad_n = touchPad_N = Touch(Pin(14))
+touchpad_p = touchPad_P = TouchPad(5)
+touchpad_y = touchPad_Y = TouchPad(4)
+touchpad_t = touchPad_T = TouchPad(3)
+touchpad_h = touchPad_H = TouchPad(2)
+touchpad_o = touchPad_O = TouchPad(1)
+touchpad_n = touchPad_N = TouchPad(0)
 
 # motor controller
 

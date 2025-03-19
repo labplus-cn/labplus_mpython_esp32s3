@@ -184,7 +184,7 @@ event = event_loop(refresh_cb = cb)
 #     lv.timer_handler_run_in_period(100)
 
 '''
-触摸按键示例
+乐动掌控V2 触摸按键示例
 '''
 from touchpad import TouchPad
 
