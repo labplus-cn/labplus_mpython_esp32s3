@@ -3,32 +3,17 @@
 #include "esp_camera.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include "driver/i2c.h"
 #include "lcd.h"
-
-// camera_fb_t *frame = NULL;
-typedef struct _machine_hw_i2c_obj_t {
-    mp_obj_base_t base;
-    i2c_port_t port : 8;
-    gpio_num_t scl : 8;
-    gpio_num_t sda : 8;
-} machine_hw_i2c_obj_t;
-static machine_hw_i2c_obj_t *i2c_obj = NULL;
 
 camera_fb_t *frame = NULL;
 
-static mp_obj_t reset(mp_obj_t i2c)
+static mp_obj_t reset(void)
 {
-    if(!i2c_obj){
-        i2c_obj = (machine_hw_i2c_obj_t *)MP_OBJ_TO_PTR(i2c);
-    }
-    
-    
     camera_init(PIXFORMAT_RGB565, FRAMESIZE_320X172, 2);
 
     return mp_const_none; 
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(sensor_reset_obj, reset);
+static MP_DEFINE_CONST_FUN_OBJ_0(sensor_reset_obj, reset);
 
 static mp_obj_t get_frame_width(void)
 {
