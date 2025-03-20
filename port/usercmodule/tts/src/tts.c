@@ -21,6 +21,8 @@ typedef struct {
     SemaphoreHandle_t done_semaphore;
 } tts_task_param_t;
 
+volatile int tts_flag = 0;
+
 void tts_task(void* param) {
     tts_task_param_t* task_param = (tts_task_param_t*)param;
     const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "voice_data");
@@ -47,6 +49,7 @@ void tts_task(void* param) {
     esp_tts_handle_t* tts_handle = esp_tts_create(voice);
 
     if (esp_tts_parse_chinese(tts_handle, task_param->text)) {
+        tts_flag=1;
         int len[1]={0};
 
         bsp_codec_dev_delete();
@@ -58,7 +61,8 @@ void tts_task(void* param) {
             bsp_audio_play2(pcm, len[0]*2, portMAX_DELAY);
         } while (len[0] > 0);
         bsp_codec_dev_close();
-	    bsp_codec_dev_delete();
+        bsp_codec_dev_open(16000,1,16);
+        tts_flag=0;
     }
 
     esp_tts_stream_reset(tts_handle);
@@ -85,4 +89,7 @@ void text_to_speech(const char* text) {
     xTaskCreatePinnedToCore(tts_task, "tts_task", 8192, task_param, 5, NULL, 0);
     xSemaphoreTake(done_semaphore, portMAX_DELAY);
     free(task_param);
+}
+int get_tts_flag(void) {
+    return tts_flag;
 }

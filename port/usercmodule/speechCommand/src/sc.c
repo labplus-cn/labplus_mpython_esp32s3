@@ -15,12 +15,13 @@
 #include "bsp_audio.h"
 #include "esp_mn_speech_commands.h"
 #include "sc_module.h"
+#include "tts.h"
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
 static esp_afe_sr_data_t *afe_data = NULL;
 static volatile int task_flag = 0;
-volatile int latest_command_id = -1;
+volatile int latest_command_id = 0;
 srmodel_list_t *models = NULL;
 
 
@@ -35,6 +36,9 @@ void feed_Task(void *arg)
     assert(i2s_buff);
 
     while (task_flag) {
+        if(get_tts_flag()){
+            continue;
+        }
         bsp_get_feed_data(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
 
         afe_handle->feed(afe_data, i2s_buff);
@@ -66,6 +70,9 @@ void detect_Task(void *arg)
 
     printf("------------detect start------------\n");
     while (task_flag) {
+        if(get_tts_flag()){
+            continue;
+        }
         afe_fetch_result_t *res = afe_handle->fetch(afe_data);
         if (!res || res->ret_value == ESP_FAIL) {
             printf("fetch error!\n");
@@ -151,5 +158,5 @@ int get_latest_command_id(void) {
 }
 
 void reset_latest_command_id(void) {
-    latest_command_id = -1;
+    latest_command_id = 0;
 }
