@@ -67,6 +67,7 @@ esp_err_t bsp_codec_dev_open(int sample_rate, int channel_format, int bits_per_s
 esp_err_t bsp_codec_dev_close(void);
 
 esp_err_t bsp_audio_play(const int8_t *data, int length, TickType_t ticks_to_wait);
+esp_err_t bsp_audio_play2(const int16_t *data, int length, TickType_t ticks_to_wait);
 
 /**
  * @brief Get the record pcm data.
@@ -80,6 +81,7 @@ esp_err_t bsp_audio_play(const int8_t *data, int length, TickType_t ticks_to_wai
  *    - Others                  Fail
  */
 esp_err_t bsp_get_feed_data(bool is_get_raw_channel, int8_t *buffer, int buffer_len);
+esp_err_t bsp_get_feed_data2(bool is_get_raw_channel, int16_t *buffer, int buffer_len);
 
 int bsp_get_feed_channel(void);
 
