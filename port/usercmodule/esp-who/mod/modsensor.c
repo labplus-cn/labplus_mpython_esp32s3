@@ -3,7 +3,7 @@
 #include "esp_camera.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include "lcd.h"
+#include "who_lcd.h"
 
 camera_fb_t *frame = NULL;
 
@@ -30,7 +30,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(get_frame_height_obj, get_frame_height);
 static mp_obj_t snapshot(void)
 {
     frame = esp_camera_fb_get();
-    display_draw_image(0, 0, frame->width, frame->height, (void *)(frame->buf));
+    lcd_draw_image(0, 0, frame->width, frame->height, (void *)(frame->buf));
     // ESP_LOGI("tag", "frame addr: %p", &(frame));
 
     // mp_obj_t items[] = {MP_OBJ_NEW_SMALL_INT(frame->width), 
