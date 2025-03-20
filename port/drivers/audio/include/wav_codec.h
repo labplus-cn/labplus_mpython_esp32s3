@@ -23,6 +23,8 @@
 #include "py/obj.h"
 #include "freertos/ringbuf.h"
 #include "wave_head.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #ifdef __cplusplus
 extern "C" {
