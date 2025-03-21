@@ -5,7 +5,7 @@
 #include "esp_camera.h"
 #include "esp_log.h"
 #include "who_lcd.h"
-extern bool human_face_detection(camera_fb_t *frame);
+
 static void detect_task_handler(void *arg)
 {
     camera_fb_t *frame = NULL;
@@ -13,7 +13,7 @@ static void detect_task_handler(void *arg)
     while(1){
         frame = esp_camera_fb_get();
         if(frame){
-            human_face_detection(frame);
+            // human_face_detection(frame);
 
             lcd_draw_image(0, 0, frame->width, frame->height, (void *)frame->buf);
             esp_camera_fb_return(frame);

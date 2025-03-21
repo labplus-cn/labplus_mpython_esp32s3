@@ -9,7 +9,7 @@ camera_fb_t *frame = NULL;
 
 static mp_obj_t reset(void)
 {
-    camera_init(PIXFORMAT_RGB565, FRAMESIZE_320X172, 2);
+    camera_init(PIXFORMAT_RGB565, FRAMESIZE_QVGA, 2);
 
     return mp_const_none; 
 }
