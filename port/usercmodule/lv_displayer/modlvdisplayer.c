@@ -1,12 +1,10 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "py/runtime.h"
-#include "lcd.h"
+#include "who_lcd.h"
 #include "lvgl.h"
 #include "py/obj.h"
 #include "esp_lcd_panel_ops.h"
-
-static const char *TAG = "lvgl_esp32_wrapper";
 
 typedef struct _lv_displayet_t
 {
@@ -45,10 +43,10 @@ static mp_obj_t lv_displayer_init(void)
     if(!lv_displayer){
         lv_displayer = calloc(1, sizeof(lv_displayet_t));
 
-        if(!lcd){
+        lv_displayer->lcd = get_lcd_handle();
+        if(!lv_displayer->lcd){
             lcd_init();
         }
-        lv_displayer->lcd = lcd;
 
         if (!lv_is_initialized()){
             lv_init();
