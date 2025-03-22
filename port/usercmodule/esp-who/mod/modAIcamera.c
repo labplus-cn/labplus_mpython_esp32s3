@@ -6,6 +6,10 @@
 #include "esp_log.h"
 #include "who_lcd.h"
 
+static bool ai_module_initialized = false;
+static QueueHandle_t xQueueAIFrame = NULL;
+static QueueHandle_t xQueueLCDFrame = NULL;
+
 static void detect_task_handler(void *arg)
 {
     camera_fb_t *frame = NULL;
@@ -23,7 +27,17 @@ static void detect_task_handler(void *arg)
 
 static mp_obj_t AI_detect_init(void)
 {
-    xTaskCreatePinnedToCore(detect_task_handler, "task", 4 * 1024, NULL, 5, NULL, 0);
+    if(!ai_module_initialized){
+        xQueueAIFrame = xQueueCreate(2, sizeof(camera_fb_t *));
+        xQueueLCDFrame = xQueueCreate(2, sizeof(camera_fb_t *));
+    
+        register_camera(PIXFORMAT_RGB565, FRAMESIZE_QVGA, 2, xQueueLCDFrame);
+        // register_human_face_detection(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
+        register_lcd(xQueueLCDFrame, NULL, true);
+
+            ai_module_initialized = true;
+    }
+
 
     return mp_const_none; 
 }
