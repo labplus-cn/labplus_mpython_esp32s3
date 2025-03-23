@@ -35,6 +35,36 @@ def get_file_size(filename):
 
 
 class AI:
+    def __init__(self, url):
+        self.url = url
+        self.payload = None
+        self.headers = None
+
+    def set_payload(self, payload):
+        self.payload = payload
+
+    def set_headers(self, headers):
+        self.headers = headers
+
+    def request_ai(self):
+        url = self.url
+
+        if self.payload is None:
+            print("Error：请设置ai参数")
+            return
+        payload = json.dumps(self.payload)
+
+        if self.headers is None:
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        else:
+            headers = self.headers
+
+        response = requests.request("POST", url, headers=headers, data=payload.encode("utf-8"))
+        return response
+
     @classmethod
     def get_text(cls, filename):
         url = "https://vop.baidu.com/server_api"
@@ -54,7 +84,6 @@ class AI:
         }
 
         response = requests.request("POST", url, headers=headers, data=payload.encode("utf-8"))
-        print(response.text)
         res = json.loads(response.text)
         if res.get("err_no") == 0:
             return res.get("result")[0]
