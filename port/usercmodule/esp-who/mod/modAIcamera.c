@@ -6,11 +6,13 @@
 #include "esp_log.h"
 #include "who_lcd.h"
 #include "who_c_wrapper.h"
+#include "who_human_face_recognition.hpp"
 
 static bool ai_module_initialized = false;
 static QueueHandle_t xQueueAIFrame = NULL;
 static QueueHandle_t xQueueLCDFrame = NULL;
 static QueueHandle_t xQueueResult = NULL;
+static QueueHandle_t xQueueEvent = NULL;
 static mp_obj_t ai_callback = MP_OBJ_NULL;
 ai_msg_t msg;
 
@@ -41,6 +43,7 @@ static mp_obj_t AI_detect_init(mp_obj_t type, mp_obj_t callback)
     if(!ai_module_initialized){
         xQueueAIFrame = xQueueCreate(2, sizeof(camera_fb_t *));
         xQueueLCDFrame = xQueueCreate(2, sizeof(camera_fb_t *));
+        xQueueEvent = xQueueCreate(2, sizeof(int8_t));
         xQueueResult = xQueueCreate(2, sizeof(ai_msg_t));
     
         if(_type == AI_TYPE_NONE){
@@ -51,13 +54,13 @@ static mp_obj_t AI_detect_init(mp_obj_t type, mp_obj_t callback)
         
         switch(_type){
             case AI_TYPE_COLOR_DETECTION:
-                register_color_detection_wrapper(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
+                register_color_detection_wrapper(xQueueAIFrame, xQueueEvent, xQueueResult, xQueueLCDFrame, false);
             break;
             case AI_TYPE_FACE_DETECTION:
                 register_human_face_detection_wrapper(xQueueAIFrame, NULL, xQueueResult, xQueueLCDFrame, false);
             break;
             case AI_TYPE_FACE_RECOGNITION:
-                register_human_face_recognition_wrapper(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
+                register_human_face_recognition_wrapper(xQueueAIFrame, xQueueEvent, xQueueResult, xQueueLCDFrame, false);
             break;
             case AI_TYPE_CAT_FACE_DETECTION:
                 register_cat_face_detection_wrapper(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
@@ -83,12 +86,13 @@ static mp_obj_t AI_detect_init(mp_obj_t type, mp_obj_t callback)
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(AI_detect_init_obj, AI_detect_init);
 
-static mp_obj_t AI_command(void)
+static mp_obj_t AI_command(mp_obj_t command)
 {
-
+    int cmd = mp_obj_get_int(command);
+    xQueueSend(xQueueEvent, &cmd, portMAX_DELAY);
     return mp_const_none; 
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(AI_command_obj, AI_command);
+static MP_DEFINE_CONST_FUN_OBJ_1(AI_command_obj, AI_command);
 
 static mp_obj_t mp_get_result(void)
 {
@@ -119,13 +123,16 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_result_obj, mp_get_result);
 static const mp_rom_map_elem_t AIcamera_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_AIcamera) },
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&AI_detect_init_obj) },
-    { MP_ROM_QSTR(MP_QSTR_command), MP_ROM_PTR(&AI_command_obj) },
+    { MP_ROM_QSTR(MP_QSTR_send_command), MP_ROM_PTR(&AI_command_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_result), MP_ROM_PTR(&mp_get_result_obj) },
     { MP_ROM_QSTR(MP_QSTR_COLOR_DETECTION), MP_ROM_INT(AI_TYPE_COLOR_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_FACE_DETECTION), MP_ROM_INT(AI_TYPE_FACE_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_FACE_RECOGNITION), MP_ROM_INT(AI_TYPE_FACE_RECOGNITION) },
     { MP_ROM_QSTR(MP_QSTR_CAT_FACE_DETECTION), MP_ROM_INT(AI_TYPE_CAT_FACE_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_MOTION_DEECTION), MP_ROM_INT(AI_TYPE_MOTION_DEECTION) },
+    { MP_ROM_QSTR(MP_QSTR_ENROLL), MP_ROM_INT(ENROLL) },
+    { MP_ROM_QSTR(MP_QSTR_RECOGNIZE), MP_ROM_INT(RECOGNIZE) },
+    { MP_ROM_QSTR(MP_QSTR_DELETE), MP_ROM_INT(DELETE) },
 };
 static MP_DEFINE_CONST_DICT(AIcamera_module_globals, AIcamera_module_globals_table);
 
