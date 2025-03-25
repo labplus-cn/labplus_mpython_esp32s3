@@ -239,11 +239,31 @@ TFT LCD
 '''
 sensor test
 '''
-import lcd
-import sensor
+# import lcd
+# import sensor
 
-sensor.reset()
+# sensor.reset()
+# while True:
+#     sensor.snapshot()
+#     sensor.free_fb()
+
+from mpython import wifi
+
+my_wifi = wifi()
+
+my_wifi.connectWiFi("labplus_dev", "helloworld")
+
+def cb(_):
+    print(AIcamera.get_box())
+    print(AIcamera.get_keypoint())
+
+import AIcamera
+AIcamera.init(AIcamera.FACE_RECOGNITION,cb)
+AIcamera.send_command(AIcamera.ENROLL)
+
+AIcamera.send_command(AIcamera.RECOGNIZE)
+
+import time
 while True:
-    sensor.snapshot()
-    sensor.free_fb()
-
+    AIcamera.send_command(AIcamera.RECOGNIZE)
+    time.sleep_ms(200)
