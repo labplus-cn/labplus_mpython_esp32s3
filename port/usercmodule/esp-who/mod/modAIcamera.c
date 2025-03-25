@@ -94,7 +94,7 @@ static mp_obj_t AI_command(mp_obj_t command)
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(AI_command_obj, AI_command);
 
-static mp_obj_t mp_get_result(void)
+static mp_obj_t mp_get_box(void)
 {
     mp_obj_t t[4];
     mp_obj_t r[msg.element_num];
@@ -118,13 +118,39 @@ static mp_obj_t mp_get_result(void)
     }
 
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_result_obj, mp_get_result);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_box_obj, mp_get_box);
+
+static mp_obj_t mp_get_keypoint(void)
+{
+    mp_obj_t t[10];
+    mp_obj_t r[msg.element_num];
+    if(msg.type == AI_TYPE_FACE_DETECTION || AI_TYPE_CAT_FACE_DETECTION){
+        for(int i = 0; i < msg.element_num; i++){
+            for(int j = 0; j < 10; j++){
+                t[j] = mp_obj_new_int(msg.keypoint[i][j]);
+            }
+            r[i] = mp_obj_new_tuple(10, t);
+        }
+        return mp_obj_new_tuple(msg.element_num, r); 
+    }else if(msg.type == AI_TYPE_FACE_RECOGNITION){
+
+        return mp_const_none;
+    }else if(msg.type == AI_TYPE_COLOR_DETECTION){
+
+        return mp_const_none;
+    }else{
+        return mp_const_none;
+    }
+
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_keypoint_obj, mp_get_keypoint);
 
 static const mp_rom_map_elem_t AIcamera_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_AIcamera) },
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&AI_detect_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_send_command), MP_ROM_PTR(&AI_command_obj) },
-    { MP_ROM_QSTR(MP_QSTR_get_result), MP_ROM_PTR(&mp_get_result_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_box), MP_ROM_PTR(&mp_get_box_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_keypoint), MP_ROM_PTR(&mp_get_keypoint_obj) },
     { MP_ROM_QSTR(MP_QSTR_COLOR_DETECTION), MP_ROM_INT(AI_TYPE_COLOR_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_FACE_DETECTION), MP_ROM_INT(AI_TYPE_FACE_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_FACE_RECOGNITION), MP_ROM_INT(AI_TYPE_FACE_RECOGNITION) },
