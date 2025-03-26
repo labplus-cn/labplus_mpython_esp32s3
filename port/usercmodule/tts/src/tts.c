@@ -17,6 +17,7 @@
 #include "bsp_audio.h"
 
 static esp_tts_handle_t *g_tts_handle = NULL;
+SemaphoreHandle_t tts_semaphore;
 
 volatile int tts_flag = 0;
 
@@ -45,38 +46,46 @@ void model_init(void)
     g_tts_handle = esp_tts_create(voice);
 }
 
-void text_to_speech(const char *text)
+static void text_to_speech_task(void *arg)
 {
+    const char *text = (const char *)arg;
     if (g_tts_handle == NULL) {
         printf("TTS model not initialized!\n");
+        xSemaphoreGive(tts_semaphore);
+        vTaskDelete(NULL);
         return;
     }
 
-    // 解析中文文本
     if (esp_tts_parse_chinese(g_tts_handle, text)) {
-        tts_flag=1;
+        tts_flag = 1;
         int len[1] = {0};
 
-        // 播放前先重建 codec 设备，确保播放参数正确
         bsp_codec_dev_delete();
         bsp_codec_dev_create();
         bsp_audio_set_play_vol(50);
         bsp_codec_dev_open(10000, 2, 16);
 
-        // 循环获取 PCM 数据并播放
         do {
+//            short *pcm = (short *)heap_caps_malloc(4*1024 * sizeof(short), MALLOC_CAP_SPIRAM);
             short *pcm = esp_tts_stream_play(g_tts_handle, len, 0);
             bsp_audio_play2(pcm, len[0] * 2, portMAX_DELAY);
         } while (len[0] > 0);
 
-        // 关闭双通道设备，恢复单通道设置
         bsp_codec_dev_close();
         bsp_codec_dev_open(16000, 1, 16);
-        tts_flag=0;
+        tts_flag = 0;
     }
 
-    // 重置流状态，准备下次合成
     esp_tts_stream_reset(g_tts_handle);
+    xSemaphoreGive(tts_semaphore);
+    vTaskDelete(NULL);
+}
+
+void text_to_speech(const char *text)
+{
+    tts_semaphore = xSemaphoreCreateBinary();
+    xTaskCreatePinnedToCore(text_to_speech_task, "tts_task", 4*1024, (void *)text, 5, NULL, 0);
+    xSemaphoreTake(tts_semaphore, portMAX_DELAY);
 }
 
 int get_tts_flag(void) {

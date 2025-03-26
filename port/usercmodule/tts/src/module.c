@@ -17,7 +17,7 @@ static mp_obj_t mp_tts_generate(mp_obj_t text_obj) {
     size_t text_len = strlen(text);
 
     // 每次处理 50 个字符
-    const size_t chunk_size = 50;
+    const size_t chunk_size = 200;
     char buffer[chunk_size + 1];  // 额外 1 字节用于存储 '\0'
 
     for (size_t i = 0; i < text_len; i += chunk_size) {
