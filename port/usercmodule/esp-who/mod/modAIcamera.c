@@ -29,7 +29,7 @@ static void task_resault_handler(void *arg)
 {
     while (true)
     {
-        xQueueReceive(xQueueResult, &msg, portMAX_DELAY);
+        xQueueReceive(xQueueResult, &msg, portMAX_DELAY); //识别成功
         if(ai_callback){
             mp_sched_schedule(ai_callback, mp_obj_new_int(0));
         }
@@ -94,47 +94,46 @@ static mp_obj_t AI_command(mp_obj_t command)
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(AI_command_obj, AI_command);
 
-static mp_obj_t mp_get_box(void)
+static mp_obj_t mp_get_result(void)
 {
-    mp_obj_t t[4];
-    mp_obj_t r[msg.element_num];
-    if(msg.type == AI_TYPE_FACE_DETECTION || msg.type == AI_TYPE_CAT_FACE_DETECTION || msg.type == AI_TYPE_FACE_RECOGNITION){
-        for(int i = 0; i < msg.element_num; i++){
+    mp_obj_t t[10];
+    int i;
+    mp_obj_t dict[msg.element_num];
+
+    if(msg.type == AI_TYPE_FACE_DETECTION || msg.type == AI_TYPE_CAT_FACE_DETECTION){
+        for(i = 0; i < msg.element_num; i++)
+            dict[i] = mp_obj_new_dict(2);
+
+        for(i = 0; i < msg.element_num; i++){
             t[0] = mp_obj_new_int(msg.box[i][0]);
             t[1] = mp_obj_new_int(msg.box[i][1]);
             t[2] = mp_obj_new_int(msg.box[i][2]);
             t[3] = mp_obj_new_int(msg.box[i][3]);
-            r[i] = mp_obj_new_tuple(4, t);
-        }
-        return mp_obj_new_tuple(msg.element_num, r); 
-    }else if(msg.type == AI_TYPE_FACE_RECOGNITION){
-
-        return mp_const_none;
-    }else if(msg.type == AI_TYPE_COLOR_DETECTION){
-
-        return mp_const_none;
-    }else{
-        return mp_const_none;
-    }
-
-}
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_box_obj, mp_get_box);
-
-static mp_obj_t mp_get_keypoint(void)
-{
-    mp_obj_t t[10];
-    mp_obj_t r[msg.element_num];
-    if(msg.type == AI_TYPE_FACE_DETECTION || msg.type == AI_TYPE_CAT_FACE_DETECTION){
-        for(int i = 0; i < msg.element_num; i++){
+            mp_obj_dict_store(dict[i], MP_OBJ_NEW_QSTR(MP_QSTR_box),  mp_obj_new_tuple(4, t));
+            
             for(int j = 0; j < 10; j++){
                 t[j] = mp_obj_new_int(msg.keypoint[i][j]);
             }
-            r[i] = mp_obj_new_tuple(10, t);
+            mp_obj_dict_store(dict[i], MP_OBJ_NEW_QSTR(MP_QSTR_keypoint),  mp_obj_new_tuple(10, t));
         }
-        return mp_obj_new_tuple(msg.element_num, r); 
+        return mp_obj_new_tuple(msg.element_num, dict); 
     }else if(msg.type == AI_TYPE_FACE_RECOGNITION){
+        mp_obj_t t[10];
 
-        return mp_const_none;
+        mp_obj_t dict = mp_obj_new_dict(4);
+        mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_id), MP_OBJ_NEW_SMALL_INT(msg.id));
+        mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_Similarity), mp_obj_new_float(msg.similarity));
+        t[0] = mp_obj_new_int(msg.box[0][0]);
+        t[1] = mp_obj_new_int(msg.box[0][1]);
+        t[2] = mp_obj_new_int(msg.box[0][2]);
+        t[3] = mp_obj_new_int(msg.box[0][3]);
+        mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_box),  mp_obj_new_tuple(4, t));
+        for(int j = 0; j < 10; j++){
+            t[j] = mp_obj_new_int(msg.keypoint[0][j]);
+        }
+        mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_keypoint),  mp_obj_new_tuple(10, t));
+
+        return dict;
     }else if(msg.type == AI_TYPE_COLOR_DETECTION){
 
         return mp_const_none;
@@ -143,14 +142,13 @@ static mp_obj_t mp_get_keypoint(void)
     }
 
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_keypoint_obj, mp_get_keypoint);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_get_result_obj, mp_get_result);
 
 static const mp_rom_map_elem_t AIcamera_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_AIcamera) },
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&AI_detect_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_send_command), MP_ROM_PTR(&AI_command_obj) },
-    { MP_ROM_QSTR(MP_QSTR_get_box), MP_ROM_PTR(&mp_get_box_obj) },
-    { MP_ROM_QSTR(MP_QSTR_get_keypoint), MP_ROM_PTR(&mp_get_keypoint_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_result), MP_ROM_PTR(&mp_get_result_obj) },
     { MP_ROM_QSTR(MP_QSTR_COLOR_DETECTION), MP_ROM_INT(AI_TYPE_COLOR_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_FACE_DETECTION), MP_ROM_INT(AI_TYPE_FACE_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_FACE_RECOGNITION), MP_ROM_INT(AI_TYPE_FACE_RECOGNITION) },

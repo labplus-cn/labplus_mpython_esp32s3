@@ -247,23 +247,33 @@ sensor test
 #     sensor.snapshot()
 #     sensor.free_fb()
 
-from mpython import wifi
+# from mpython import wifi
 
-my_wifi = wifi()
+# my_wifi = wifi()
 
-my_wifi.connectWiFi("labplus_dev", "helloworld")
+# my_wifi.connectWiFi("labplus_dev", "helloworld")
 
-def cb(_):
-    print(AIcamera.get_box())
-    print(AIcamera.get_keypoint())
-
+'''
+人脸检测
+'''
 import AIcamera
-AIcamera.init(AIcamera.FACE_RECOGNITION,cb)
-AIcamera.send_command(AIcamera.ENROLL)
+def cb(_):
+    print(AIcamera.get_result())  #获取识别结果
 
-AIcamera.send_command(AIcamera.RECOGNIZE)
+AIcamera.init(AIcamera.FACE_DETECTION,cb)
+
+'''
+人脸识别
+'''
+def cb(_):
+    print(AIcamera.get_result())
+
+AIcamera.init(AIcamera.FACE_RECOGNITION,cb)
+
+AIcamera.send_command(AIcamera.ENROLL)  # 录入人脸，通常用按键触发调用
 
 import time
+# 循环发送人脸检测指令
 while True:
     AIcamera.send_command(AIcamera.RECOGNIZE)
     time.sleep_ms(200)
