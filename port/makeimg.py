@@ -105,6 +105,8 @@ arg_application_bin = "micropython.bin"
 arg_output_bin = bin_name
 arg_output_uf2= uf2_name
 arg_font_bin = "../Noto_Sans_CJK_SC_Light16.bin"
+arg_voice_data_bin = "../components/espressif__esp-sr/esp-tts/esp_tts_chinese/esp_tts_voice_data_xiaoxin.dat"
+arg_sr_bin = "../build/srmodels/srmodels.bin"
 
 # Load required sdkconfig values.
 idf_target = load_sdkconfig_str_value(arg_sdkconfig, "IDF_TARGET", "").upper()
@@ -124,23 +126,35 @@ offset_application = 0
 max_size_application = 0
 offset_font = 0
 
+offset_voice_data = 0
+max_size_voice_data = 0
+offset_sr = 0
+max_size_sr = 0
+
 # Inspect the partition table to find offsets and maximum sizes.
 for part in partition_table:
     if part.name == "nvs":
         max_size_partitions = part.offset - offset_partitions
     elif part.name == "font":
-        offset_font =  part.offset
+        offset_font = part.offset
         max_size_font = part.size
     elif part.type == gen_esp32part.APP_TYPE and offset_application == 0:
         offset_application = part.offset
         max_size_application = part.size
+    elif part.name == "voice_data":
+        offset_voice_data = part.offset
+        max_size_voice_data = part.size
+    elif part.name == "sr_module":
+        offset_sr = part.offset
+        max_size_sr = part.size
 
 # Define the input files, their location and maximum size.
 files_in = [
     ("bootloader", offset_bootloader, max_size_bootloader, arg_bootloader_bin),
     ("partitions", offset_partitions, max_size_partitions, arg_partitions_bin),
     ("application", offset_application, max_size_application, arg_application_bin),
-    # ("font", offset_font, max_size_font, arg_font_bin),
+    ("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin),
+    ("sr_module", offset_sr, max_size_sr, arg_sr_bin),
 ]
 file_out = arg_output_bin
 

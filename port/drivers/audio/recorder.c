@@ -11,6 +11,8 @@
 #include <ctype.h>
 #include <math.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "py/stream.h"
@@ -65,7 +67,10 @@ void recorder_record(const char *filename, wav_fmt_t fmt, int time)
     recorder->total_frames = recorder->time * (recorder->wav_fmt.sampleRate * recorder->wav_fmt.channels * recorder->wav_fmt.bits_per_sample / 8) / READ_RINGBUF_BLOCK_SIZE;
     // ESP_LOGE(TAG, "record total frame: %d, time: %d", recorder->total_frames, recorder->time);
     recorder->file_uri = filename;
+    xBinarySemaphore = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(&stream_i2s_read_task, "stream_i2s_read_task", 4 * 1024, (void*)recorder, 8, NULL, CORE_NUM1);
+    xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
+    vSemaphoreDelete(xBinarySemaphore);
 }
 
 void record_deinit(void)

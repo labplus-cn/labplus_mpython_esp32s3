@@ -2,6 +2,7 @@
 #define __RECORDER_
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "ringbuf.h"
 #include "py/obj.h"
 #include "wav_codec.h"
@@ -27,5 +28,6 @@ typedef struct
 void recorder_record(const char *filename, wav_fmt_t fmt, int time);
 
 extern recorder_handle_t *recorder;
+extern SemaphoreHandle_t xBinarySemaphore;
 
 #endif
