@@ -239,11 +239,86 @@ TFT LCD
 '''
 sensor test
 '''
-import lcd
-import sensor
+# import lcd
+# import sensor
 
-sensor.reset()
+# sensor.reset()
+# while True:
+#     sensor.snapshot()
+#     sensor.free_fb()
+
+# from mpython import wifi
+
+# my_wifi = wifi()
+
+# my_wifi.connectWiFi("labplus_dev", "helloworld")
+
+'''
+人脸、猫脸检测
+'''
+import AIcamera
+
+isDetect = False
+
+def cb(_):
+    global isDetect
+    isDetect = True
+
+'''
+可选参数：
+    AIcamera.FACE_DETECTION      # 人脸检测
+    AIcamera.FACE_RECOGNITION    # 人脸识别
+    AIcamera.CAT_FACE_DETECTION  # 猫脸检测
+    AIcamera.COLOR_DETECTION     # 颜色识别
+    AIcamera.MOTION_DEECTION     # 运动检测
+    AIcamera.CODE_SCANNER        # 二维码识别
+'''
+AIcamera.init(AIcamera.FACE_DETECTION,cb)
+
 while True:
-    sensor.snapshot()
-    sensor.free_fb()
+    if isDetect:
+        print(AIcamera.get_result())  #获取识别结果，检测到的人脸框选位置及关键点坐标（口左角，口右角，鼻，左眼，右眼）,数据结构：（{'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}, {'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}, ...)
+        # 用户可以利用识别结果做点别的。
+        isDetect = False  # 清除识别标记
+    time_sleep_ms(100)
 
+'''
+人脸识别
+'''
+isDetect = False
+
+def cb(_):
+    global isDetect
+    isDetect = True
+
+AIcamera.init(AIcamera.FACE_RECOGNITION,cb)
+
+AIcamera.send_command(AIcamera.ENROLL)  # 录入人脸，通常在按键响应里调用它
+AIcamera.send_command(AIcamera.DELETE)  # 删除人脸，通常在按键响应里调用它
+
+import time
+# 循环发送人脸检测指令
+while True:
+    AIcamera.send_command(AIcamera.RECOGNIZE)
+    time.sleep_ms(200)
+    if isDetect:
+        #获取识别结果，检测到的人脸ID、置信度、框选位置及关键点坐标（口左角，口右角，鼻，左眼，右眼）,数据结构：{'id': id, 'similarity': sim, 'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}
+        print(AIcamera.get_result())
+        # 用户可以利用识别结果做点别的。
+        isDetect = False
+    
+'''
+运动检测
+'''
+isDetect = False
+
+def cb(_):
+    global isDetect
+    isDetect = True
+
+AIcamera.init(AIcamera.MOTION_DEECTION, cb)
+
+while True:
+    if isDetect:
+        #do something
+        isDetect = False
