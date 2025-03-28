@@ -5,8 +5,13 @@ from flashbdev import bdev
 from neopixel import NeoPixel
 import machine 
 import ubinascii
-import lcd
 
+# 硬件复位标志
+for count in range(3):
+    print("=$%#=")
+    time.sleep_ms(150)
+    
+import lcd
 lcd.draw_logo()
 
 # 上电后立即关闭rgb,防止随机灯亮问题
@@ -20,12 +25,6 @@ try:
 except OSError:
     import inisetup
     vfs = inisetup.setup()
-
-# 硬件复位标志
-for count in range(3):
-    print("=$%#=")
-    time.sleep_ms(150)
-
 
 # mac地址
 # mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())

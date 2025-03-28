@@ -8,8 +8,12 @@ from machine import I2C, Pin
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
+# 硬件复位标志
+for count in range(3):
+    print("=$%#=")
+    time.sleep_ms(150)
+    
 import lcd
-
 lcd.draw_logo()
 
 # 上电后立即关闭rgb,防止随机灯亮问题
@@ -23,12 +27,6 @@ try:
 except OSError:
     import inisetup
     vfs = inisetup.setup()
-
-# 硬件复位标志
-for count in range(3):
-    print("=$%#=")
-    time.sleep_ms(150)
-
 
 # mac地址
 # mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
