@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_process_sdkconfig.h"
@@ -24,6 +25,10 @@ static volatile int task_flag = 0;
 volatile int latest_command_id = 0;
 srmodel_list_t *models = NULL;
 
+static char wakeup_word[64] = "";
+static uint16_t timeout  = 6000;
+static bool enable_flag = false;
+
 
 void feed_Task(void *arg)
 {
@@ -32,7 +37,7 @@ void feed_Task(void *arg)
     int nch = afe_handle->get_feed_channel_num(afe_data);
     int feed_channel = 1;
     assert(nch == feed_channel);
-    int16_t *i2s_buff = malloc(audio_chunksize * sizeof(int16_t) * feed_channel);
+    int16_t *i2s_buff = heap_caps_malloc(audio_chunksize * sizeof(int16_t) * feed_channel,MALLOC_CAP_SPIRAM);
     assert(i2s_buff);
 
     while (task_flag) {
@@ -44,7 +49,7 @@ void feed_Task(void *arg)
         afe_handle->feed(afe_data, i2s_buff);
     }
     if (i2s_buff) {
-        free(i2s_buff);
+        heap_caps_free(i2s_buff);
         i2s_buff = NULL;
     }
     vTaskDelete(NULL);
@@ -58,7 +63,7 @@ void detect_Task(void *arg)
     printf("multinet:%s\n", mn_name);
     esp_mn_iface_t *multinet = esp_mn_handle_from_name(mn_name);
     printf("RAM left %lu\n", esp_get_free_heap_size());
-    model_iface_data_t *model_data = multinet->create(mn_name, 6000); //这一步为加载模型数据，psram <= 2mb会不够用
+    model_iface_data_t *model_data = multinet->create(mn_name, timeout); //这一步为加载模型数据，psram <= 2mb会不够用
     esp_mn_commands_update_from_sdkconfig(multinet, model_data); // Add speech commands from sdkconfig
     int mu_chunksize = multinet->get_samp_chunksize(model_data);
     assert(mu_chunksize == afe_chunksize);
@@ -82,6 +87,13 @@ void detect_Task(void *arg)
         if (res->wakeup_state == WAKENET_DETECTED) {
             printf("WAKEWORD DETECTED\n");
 	        multinet->clean(model_data);
+	        if(!get_tts_init_flag()){
+	            model_init();
+	        }
+	        if(wakeup_word[0] != '\0'){
+	            text_to_speech(wakeup_word);
+	        }
+
         }
 
         if (res->raw_data_channels == 1 && res->wakeup_state == WAKENET_DETECTED) {
@@ -133,8 +145,15 @@ void detect_Task(void *arg)
     vTaskDelete(NULL);
 }
 
-void sc_init()
+void sc_init(const char *word, uint16_t t, bool f)
 {
+    if (word && word[0] != '\0') {
+        strncpy(wakeup_word, word, sizeof(wakeup_word) - 1);
+        wakeup_word[sizeof(wakeup_word) - 1] = '\0';  // 确保字符串以 '\0' 结尾
+    }
+    timeout = t;
+    enable_flag = f;
+
     bsp_codec_dev_create();
     bsp_codec_dev_open(16000, 1, 16);
     models = esp_srmodel_init("sr_module");
@@ -155,6 +174,9 @@ void sc_init()
 }
 int get_latest_command_id(void) {
     return latest_command_id;
+}
+int get_wakeup_flag(void) {
+    return wakeup_flag;
 }
 
 void reset_latest_command_id(void) {

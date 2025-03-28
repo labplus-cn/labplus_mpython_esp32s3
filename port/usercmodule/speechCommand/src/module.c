@@ -7,6 +7,13 @@
 
 static mp_obj_dict_t *callback_dict = NULL;
 
+enum { ARG_wakeup, ARG_timeout, ARG_flag };
+static const mp_arg_t allowed_args[] = {
+    { MP_QSTR_wakeup_word, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },  // 唤醒词
+    { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 6000} },              // 超时时间
+    { MP_QSTR_flag, MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false} }               // 布尔标志
+};
+
 void sc_invoke_callback_for_id(int command_id) {
     if (callback_dict == NULL) {
         return;
@@ -22,14 +29,24 @@ void sc_invoke_callback_for_id(int command_id) {
 }
 
 // MicroPython 绑定函数
-static mp_obj_t mp_sc_init(void) {
-    sc_init();
-//    xTaskCreatePinnedToCore(callback_poll_task, "cb_poll", 4096, NULL, 5, NULL, 1);
+static mp_obj_t mp_sc_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+{
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-    return mp_const_none;  // 播放完成后返回 None
+    const char *word = NULL;  // 默认唤醒词
+    if (args[0].u_obj != mp_const_none) {
+        word = mp_obj_str_get_str(args[0].u_obj);
+    }
+
+    uint16_t t = args[1].u_int;
+    bool f = args[2].u_bool;
+
+    sc_init(word, t, f);
+    return mp_const_none;
 }
 
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_init_obj, mp_sc_init);
+static MP_DEFINE_CONST_FUN_OBJ_KW(mp_sc_init_obj, 0, mp_sc_init);
 
 // 清空语音指令
 static mp_obj_t mp_esp_mn_commands_clear(void) {
@@ -75,6 +92,12 @@ static mp_obj_t mp_sc_get_latest_command_id(void) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_get_latest_command_id_obj, mp_sc_get_latest_command_id);
 
+static mp_obj_t mp_sc_get_wakeup_flag(void) {
+    int cmd_id = get_wakeup_flag();
+    return mp_obj_new_int(cmd_id);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_get_wakeup_flag_obj, mp_sc_get_wakeup_flag);
+
 // 模块定义
 static const mp_rom_map_elem_t sc_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sc) },
@@ -84,6 +107,7 @@ static const mp_rom_map_elem_t sc_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_update), MP_ROM_PTR(&mp_esp_mn_commands_update_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_callback),     MP_ROM_PTR(&mp_sc_set_callback_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_latest_id),    MP_ROM_PTR(&mp_sc_get_latest_command_id_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_wakeup_flag),    MP_ROM_PTR(&mp_sc_get_wakeup_flag_obj) },
 };
 static MP_DEFINE_CONST_DICT(sc_module_globals, sc_module_globals_table);
 

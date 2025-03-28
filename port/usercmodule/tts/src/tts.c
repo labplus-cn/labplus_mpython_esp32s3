@@ -20,9 +20,13 @@ static esp_tts_handle_t *g_tts_handle = NULL;
 SemaphoreHandle_t tts_semaphore;
 
 volatile int tts_flag = 0;
+volatile int tts_init_flag = 0;
 
 void model_init(void)
 {
+    if(tts_init_flag){
+        return;
+    }
     const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "voice_data");
     if (part == NULL) {
         printf("Couldn't find voice data partition!\n");
@@ -44,6 +48,7 @@ void model_init(void)
         return;
     }
     g_tts_handle = esp_tts_create(voice);
+    tts_init_flag=1;
 }
 
 static void text_to_speech_task(void *arg)
@@ -62,7 +67,7 @@ static void text_to_speech_task(void *arg)
 
         bsp_codec_dev_delete();
         bsp_codec_dev_create();
-        bsp_audio_set_play_vol(50);
+//        bsp_audio_set_play_vol(50);
         bsp_codec_dev_open(10000, 2, 16);
 
         do {
@@ -90,4 +95,8 @@ void text_to_speech(const char *text)
 
 int get_tts_flag(void) {
     return tts_flag;
+}
+
+int get_tts_init_flag(void) {
+    return tts_init_flag;
 }
