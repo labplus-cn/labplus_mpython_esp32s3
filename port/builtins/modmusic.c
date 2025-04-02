@@ -42,11 +42,12 @@
 #define MCPWM_UNIT_MUSIC      MCPWM_UNIT_1
 #define MCPWM_TIMER_MUSIC     MCPWM_TIMER_0
 #define MCPWM_PWM_MUSIC       MCPWM0A
+#define DEFAULT_MUSIC_PIN     21
 
 #define music_set_frequecty(freq)   mcpwm_set_frequency(MCPWM_UNIT_1, MCPWM_TIMER_0, (freq))
 #define music_set_duty(duty)        mcpwm_set_duty(MCPWM_UNIT_1, MCPWM_TIMER_0, MCPWM_OPR_A, (duty))
 #define music_acquire_pin(pin)      mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM0A, (pin))
-#define music_free_pin(pin)         gpio_reset_pin(pin)
+#define music_free_pin(pin)         //gpio_reset_pin(pin)
 
 __attribute__ ((gnu_inline))inline void music_init_contorl(void) {
     mcpwm_config_t pwm_config;
@@ -89,7 +90,8 @@ enum {
 };
 
 // #define music_data MP_STATE_PORT(music_data)
-music_data_t *music_data;
+// music_data_t *music_data;
+static bool is_module_initialized = false;
 volatile uint32_t ticker_ticks_ms = 0;
 
 static void timer_1ms_ticker(void *args)
@@ -101,6 +103,7 @@ static void timer_1ms_ticker(void *args)
 static uint32_t start_note(const char *note_str, size_t note_len);
 
 void mpython_music_tick(void) {
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
     if (music_data == NULL) {
         // music module not yet imported
         return;
@@ -159,6 +162,7 @@ void mpython_music_tick(void) {
 }
 
 static void wait_async_music_idle(void) {
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
     // wait for the async music state to become idle
     while (music_data->async_state != ASYNC_MUSIC_STATE_IDLE) {
         // allow CTRL-C to stop the music
@@ -189,7 +193,11 @@ static uint32_t start_note(const char *note_str, size_t note_len) {
     uint8_t note_index = (note_str[0] & 0x1f) - 1;
 
     // TODO: the duration and bpm should be persistent between notes
-    uint32_t ms_per_tick = (60000 / music_data->bpm) / music_data->ticks;
+    uint32_t ms_per_tick = 0;
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
+    if(music_data->bpm != 0 && music_data->ticks != 0){
+        ms_per_tick = (60000 / music_data->bpm) / music_data->ticks;
+    }
 
     int8_t octave = 0;
     bool sharp = false;
@@ -284,6 +292,8 @@ static uint32_t start_note(const char *note_str, size_t note_len) {
 }
 
 static mp_obj_t mpython_music_reset(void) {
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
+
     music_data->bpm = DEFAULT_BPM;
     music_data->ticks = DEFAULT_TICKS;
     music_data->last_octave = DEFAULT_OCTAVE;
@@ -294,6 +304,7 @@ MP_DEFINE_CONST_FUN_OBJ_0(mpython_music_reset_obj, mpython_music_reset);
 
 static mp_obj_t mpython_music_get_tempo(void) {
     mp_obj_t tempo_tuple[2];
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
 
     tempo_tuple[0] = mp_obj_new_int(music_data->bpm);
     tempo_tuple[1] = mp_obj_new_int(music_data->ticks);
@@ -305,11 +316,12 @@ MP_DEFINE_CONST_FUN_OBJ_0(mpython_music_get_tempo_obj, mpython_music_get_tempo);
 static mp_obj_t mpython_music_stop(size_t n_args, const mp_obj_t *args) {
     int pin;
     if (n_args == 0) {
-        pin = 16;
+        pin = DEFAULT_MUSIC_PIN;
     } else {
         pin = mp_obj_get_int(args[0]);
     }
     // Raise exception if the pin we are trying to stop is not in a compatible mode.
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
     if(music_data->async_pin == pin) {
         music_free_pin(pin);
         music_data->async_pin = -1;
@@ -324,7 +336,7 @@ static mp_obj_t mpython_music_play(size_t n_args, const mp_obj_t *pos_args, mp_m
     
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_music, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
-        { MP_QSTR_pin,   MP_ARG_INT, {.u_int = 21} },
+        { MP_QSTR_pin,   MP_ARG_INT, {.u_int = DEFAULT_MUSIC_PIN} },
         { MP_QSTR_wait,  MP_ARG_BOOL, {.u_bool = true} },
         { MP_QSTR_loop,  MP_ARG_BOOL, {.u_bool = false} },
     };
@@ -334,6 +346,7 @@ static mp_obj_t mpython_music_play(size_t n_args, const mp_obj_t *pos_args, mp_m
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     // reset octave and duration so tunes always play the same
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
     music_data->last_octave = DEFAULT_OCTAVE;
     music_data->last_duration = DEFAULT_DURATION;
 
@@ -390,7 +403,7 @@ static mp_obj_t mpython_music_pitch(size_t n_args, const mp_obj_t *pos_args, mp_
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_frequency, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
         { MP_QSTR_duration, MP_ARG_INT, {.u_int = -1} },
-        { MP_QSTR_pin,    MP_ARG_INT, {.u_int = 21} },
+        { MP_QSTR_pin,    MP_ARG_INT, {.u_int = DEFAULT_MUSIC_PIN} },
         { MP_QSTR_wait,   MP_ARG_BOOL, {.u_bool = true} },
     };
 
@@ -402,7 +415,8 @@ static mp_obj_t mpython_music_pitch(size_t n_args, const mp_obj_t *pos_args, mp_
     mp_uint_t frequency = args[0].u_int;
     mp_int_t duration = args[1].u_int;
     int pin = args[2].u_int;
-    
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
+
     // Update pin modes
     if(music_data->async_pin != -1) {
         music_free_pin(music_data->async_pin);
@@ -453,6 +467,7 @@ static mp_obj_t mpython_music_set_tempo(size_t n_args, const mp_obj_t *pos_args,
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
+    music_data_t *music_data = MP_STATE_PORT(_music_data);
     if (args[0].u_int != 0) {
         // set ticks
         music_data->ticks = args[0].u_int;
@@ -468,30 +483,30 @@ MP_DEFINE_CONST_FUN_OBJ_KW(mpython_music_set_tempo_obj, 0, mpython_music_set_tem
 
 
 static mp_obj_t music_init(void) {
-    music_data = MP_STATE_PORT(music_data);
-    if(music_data){
-        return mp_const_none;
+    if(!is_module_initialized){
+        MP_STATE_PORT(_music_data) = m_new_obj(music_data_t);
+        MP_STATE_PORT(_music_data)->bpm = DEFAULT_BPM;
+        MP_STATE_PORT(_music_data)->ticks = DEFAULT_TICKS;
+        MP_STATE_PORT(_music_data)->last_octave = DEFAULT_OCTAVE;
+        MP_STATE_PORT(_music_data)->last_duration = DEFAULT_DURATION;
+        MP_STATE_PORT(_music_data)->async_state = ASYNC_MUSIC_STATE_IDLE;
+        MP_STATE_PORT(_music_data)->async_pin = -1;
+        MP_STATE_PORT(_music_data)->async_note = NULL;
+    
+        music_init_contorl();
+    
+        // for music function
+        const esp_timer_create_args_t periodic_timer_args = {
+            .callback = &timer_1ms_ticker,
+            .name = "music tick timer"
+        };
+        esp_timer_handle_t periodic_timer;
+        ticker_ticks_ms = 0;
+        ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+        ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 1000));
+
+        is_module_initialized = true;
     }
-    music_data = m_new_obj(music_data_t);
-    music_data->bpm = DEFAULT_BPM;
-    music_data->ticks = DEFAULT_TICKS;
-    music_data->last_octave = DEFAULT_OCTAVE;
-    music_data->last_duration = DEFAULT_DURATION;
-    music_data->async_state = ASYNC_MUSIC_STATE_IDLE;
-    music_data->async_pin = -1;
-    music_data->async_note = NULL;
-
-    music_init_contorl();
-
-	// for music function
-	const esp_timer_create_args_t periodic_timer_args = {
-		.callback = &timer_1ms_ticker,
-		.name = "music tick timer"
-	};
-	esp_timer_handle_t periodic_timer;
-    ticker_ticks_ms = 0;
-	ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-	ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 1000));
 
     return mp_const_none;
 }
@@ -547,6 +562,6 @@ const mp_obj_module_t mp_music_module = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_music, mp_music_module);
-MP_REGISTER_ROOT_POINTER(struct _music_data_t *music_data);
+MP_REGISTER_ROOT_POINTER(struct _music_data_t *_music_data);
 
 #endif //MICROPY_PY_ESP_MUSIC
