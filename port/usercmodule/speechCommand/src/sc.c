@@ -29,6 +29,8 @@ static char wakeup_word[64] = "";
 static uint16_t timeout  = 6000;
 static bool enable_flag = false;
 
+volatile int sc_stop_flag = 0;
+
 
 void feed_Task(void *arg)
 {
@@ -41,9 +43,14 @@ void feed_Task(void *arg)
     assert(i2s_buff);
 
     while (task_flag) {
-        if(get_tts_flag()){
+        if(sc_stop_flag){
+            vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
+        if (!dev_open_flag){
+            bsp_codec_dev_open(16000, 1, 16);
+        }
+
         bsp_get_feed_data(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
 
         afe_handle->feed(afe_data, i2s_buff);
@@ -75,7 +82,8 @@ void detect_Task(void *arg)
 
     printf("------------detect start------------\n");
     while (task_flag) {
-        if(get_tts_flag()){
+        if(sc_stop_flag){
+            vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
         afe_fetch_result_t *res = afe_handle->fetch(afe_data);
@@ -87,10 +95,11 @@ void detect_Task(void *arg)
         if (res->wakeup_state == WAKENET_DETECTED) {
             printf("WAKEWORD DETECTED\n");
 	        multinet->clean(model_data);
-	        if(!get_tts_init_flag()){
-	            model_init();
-	        }
+
 	        if(wakeup_word[0] != '\0'){
+                if(!get_tts_init_flag()){
+                    model_init();
+                }
 	            text_to_speech(wakeup_word);
 	        }
 
@@ -154,7 +163,6 @@ void sc_init(const char *word, uint16_t t, bool f)
     timeout = t;
     enable_flag = f;
 
-    bsp_codec_dev_create();
     bsp_codec_dev_open(16000, 1, 16);
     models = esp_srmodel_init("sr_module");
 

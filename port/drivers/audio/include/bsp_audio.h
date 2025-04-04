@@ -103,6 +103,7 @@ esp_err_t bsp_audio_set_play_vol(int volume);
  */
 esp_err_t bsp_audio_get_play_vol(int *volume);
 
+extern volatile int dev_open_flag;
 
 #ifdef __cplusplus
 }

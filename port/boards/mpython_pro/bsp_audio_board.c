@@ -57,6 +57,8 @@ static int s_play_sample_rate = 16000;
 static int s_play_channel_format = 1;
 static int s_bits_per_chan = 16;
 
+volatile int dev_open_flag = 0;
+
 static esp_err_t bsp_i2s_init(uint32_t sample_rate, int channel_format, int bits_per_sample)
 {
     esp_err_t ret_val = ESP_OK;
@@ -237,12 +239,14 @@ esp_err_t bsp_codec_dev_open(uint32_t sample_rate, int channel_format, int bits_
         esp_codec_dev_set_in_gain(codec_dev, RECORD_VOLUME);  
         esp_codec_dev_set_out_vol(codec_dev, PLAYER_VOLUME);   
     }
+    dev_open_flag = 1;
     return err;
 }
 
 esp_err_t bsp_codec_dev_close(void)
 {
     if(codec_dev){
+        dev_open_flag = 0;
         return esp_codec_dev_close(codec_dev);
     }
     return ESP_OK;
