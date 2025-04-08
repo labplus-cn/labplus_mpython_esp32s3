@@ -22,7 +22,7 @@
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
-static esp_afe_sr_data_t *afe_data = NULL;
+//static esp_afe_sr_data_t *afe_data = NULL;
 static volatile int task_flag = 0;
 volatile int latest_command_id = 0;
 srmodel_list_t *models = NULL;
@@ -41,6 +41,14 @@ static int silence_counter = 0;
 const char *file_path = "vad_record.pcm";
 SemaphoreHandle_t recording_done_semaphore = NULL;
 afe_fetch_result_t *res = NULL;
+
+extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
+                                             const char * const pcName,
+                                             const uint32_t usStackDepth,
+                                             void * const pvParameters,
+                                             UBaseType_t uxPriority,
+                                             TaskHandle_t * const pxCreatedTask,
+                                             const BaseType_t xCoreID );
 
 
 void vad_record()
@@ -111,7 +119,7 @@ void feed_Task(void *arg)
             bsp_codec_dev_open(16000, 1, 16);
         }
 
-        bsp_get_feed_data(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
+        bsp_get_feed_data2(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
 
         afe_handle->feed(afe_data, i2s_buff);
     }
@@ -243,8 +251,8 @@ void sc_init(const char *word, uint16_t t, bool f)
 
     task_flag = 1;
 
-    xTaskCreatePinnedToCore(&detect_Task, "detect", 4 * 1024, (void*)afe_data, 5, NULL, 1);
-    xTaskCreatePinnedToCore(&feed_Task, "feed", 4 * 1024, (void*)afe_data, 5, NULL, 0);
+    xTaskCreatePinnedToCore(detect_Task, "detect", 4 * 1024, (void*)afe_data, 5, NULL, 1);
+    xTaskCreatePinnedToCore(feed_Task, "feed", 4 * 1024, (void*)afe_data, 5, NULL, 0);
 }
 int get_latest_command_id(void) {
     return latest_command_id;

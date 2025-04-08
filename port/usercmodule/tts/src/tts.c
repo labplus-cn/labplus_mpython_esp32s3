@@ -23,6 +23,14 @@ SemaphoreHandle_t tts_semaphore;
 volatile int tts_flag = 0;
 volatile int tts_init_flag = 0;
 
+extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
+                                             const char * const pcName,
+                                             const uint32_t usStackDepth,
+                                             void * const pvParameters,
+                                             UBaseType_t uxPriority,
+                                             TaskHandle_t * const pxCreatedTask,
+                                             const BaseType_t xCoreID );
+
 void model_init(void)
 {
     if(tts_init_flag){

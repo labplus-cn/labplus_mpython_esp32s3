@@ -53,9 +53,9 @@ static const audio_codec_ctrl_if_t *codec_ctrl_if = NULL;
 static const audio_codec_if_t *codec_if = NULL;
 static esp_codec_dev_handle_t codec_dev = NULL;
 
-static int s_play_sample_rate = 16000;
-static int s_play_channel_format = 1;
-static int s_bits_per_chan = 16;
+//static int s_play_sample_rate = 16000;
+//static int s_play_channel_format = 1;
+//static int s_bits_per_chan = 16;
 
 volatile int dev_open_flag = 0;
 
