@@ -14,6 +14,7 @@ int get_wakeup_flag(void);
 
 // 重置最新命令 id（例如置为 -1）
 void reset_latest_command_id(void);
+void start_vad_record(void);
 
 #ifdef __cplusplus
 }
