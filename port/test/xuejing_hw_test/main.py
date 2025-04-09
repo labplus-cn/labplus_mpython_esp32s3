@@ -14,7 +14,7 @@ import machine
 my_wifi = wifi()
 my_wifi.connectWiFi("office", "wearemaker")
 
-audio.play('http://cdn.makeymonkey.com/test/32_%E6%8B%94%E8%90%9D%E5%8D%9C.mp3')
+audio.play('http://cdn.makeymonkey.com/test/test.mp3')
 # audio.play('http://downsc.chinaz.net/Files/DownLoad/sound1/201906/11582.mp3')
 # audio.play('https://dl.espressif.cn/dl/audio/ff-16b-2c-44100hz.mp3')
 # audio.play("https://github.com/schreibfaul1/ESP32-audioI2S/raw/master/additional_info/Testfiles/sample.opus")

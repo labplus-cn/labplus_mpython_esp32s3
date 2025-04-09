@@ -7,9 +7,9 @@ set(SDKCONFIG_DEFAULTS
     ${SDKCONFIG_IDF_VERSION_SPECIFIC}
     boards/sdkconfig.ble 
     boards/sdkconfig.240mhz
-    boards/mpython_pro/sdkconfig.spiram 
-    boards/mpython_pro/sdkconfig.board
-    # boards/mpython_pro/sdkconfig.usb
+    boards/labplus_xunfei_js_primary/sdkconfig.spiram 
+    boards/labplus_xunfei_js_primary/sdkconfig.board
+    # boards/labplus_xunfei_js_primary/sdkconfig.usb
 )
 
 if(NOT MPY_PORT_DIR)
@@ -65,6 +65,12 @@ set(MICROPY_SOURCE_BOARD_DIR
     ${MPY_PORT_DIR}/boards
 )
 
-set(MPYTHON_PRO_BOARD ON)
+set(LABPLUS_XUNFEI_JS_PRIMARY_BOARD ON)
+
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp-code-scanner)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp-dl)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/modules)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/fb_gfx)
+list(APPEND EXTRA_COMPONENT_DIRS ${MPY_PORT_DIR}/usercmodule/esp-who/esp-who/components/esp32-camera)
 
 set(MICROPY_FROZEN_MANIFEST ${MICROPY_BOARD_DIR}/manifest.py)

@@ -51,10 +51,7 @@ set(MICROPY_SOURCE_BOARD
     ${MPY_PORT_DIR}/builtins/modframebuf.c
     ${MPY_PORT_DIR}/builtins/modaudio.c
     ${MPY_PORT_DIR}/builtins/modrfid.c
-    # ${MPY_PORT_DIR}/builtins/mod_audio/audio_player.c
-    # ${MPY_PORT_DIR}/builtins/mod_audio/audio_recorder.c 
-    # ${MPY_PORT_DIR}/builtins/mod_audio/vfs_stream.c 
-    # ${MPY_PORT_DIR}/builtins/mod_audio/modaudio.c
+    # ${MPY_PORT_DIR}/builtins/modrfid_1.c
 )
 
 set(MICROPY_SOURCE_BOARD_DIR
@@ -65,6 +62,6 @@ set(MICROPY_SOURCE_BOARD_DIR
     ${MPY_PORT_DIR}/boards
 )
 
-set(MPYTHON_PRO_BOARD ON)
+set(LABPLUS_XUNFEI_JS_MIDDLE_BOARD ON)
 
 set(MICROPY_FROZEN_MANIFEST ${MICROPY_BOARD_DIR}/manifest.py)

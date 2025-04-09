@@ -298,362 +298,9 @@ class MOTION(object):
             except OSError as e:
                 print('Gyroscope set_nvs_offset error:',e)
    
-motion = MOTION()
-accelerometer = motion.Accelerometer()
-gyroscope = motion.Gyroscope()
-
-class Magnetic(object):
-    """ MMC5983MA driver """
-    """ MMC5603NJ driver 20211028替换"""
-    def __init__(self):
-        self.addr = 48
-        self.i2c = i2c
-        self._judge_id()
-        time.sleep_ms(5)
-        if (self.product_ID==48):
-            pass  # MMC5983MA
-        elif (self.product_ID==16):
-            pass  # MMC5603NJ
-        else:
-            raise OSError("Magnetic init error")
-        """ MMC5983MA driver """
-        # 传量器裸数据，乘0.25后转化为mGS
-        self.raw_x = 0.0
-        self.raw_y = 0.0
-        self.raw_z = 0.0
-        # 校准后的偏移量, 基于裸数据
-        self.cali_offset_x = 0.0 
-        self.cali_offset_y = 0.0
-        self.cali_offset_z = 0.0
-        # 去皮偏移量，类似电子秤去皮功能，基于裸数据。
-        self.peeling_x = 0.0
-        self.peeling_y = 0.0
-        self.peeling_z = 0.0
-        self.is_peeling = 0
-        if (self.chip==1):
-            self.i2c.writeto(self.addr, b'\x09\x20\xbd\x00', True)
-        """ MMC5603NJ driver """
-        if (self.chip==2):
-            self._writeReg(0x1C, 0x80)#软件复位
-            time.sleep_ms(100)
-            self._writeReg(0x1A, 255)
-            self._writeReg(0x1B, 0b10100001)
-            # self._writeReg(0x1C, 0b00000011)
-            self._writeReg(0x1C, 0b00000000)
-            self._writeReg(0x1D, 0b10010000)
-            time.sleep_ms(100)
-
-    def _readReg(self, reg, nbytes=1):
-        return i2c.readfrom_mem(self.addr, reg, nbytes)
-
-    def _writeReg(self, reg, value):
-        i2c.writeto_mem(self.addr, reg, value.to_bytes(1, 'little')) 
-
-    def _set_offset(self):
-        if(self.chip == 1):
-            self.i2c.writeto(self.addr, b'\x09\x08', True)  #set
-            self.i2c.writeto(self.addr, b'\x09\x01', True)
-            while True:
-                self.i2c.writeto(self.addr, b'\x08', False)
-                buf = self.i2c.readfrom(self.addr, 1)
-                status = ustruct.unpack('B', buf)[0]
-                if(status & 0x01):
-                    break
-            self.i2c.writeto(self.addr, b'\x00', False)
-            buf = self.i2c.readfrom(self.addr, 6)
-            data = ustruct.unpack('>3H', buf)
-
-            self.i2c.writeto(self.addr, b'\x09\x10', True)  #reset
-
-            self.i2c.writeto(self.addr, b'\x09\x01', True)
-            while True:
-                self.i2c.writeto(self.addr, b'\x08', False)
-                buf = self.i2c.readfrom(self.addr, 1)
-                status = ustruct.unpack('B', buf)[0]
-                if(status & 0x01):
-                    break
-            self.i2c.writeto(self.addr, b'\x00', False)
-            buf = self.i2c.readfrom(self.addr, 6)
-            data1 = ustruct.unpack('>3H', buf)
-
-            self.x_offset = (data[0] + data1[0])/2
-            self.y_offset = (data[1] + data1[1])/2
-            self.z_offset = (data[2] + data1[2])/2
-        elif(self.chip == 2):
-            pass
-    
-    def _get_raw(self):
-        if (self.chip == 1):
-            retry = 0
-            if (retry < 5):
-                try:
-                    self.i2c.writeto(self.addr, b'\x09\x08', True)  #set
-
-                    self.i2c.writeto(self.addr, b'\x09\x01', True)
-                    while True:
-                        self.i2c.writeto(self.addr, b'\x08', False)
-                        buf = self.i2c.readfrom(self.addr, 1)
-                        status = ustruct.unpack('B', buf)[0]
-                        if(status & 0x01):
-                            break
-                    self.i2c.writeto(self.addr, b'\x00', False)
-                    buf = self.i2c.readfrom(self.addr, 6)
-                    data = ustruct.unpack('>3H', buf)
-
-                    self.i2c.writeto(self.addr, b'\x09\x10', True)  #reset
-
-                    self.i2c.writeto(self.addr, b'\x09\x01', True)
-                    while True:
-                        self.i2c.writeto(self.addr, b'\x08', False)
-                        buf = self.i2c.readfrom(self.addr, 1)
-                        status = ustruct.unpack('B', buf)[0]
-                        if(status & 0x01):
-                            break
-                    self.i2c.writeto(self.addr, b'\x00', False)
-                    buf = self.i2c.readfrom(self.addr, 6)
-                    data1 = ustruct.unpack('>3H', buf)
-
-                    self.raw_x = -((data[0] - data1[0])/2)
-                    self.raw_y = -((data[1] - data1[1])/2)
-                    self.raw_z = -((data[2] - data1[2])/2)
-                    # print(str(self.raw_x) + "   " + str(self.raw_y) + "  " + str(self.raw_z))
-                except:
-                    retry = retry + 1
-            else:
-                raise Exception("i2c read/write error!")     
-        elif(self.chip == 2):
-            retry = 0
-            if (retry < 5):
-                try:
-                    _raw_x = 0.0
-                    _raw_y = 0.0
-                    _raw_z = 0.0
-
-                    self.i2c.writeto(self.addr, b'\x1B\x08', True)  #set
-                    self.i2c.writeto(self.addr, b'\x1B\x01', True)
-                    
-                    while True:
-                        sleep_ms(25)
-                        buf = self._readReg(0x18, 1)
-                        status = buf[0]
-                        if(status & 0x40):
-                            break
-
-                    buf = self._readReg(0x00, 9)
-
-                    _raw_x = (buf[0] << 12) | (buf[1] << 4) | (buf[6] >> 4)
-                    _raw_y = (buf[2] << 12) | (buf[3] << 4) | (buf[7] >> 4)
-                    _raw_z = (buf[4] << 12) | (buf[5] << 4) | (buf[8] >> 4)
-
-                    self.raw_x = _raw_x
-                    self.raw_y = _raw_y
-                    self.raw_z = _raw_z
-                except:
-                    retry = retry + 1
-            else:
-                raise Exception("i2c read/write error!")
-
-    def peeling(self):
-        '''
-        去除磁场环境
-        '''
-        self._get_raw()
-        self.peeling_x = self.raw_x
-        self.peeling_y = self.raw_y
-        self.peeling_z = self.raw_z
-        self.is_peeling = 1
-
-    def clear_peeling(self):
-        self.peeling_x = 0.0
-        self.peeling_y = 0.0
-        self.peeling_z = 0.0
-        self.is_peeling = 0
-
-    def get_x(self):
-        if (self.chip == 1):
-            self._get_raw()
-            return self.raw_x * 0.25
-        if (self.chip == 2):
-            self._get_raw()
-            if(self.cali_offset_x):
-                return -0.0625 * (self.raw_x - self.cali_offset_x)
-            else:
-                return -0.0625 * (self.raw_x - 524288)
-            # return -(self.raw_x - 524288)/16384
-
-    def get_y(self):
-        if (self.chip == 1):
-            self._get_raw()
-            return self.raw_y * 0.25
-        if (self.chip == 2):
-            self._get_raw()
-            if(self.cali_offset_y):
-                return -0.0625 * (self.raw_y - self.cali_offset_y)
-            else:
-                return -0.0625 * (self.raw_y - 524288)
-            # return -(self.raw_y - 524288)/16384
-
-    def get_z(self):
-        if (self.chip == 1):
-            self._get_raw()
-            return self.raw_z * 0.25 
-        if (self.chip == 2):
-            self._get_raw()
-            if(self.cali_offset_z):
-                return 0.0625 * (self.raw_z - self.cali_offset_z)
-            else:
-                return 0.0625 * (self.raw_z - 524288)
-            # return (self.raw_z - 524288)/16384
-
-    def get_field_strength(self):
-        if(self.chip==1):
-            self._get_raw()
-            if self.is_peeling == 1:
-                return (math.sqrt((self.raw_x - self.peeling_x)*(self.raw_x - self.peeling_x) + (self.raw_y - self.peeling_y)*(self.raw_y - self.peeling_y) + (self.raw_z - self.peeling_z)*(self.raw_z - self.peeling_z)))*0.25
-            return (math.sqrt(self.raw_x * self.raw_x + self.raw_y * self.raw_y + self.raw_z * self.raw_z))*0.25
-        elif(self.chip==2):
-            self._get_raw()
-            if self.is_peeling == 1:
-                return (math.sqrt(math.pow(self.raw_x - self.peeling_x, 2) + pow(self.raw_y - self.peeling_y, 2) + pow(self.raw_z - self.peeling_z , 2)))*0.0625
-            return (math.sqrt(math.pow(self.get_x(), 2) + pow(self.get_y(), 2) + pow(self.get_z(), 2)))
-
-    def calibrate(self):
-        # oled.fill(0)
-        # oled.DispChar("步骤1:", 0,0,1)
-        # oled.DispChar("如图",0,26,1)
-        # oled.DispChar("转几周",0,43,1)
-        # oled.bitmap(64,0,calibrate_img.rotate,64,64,1)
-        # oled.show()
-        self._get_raw()
-        min_x = max_x = self.raw_x
-        min_y = max_y = self.raw_y
-        min_z = max_z = self.raw_z
-        ticks_start = time.ticks_ms()
-        while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
-            self._get_raw()
-            min_x = min(self.raw_x, min_x)
-            min_y = min(self.raw_y, min_y)
-            max_x = max(self.raw_x, max_x)
-            max_y = max(self.raw_y, max_y)
-            time.sleep_ms(100)
-        self.cali_offset_x = (max_x + min_x) / 2
-        self.cali_offset_y = (max_y + min_y) / 2
-        print('cali_offset_x: ' + str(self.cali_offset_x) + '  cali_offset_y: ' + str(self.cali_offset_y))
-        # oled.fill(0)
-        # oled.DispChar("步骤2:", 85,0,1)
-        # oled.DispChar("如图",85,26,1)
-        # oled.DispChar("转几周",85,43,1)
-        # oled.bitmap(0,0,calibrate_img.rotate1,64,64,1)
-        # oled.show()
-        ticks_start = time.ticks_ms()
-        while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
-            self._get_raw()
-            min_z = min(self.raw_z, min_z)
-            max_z = max(self.raw_z, max_z)
-            time.sleep_ms(100)
-        self.cali_offset_z = (max_z + min_z) / 2
-  
-        print('cali_offset_z: ' + str(self.cali_offset_z))
-
-        # oled.fill(0)
-        # oled.DispChar("校准完成", 40,24,1)
-        # oled.show()
-        # oled.fill(0)
-        print("校准完成")
-
-    def get_heading(self):
-        if(self.chip==1):
-            self._get_raw()
-            temp_x = self.raw_x - self.cali_offset_x
-            temp_y = self.raw_y - self.cali_offset_y
-            # temp_z = self.raw_z - self.cali_offset_z
-            heading = math.atan2(temp_y, -temp_x) * (180 / 3.14159265) + 180 + 3
-            return heading
-        else:
-            if(self.cali_offset_x):
-                self._get_raw()
-                temp_x = -(self.raw_x - self.cali_offset_x)
-                temp_y = -(self.raw_y - self.cali_offset_y)
-                heading = math.atan2(temp_y, -temp_x) * (180 / 3.14159265) + 180 + 3
-            else:
-                heading = math.atan2(self.get_y(), -self.get_x()) * (180 / 3.14159265) + 180 + 3
-            return heading
-        
-    def _get_temperature(self):
-        if(self.chip==1):
-            retry = 0
-            if (retry < 5):
-                try:
-                    self.i2c.writeto(self.addr, b'\x09\x02', True)
-                    while True:
-                        self.i2c.writeto(self.addr, b'\x08', False)
-                        buf = self.i2c.readfrom(self.addr, 1)
-                        status = ustruct.unpack('B', buf)[0]
-                        if(status & 0x02):
-                            break
-                    self.i2c.writeto(self.addr, b'\x07', False)
-                    buf = self.i2c.readfrom(self.addr, 1)
-                    temp = (ustruct.unpack('B', buf)[0])*0.8 -75
-                    # print(data)
-                    return temp
-                except:
-                    retry = retry + 1
-            else:
-                raise Exception("i2c read/write error!")   
-        elif(self.chip == 2):
-            pass
-
-    def _get_id(self):
-        if (self.chip==1):
-            retry = 0
-            if (retry < 5):
-                try:
-                    self.i2c.writeto(self.addr, bytearray([0x2f]), False)
-                    buf = self.i2c.readfrom(self.addr, 1, True)
-                    print(buf)
-                    id = ustruct.unpack('B', buf)[0]
-                    return id
-                except:
-                    retry = retry + 1
-            else:
-                raise Exception("i2c read/write error!")
-        elif (self.chip==2):
-            retry = 0
-            if (retry < 5):
-                try:
-                    self.i2c.writeto(self.addr, bytearray([0x39]), False)
-                    buf = self.i2c.readfrom(self.addr, 1, True)
-                    id = ustruct.unpack('B', buf)[0]
-                    return id
-                except:
-                    retry = retry + 1
-            else:
-                raise Exception("i2c read/write error!")
-
-    def _judge_id(self):
-        """
-        判断product_ID
-        """
-        retry = 0
-        if (retry < 5):
-            try:
-                self.i2c.writeto(self.addr, bytearray([0x39]), False)
-                buf = self.i2c.readfrom(self.addr, 1, True)
-                id = ustruct.unpack('B', buf)[0]
-                if(id == 16):
-                    self.chip = 2
-                    self.product_ID = 16
-                else:
-                    self.chip = 1
-                    self.product_ID = 48
-            except:
-                retry = retry + 1
-        else:
-            raise Exception("i2c read/write error!")  
-
-# Magnetic
-if 48 in i2c.scan():
-    magnetic = Magnetic()
+# motion = MOTION()
+# accelerometer = motion.Accelerometer()
+# gyroscope = motion.Gyroscope()
 
 class PinMode(object):
     IN = 1
@@ -683,23 +330,23 @@ class MPythonPin():
         except IndexError:
             raise IndexError("Out of Pin range")
         if mode == PinMode.IN:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('IN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
         if mode == PinMode.OUT:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('PWM not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
@@ -806,7 +453,7 @@ class wifi:
         print('disable AP WiFi...')
 
 # 3 rgb leds
-rgb = NeoPixel(Pin(8, Pin.OUT), 3, 3, 1, brightness=0.3)
+rgb = NeoPixel(Pin(8, Pin.OUT), 1, 3, 1, brightness=0.3)
 rgb.write()
 
 # light sensor LTR-308ALS 
@@ -815,6 +462,25 @@ light = LTR_308ALS(i2c)
 # sound sensor
 sound = ADC(Pin(6))
 sound.atten(sound.ATTN_11DB)
+
+# IR
+class IR():
+    def __init__(self, num = 1):
+        self.p12 = Pin(12, Pin.OUT, value=0)
+        if(num == 1):
+            self.ir = ADC(Pin(5))
+            self.ir.atten(self.ir.ATTN_11DB)
+        elif num == 2:
+            self.ir = ADC(Pin(7))
+            self.ir.atten(self.ir.ATTN_11DB)
+        
+    def read(self):
+        self.p12.on()
+        time.sleep_us(100)
+        val = self.ir.read()
+        self.p12.off()
+        time.sleep_ms(5) 
+        return val           
 
 # buttons
 class Button:
@@ -883,81 +549,32 @@ class Button:
 button_a = Button(0)
 button_b = Button(46)
 
-class Touch:
-    def __init__(self, pin):
-        self.__touch_pad = TouchPad(pin)
-        self.__touch_pad.config(30000)
-        self.__touch_pad.irq(self.__irq_handler)
-        self.event_pressed = None
-        self.event_released = None
-        self.__pressed_count = 0
-        self.__was_pressed = False
-        self.__value = 0
+# shield 
+class Ledong_shield(object):
+    def __init__(self):
+        self.speed = 0 
+        self.i2c = i2c
+        self.i2c_addr = 17
 
-    def __irq_handler(self, value):
-        # when pressed
-        # print("%d" % value)
-        if value == 1:
-            if self.event_pressed is not None:
-                self.event_pressed(value)
-            self.__was_pressed = True
-            self.__value = 1
-            if (self.__pressed_count < 100):
-                self.__pressed_count = self.__pressed_count + 1
-        # when released
-        else:
-            self.__value = 0
-            if self.event_released is not None:
-                self.event_released(value)
-            
-    def config(self, threshold):
-        self.__touch_pad.config(threshold)
+    def set_motor(self, motor_num, speed):
+        self.speed = speed
+        if self.speed > 100:
+            self.speed = 100
+        if self.speed < -100:
+            self.speed = -100
+        self.i2c.writeto(self.i2c_addr, bytearray([motor_num, self.speed]), True)
 
-    def is_pressed(self):
-        if self.__value:
-            return True
-        else:
-            return False
+    def power_off(self):
+        self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
 
-    def was_pressed(self):
-        r = self.__was_pressed
-        self.__was_pressed = False
-        return r
+    def get_battery_level(self):
+        self.i2c.writeto(self.i2c_addr, b'\x03', True)
+        tmp = self.i2c.readfrom(self.i2c_addr, 2)
+        data = tmp[1] << 8 +  tmp[0]
+        data = max(min(data, 4200), 3300)
+        return data
 
-    def get_presses(self):
-        r = self.__pressed_count
-        self.__pressed_count = 0
-        return r
-
-    def read(self):
-        return self.__touch_pad.read()
-    
-# touchpad
-touchpad_p = touchPad_P = Touch(Pin(9))
-touchpad_y = touchPad_Y = Touch(Pin(10))
-touchpad_t = touchPad_T = Touch(Pin(11))
-touchpad_h = touchPad_H = Touch(Pin(12))
-touchpad_o = touchPad_O = Touch(Pin(13))
-touchpad_n = touchPad_N = Touch(Pin(14))
-
-# # shield 
-# class Ledong_shield(object):
-#     def __init__(self):
-#         self.speed = 0 
-#         self.i2c = i2c
-#         self.i2c_addr = 17
-
-#     def power_off(self):
-#         self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
-
-#     def get_battery_level(self):
-#         self.i2c.writeto(self.i2c_addr, b'\x03', True)
-#         tmp = self.i2c.readfrom(self.i2c_addr, 2)
-#         data = tmp[1] << 8 +  tmp[0]
-#         data = max(min(data, 4200), 3300)
-#         return data
-
-# ledong_shield = Ledong_shield()
+ledong_shield = Ledong_shield()
 
 # from gui import *
 

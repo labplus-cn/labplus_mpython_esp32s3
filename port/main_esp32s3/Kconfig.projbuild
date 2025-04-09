@@ -19,6 +19,12 @@ config MPYTHON_PRO_BOARD
 config LABPLUS_LEDONG_V2_BOARD
     bool "labplus Ledong v2 board"
     depends on IDF_TARGET_ESP32S3
+config LABPLUS_XUNFEI_JS_PRIMARY_BOARD
+    bool "labplus xunfei for jiangshu primary school board"
+    depends on IDF_TARGET_ESP32S3
+config LABPLUS_XUNFEI_JS_MIDDLE_BOARD
+    bool "labplus xunfei for jiangshu middle school board"
+    depends on IDF_TARGET_ESP32S3
 
 endchoice
 

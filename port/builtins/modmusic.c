@@ -47,7 +47,7 @@
 #define music_set_frequecty(freq)   mcpwm_set_frequency(MCPWM_UNIT_1, MCPWM_TIMER_0, (freq))
 #define music_set_duty(duty)        mcpwm_set_duty(MCPWM_UNIT_1, MCPWM_TIMER_0, MCPWM_OPR_A, (duty))
 #define music_acquire_pin(pin)      mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM0A, (pin))
-#define music_free_pin(pin)         //gpio_reset_pin(pin)
+#define music_free_pin(pin)         gpio_reset_pin(pin)
 
 __attribute__ ((gnu_inline))inline void music_init_contorl(void) {
     mcpwm_config_t pwm_config;

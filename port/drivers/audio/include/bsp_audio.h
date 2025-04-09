@@ -41,6 +41,10 @@
     #include "mpython_pro/bsp_audio_board.h"
 #elif CONFIG_LABPLUS_LEDONG_V2_BOARD
     #include "labplus_Ledong_v2/bsp_audio_board.h"
+#elif CONFIG_LABPLUS_XUNFEI_JS_PRIMARY_BOARD
+    #include "labplus_xunfei_js_primary/bsp_audio_board.h"
+#elif CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD
+    #include "labplus_xunfei_js_middle/bsp_audio_board.h"
 #else 
     #error "Please select type of dev board"
 #endif

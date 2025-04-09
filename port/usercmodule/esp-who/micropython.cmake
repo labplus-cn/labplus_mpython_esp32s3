@@ -1,13 +1,14 @@
-# list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp-code-scanner)
-# list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp-dl)
-# list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules)
-# list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/fb_gfx)
-# list(APPEND EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/esp32-camera)
-
 add_library(usermod_lcd INTERFACE)
+
+if(LABPLUS_LEDONG_V2_BOARD OR LABPLUS_XUNFEI_JS_PRIMARY_BOARD)
+        set(WHO_LCD_SRC)
+elseif(MPYTHON_PRO_BOARD OR LABPLUS_XUNFEI_JS_MIDDLE_BOARD)
+        set(WHO_LCD_SRC ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/lcd/who_lcd.c)
+endif()
 
 target_sources(usermod_lcd INTERFACE
         ${CMAKE_CURRENT_LIST_DIR}/mod/modlcd.c
+        ${WHO_LCD_SRC}
 )
 
 set(ESP_COMPONENTS_LCD_INCLUDEDIRS
@@ -34,7 +35,7 @@ target_include_directories(usermod_lcd INTERFACE
 
 target_link_libraries(usermod INTERFACE usermod_lcd)
 
-if(LABPLUS_LEDONG_V2_BOARD)
+if(LABPLUS_LEDONG_V2_BOARD OR LABPLUS_XUNFEI_JS_PRIMARY_BOARD)
         add_library(usermod_sensor INTERFACE)
 
         target_sources(usermod_sensor INTERFACE
