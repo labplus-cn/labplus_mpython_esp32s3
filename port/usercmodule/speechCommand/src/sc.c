@@ -3,6 +3,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_process_sdkconfig.h"
 #include "esp_wn_iface.h"
 #include "esp_wn_models.h"
@@ -17,10 +18,11 @@
 #include "esp_mn_speech_commands.h"
 #include "sc_module.h"
 #include "tts.h"
+#include "wav_codec.h"
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
-static esp_afe_sr_data_t *afe_data = NULL;
+//static esp_afe_sr_data_t *afe_data = NULL;
 static volatile int task_flag = 0;
 volatile int latest_command_id = 0;
 srmodel_list_t *models = NULL;
@@ -28,6 +30,74 @@ srmodel_list_t *models = NULL;
 static char wakeup_word[64] = "";
 static uint16_t timeout  = 6000;
 static bool enable_flag = false;
+
+volatile int sc_stop_flag = 0;
+
+#define SILENCE_THRESHOLD 50
+static wav_codec_t *wav_codec = NULL;
+static bool vad_record_flag = false;
+static bool recording = false;
+static int silence_counter = 0;
+const char *file_path = "vad_record.pcm";
+SemaphoreHandle_t recording_done_semaphore = NULL;
+afe_fetch_result_t *res = NULL;
+
+extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
+                                             const char * const pcName,
+                                             const uint32_t usStackDepth,
+                                             void * const pvParameters,
+                                             UBaseType_t uxPriority,
+                                             TaskHandle_t * const pxCreatedTask,
+                                             const BaseType_t xCoreID );
+
+
+void vad_record()
+{
+    if (res->vad_state == VAD_SPEECH) {
+        if (!recording) {
+            silence_counter = 0;
+            // 第一次检测到语音，开始录音
+            wav_codec = (wav_codec_t*) heap_caps_malloc(sizeof(wav_codec_t), MALLOC_CAP_SPIRAM);
+            wav_codec->lfs2_file = vfs_lfs2_file_open(file_path, LFS2_O_WRONLY | LFS2_O_CREAT | LFS2_O_TRUNC);
+            recording = true;
+            printf("检测到语音，开始录音\n");
+        }
+    }else {  // VAD_SILENCE
+        if (recording) {
+            silence_counter++;
+            if (silence_counter >= SILENCE_THRESHOLD) {
+                recording = false;
+                vad_record_flag=false;
+                silence_counter = 0;
+                if (wav_codec) {
+                    vfs_lfs2_file_close(wav_codec->lfs2_file);
+                    if(wav_codec){
+                        heap_caps_free(wav_codec);
+                        wav_codec=NULL;
+                    }
+                }
+                printf("检测到静音，停止录音\n");
+                // 录音结束，释放信号量
+                xSemaphoreGive(recording_done_semaphore);
+            }
+        }
+    }
+    if (recording && wav_codec) {
+        if (res->vad_cache_size > 0) {
+            printf("写入 vad cache: %d 字节\n",res->vad_cache_size);
+            lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
+                            &wav_codec->lfs2_file->file,
+                            res->vad_cache,
+                            res->vad_cache_size);
+        }
+        if (res->vad_state == 1) {
+            lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
+                            &wav_codec->lfs2_file->file,
+                            res->data,
+                            res->data_size);
+        }
+    }
+}
 
 
 void feed_Task(void *arg)
@@ -41,10 +111,15 @@ void feed_Task(void *arg)
     assert(i2s_buff);
 
     while (task_flag) {
-        if(get_tts_flag()){
+        if(sc_stop_flag){
+            vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
-        bsp_get_feed_data(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
+        if (!dev_open_flag){
+            bsp_codec_dev_open(16000, 1, 16);
+        }
+
+        bsp_get_feed_data2(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
 
         afe_handle->feed(afe_data, i2s_buff);
     }
@@ -68,29 +143,37 @@ void detect_Task(void *arg)
     int mu_chunksize = multinet->get_samp_chunksize(model_data);
     assert(mu_chunksize == afe_chunksize);
 
-    //print active speech commands
     esp_mn_commands_clear();
     esp_mn_commands_update();
+    //print active speech commands
 //    multinet->print_active_speech_commands(model_data);
 
     printf("------------detect start------------\n");
+
     while (task_flag) {
-        if(get_tts_flag()){
+        if(sc_stop_flag){
+            vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
-        afe_fetch_result_t *res = afe_handle->fetch(afe_data);
+        res = afe_handle->fetch(afe_data);
         if (!res || res->ret_value == ESP_FAIL) {
             printf("fetch error!\n");
             break;
         }
 
+        if (vad_record_flag){
+            vad_record();
+            continue;
+        }
+
         if (res->wakeup_state == WAKENET_DETECTED) {
             printf("WAKEWORD DETECTED\n");
 	        multinet->clean(model_data);
-	        if(!get_tts_init_flag()){
-	            model_init();
-	        }
+
 	        if(wakeup_word[0] != '\0'){
+                if(!get_tts_init_flag()){
+                    model_init();
+                }
 	            text_to_speech(wakeup_word);
 	        }
 
@@ -154,7 +237,6 @@ void sc_init(const char *word, uint16_t t, bool f)
     timeout = t;
     enable_flag = f;
 
-    bsp_codec_dev_create();
     bsp_codec_dev_open(16000, 1, 16);
     models = esp_srmodel_init("sr_module");
 
@@ -163,14 +245,14 @@ void sc_init(const char *word, uint16_t t, bool f)
     afe_handle = esp_afe_handle_from_config(afe_config);
 
     esp_afe_sr_data_t *afe_data = afe_handle->create_from_config(afe_config);
-    afe_handle->disable_vad(afe_data);
+//    afe_handle->disable_vad(afe_data);
     afe_handle->disable_aec(afe_data);
     afe_config_free(afe_config);
 
     task_flag = 1;
 
-    xTaskCreatePinnedToCore(&detect_Task, "detect", 4 * 1024, (void*)afe_data, 5, NULL, 1);
-    xTaskCreatePinnedToCore(&feed_Task, "feed", 4 * 1024, (void*)afe_data, 5, NULL, 0);
+    xTaskCreatePinnedToCore(detect_Task, "detect", 4 * 1024, (void*)afe_data, 5, NULL, 1);
+    xTaskCreatePinnedToCore(feed_Task, "feed", 4 * 1024, (void*)afe_data, 5, NULL, 0);
 }
 int get_latest_command_id(void) {
     return latest_command_id;
@@ -181,4 +263,12 @@ int get_wakeup_flag(void) {
 
 void reset_latest_command_id(void) {
     latest_command_id = 0;
+}
+void start_vad_record(void) {
+    recording_done_semaphore = xSemaphoreCreateBinary();
+    // 调用函数后，将录音标志置为 true
+    vad_record_flag = true;
+
+    xSemaphoreTake(recording_done_semaphore, portMAX_DELAY);
+    vSemaphoreDelete(recording_done_semaphore);
 }

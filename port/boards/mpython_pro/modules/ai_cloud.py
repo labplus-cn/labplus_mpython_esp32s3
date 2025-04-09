@@ -66,13 +66,13 @@ class AI:
         return response
 
     @classmethod
-    def get_text(cls, filename):
+    def get_text(cls, filename="vad_record.pcm", audio_format="pcm", rate=16000, channel=1):
         url = "https://vop.baidu.com/server_api"
 
         payload = json.dumps({
-            "format": "pcm",
-            "rate": 8000,
-            "channel": 1,
+            "format": audio_format,
+            "rate": rate,
+            "channel": channel,
             "cuid": "qYi9Jv83W9SvZCxUSjFbXmFyBY5cvdnI",
             "token": get_access_token(API_KEY, SECRET_KEY),
             "speech": file_to_base64(filename),

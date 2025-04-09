@@ -15,12 +15,21 @@
 #include "esp_partition.h"
 #include "esp_idf_version.h"
 #include "bsp_audio.h"
+#include "sc.h"
 
 static esp_tts_handle_t *g_tts_handle = NULL;
 SemaphoreHandle_t tts_semaphore;
 
 volatile int tts_flag = 0;
 volatile int tts_init_flag = 0;
+
+extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
+                                             const char * const pcName,
+                                             const uint32_t usStackDepth,
+                                             void * const pvParameters,
+                                             UBaseType_t uxPriority,
+                                             TaskHandle_t * const pxCreatedTask,
+                                             const BaseType_t xCoreID );
 
 void model_init(void)
 {
@@ -88,9 +97,12 @@ static void text_to_speech_task(void *arg)
 
 void text_to_speech(const char *text)
 {
+    sc_stop_flag = 1;
     tts_semaphore = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(text_to_speech_task, "tts_task", 4*1024, (void *)text, 5, NULL, 0);
     xSemaphoreTake(tts_semaphore, portMAX_DELAY);
+    sc_stop_flag = 0;
+    vSemaphoreDelete(tts_semaphore);
 }
 
 int get_tts_flag(void) {
