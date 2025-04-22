@@ -97,7 +97,7 @@ static bool tp_fw_valid = false;/*to note firmware in TP controller is valid or 
  * need read firmware file using your method.
  */
 const uint8_t fw_file_ft3x68[] = {
-#include "app.i"
+#include "CY_FT6146_V04_20250325_app.i"
 };
 
 

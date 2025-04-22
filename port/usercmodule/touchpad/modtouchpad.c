@@ -165,10 +165,11 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
 
     static int initialized = 0;
     if (!initialized) {
-        int ret = fts_fwupg_auto_upgrade();
-        if(ret < 0) {
-            mp_raise_ValueError(MP_ERROR_TEXT("firmware upgrade fails."));
-        }
+        int ret;
+        // int ret = fts_fwupg_auto_upgrade();
+        // if(ret < 0) {
+        //     mp_raise_ValueError(MP_ERROR_TEXT("firmware upgrade fails."));
+        // }
         ret = fts_check_id1();
         if (ret < 0){
             mp_raise_ValueError(MP_ERROR_TEXT("get chip id fails."));
