@@ -108,8 +108,19 @@ servo_0.write_angle(60)
 # 10、红外探测
 from mpython import *
 
-ir1 = IR(1)
+ir1 = IR(2)
 while True:
     print(ir1.read())
     time.sleep_ms(100)
     
+# 11、电机
+from mpython import ledong_shield
+ledong_shield.set_motor(2, 60)
+
+# 12、录音
+from mpython import *
+import audio
+
+audio.record('2.wav', 3, 16, 2, 16000)
+time.sleep(6)
+audio.play('2.wav')
