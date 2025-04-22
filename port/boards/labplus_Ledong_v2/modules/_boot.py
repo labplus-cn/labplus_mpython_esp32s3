@@ -6,7 +6,7 @@ from neopixel import NeoPixel
 import ubinascii
 from machine import I2C, Pin
 
-i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
+i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=200000)
 
 # 硬件复位标志
 for count in range(3):
