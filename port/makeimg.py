@@ -105,7 +105,7 @@ arg_application_bin = "micropython.bin"
 arg_output_bin = bin_name
 arg_output_uf2= uf2_name
 arg_font_bin = "../Noto_Sans_CJK_SC_Light16.bin"
-arg_voice_data_bin = "../components/espressif__esp-sr/esp-tts/esp_tts_chinese/esp_tts_voice_data_xiaoxin.dat"
+arg_voice_data_bin = "../managed_components/espressif__esp-sr/esp-tts/esp_tts_chinese/esp_tts_voice_data_xiaoxin.dat"
 arg_sr_bin = "../build/srmodels/srmodels.bin"
 
 # Load required sdkconfig values.

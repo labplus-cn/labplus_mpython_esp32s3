@@ -284,65 +284,17 @@ class Button:
 button_a = Button(0)
 button_b = Button(46)
 
-class Touch:
-    def __init__(self, pin):
-        self.__touch_pad = TouchPad(pin)
-        self.__touch_pad.config(30000)
-        self.__touch_pad.irq(self.__irq_handler)
-        self.event_pressed = None
-        self.event_released = None
-        self.__pressed_count = 0
-        self.__was_pressed = False
-        self.__value = 0
+# IR
+ir1 = ADC(Pin(5))
+ir1.atten(ir1.ATTN_11DB)
+ir2 = ADC(Pin(7))
+ir2.atten(ir2.ATTN_11DB)
 
-    def __irq_handler(self, value):
-        # when pressed
-        # print("%d" % value)
-        if value == 1:
-            if self.event_pressed is not None:
-                self.event_pressed(value)
-            self.__was_pressed = True
-            self.__value = 1
-            if (self.__pressed_count < 100):
-                self.__pressed_count = self.__pressed_count + 1
-        # when released
-        else:
-            self.__value = 0
-            if self.event_released is not None:
-                self.event_released(value)
-            
-    def config(self, threshold):
-        self.__touch_pad.config(threshold)
-
-    def is_pressed(self):
-        if self.__value:
-            return True
-        else:
-            return False
-
-    def was_pressed(self):
-        r = self.__was_pressed
-        self.__was_pressed = False
-        return r
-
-    def get_presses(self):
-        r = self.__pressed_count
-        self.__pressed_count = 0
-        return r
-
-    def read(self):
-        return self.__touch_pad.read()
-    
-# touchpad
-touchpad_p = touchPad_P = Touch(Pin(9))
-touchpad_y = touchPad_Y = Touch(Pin(10))
-touchpad_t = touchPad_T = Touch(Pin(11))
-touchpad_h = touchPad_H = Touch(Pin(12))
-touchpad_o = touchPad_O = Touch(Pin(13))
-touchpad_n = touchPad_N = Touch(Pin(14))
+# POT
+pot = ADC(Pin(8))
+pot.atten(pot.ATTN_11DB)
 
 # motor controller
-
 class Ledong_shield(object):
     def __init__(self):
         self.speed = 0 
