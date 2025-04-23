@@ -19,18 +19,16 @@ def on_button_b_pressed(_):
 
 button_b.event_pressed = on_button_b_pressed
 
+# ----------------------------------------------
 # 2、温湿度
 from mpython import *
-
-from bluebit import SHT20
-
 import time
 
-sht20 = SHT20()
 while True:
     print(sht20.temperature())
     time.sleep(1)
     
+# ----------------------------------------------
 # 3、数字光线
 from mpython import *
 import time
@@ -39,6 +37,7 @@ while True:
     print(light.read())
     time.sleep(1)
     
+# ----------------------------------------------
 # 4、旋钮电位器
 from mpython import *
 
@@ -46,8 +45,22 @@ while True:
     print(pot.read())
     time.sleep_ms(300)
 
+# ----------------------------------------------
+
+# 5、红外探测
+from mpython import *
+
+while True:
+    print(ir1.read())
+    time.sleep_ms(300)
+    
+while True:
+    print(ir2.read())
+    time.sleep_ms(300)
+    
+# ----------------------------------------------
 # '''
-# 4、声音触发器
+# 6、声音触发器
 # 说明：打印声音采样值
 # '''
 from mpython import *
@@ -56,13 +69,11 @@ import time
 while True:
     print(sound.read())
     time.sleep_ms(50)
-    
-#6、RFID  
+   
+# ----------------------------------------------
+# 7、RFID  
 from mpython import *
-
 import time
-
-from bluebit import *
 
 def on_button_a_down(_):
     global a, b, c, d, DIR
@@ -92,48 +103,62 @@ button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
 
 button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
     
-# #########################################################################
-# '''
-# 5、触摸按键
-# 说明：打印触摸按键值
-# '''
+# ----------------------------------------------
+# 8、蜂鸣器
+from mpython import *
+import music
+music.pitch(131, 500, Pin.P12)
 
+# ----------------------------------------------
+# 9、RGB
+from mpython import *
 
-# '''
-# 6、金手指IO
-# 说明：外接LED模块，用代码测试每一个IO，效果闪灯。
-# '''
-# from mpython import *
+rgb.fill((int(255), int(0), int(0)))
+rgb.write()
+time.sleep_ms(1)
 
-# p0 = MPythonPin(0, PinMode.OUT)
+# ----------------------------------------------
+# 10、编码电机
+from mpython import *
 
-# import time
-# while True:
-#     p0.write_digital(1)
-#     time.sleep(0.1)
-#     p0.write_digital(0)
-#     time.sleep(0.1)
-    
+encoder_motor.move(100,100)
 
+# ----------------------------------------------
+# 11、超声波
+from mpython import *
 
-
-'''
-sensor test
-'''
-import lcd
-import sensor
-
-sensor.reset()
+import time
 while True:
-    sensor.snapshot()
-    sensor.free_fb()
+    print(get_distance())
+    time.sleep(1)
+    
+# ----------------------------------------------
+# 12、电池电量
+from mpython import *
 
-# from mpython import wifi
+while True:
+    print(get_bat_level())
+    time.sleep(1)
+    
+# ----------------------------------------------
+# 13、循迹
+from mpythonbox import *
 
-# my_wifi = wifi()
+l = Line_follow()
 
-# my_wifi.connectWiFi("labplus_dev", "helloworld")
+import time
+while True:
+    print(l.get_val())
+    time.sleep(1)
+    
+# ----------------------------------------------
+# 14、风扇、水泵
+from mpython import *       
+set_speed(1, 100)
+set_speed(2, 100)   
 
+# ----------------------------------------------
+# 15、摄像头
 '''
 人脸、猫脸检测
 '''
@@ -163,30 +188,9 @@ while True:
         isDetect = False  # 清除识别标记
     time_sleep_ms(100)
 
-# 红外探测
-from mpython import *
 
-while True:
-    print(ir1.read())
-    time.sleep_ms(300)
-    
-while True:
-    print(ir2.read())
-    time.sleep_ms(300)
-    
-#7、蜂鸣器
-from mpython import *
-import music
-music.pitch(131, 500, Pin.P12)
-
-# 8、RGB
-from mpython import *
-
-rgb.fill((int(255), int(0), int(0)))
-rgb.write()
-time.sleep_ms(1)
-
-# 音乐播放
+# ----------------------------------------------
+# 16、音乐播放
 from mpython import *
 import audio
 
@@ -197,35 +201,11 @@ audio.play('http://cdn.makeymonkey.com/test/test.mp3')
 time.sleep(10)
 audio.stop()
 
-# 录音
+# ----------------------------------------------
+# 17、录音
 from mpython import *
 import audio
 
 audio.record('2.wav', 5, 16, 2, 16000)
 time.sleep(5)
 audio.play('2.wav')
-
-
-# 编码电机
-from mpython import *
-from mpythonbox import *
-
-encoder_motor.move(100,100)
-
-# 超声波
-from mpythonbox import *
-
-import time
-while True:
-    print(get_distance())
-    time.sleep(1)
-
-# 循迹
-from mpythonbox import *
-
-l = Line_follow()
-
-import time
-while True:
-    print(l.get_val())
-    time.sleep(1)
