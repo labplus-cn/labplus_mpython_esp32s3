@@ -3,7 +3,10 @@
 
 from machine import PWM, Pin
 
-pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 34, 35, 33, -1, 9, 10, 11, 12, 13, 14)
+# P3: 阻性器件 P5: A P10: sound P11: B P12: buzzer P7: RGB LED
+#                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21  P22  P23 P24 P25 P26 P27 P28
+#                                  *     *          *  *   *                          scl  sda *          P  Y   T   H   O   N
+pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 9, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 43, 44, 45   33,   9, 10, 11, 12, 13, 14)
 class Servo(object):
     def __init__(self,pin, freq = 50, angle = 0, min_us = 750, max_us = 2250, actuation_range = 180):
         self.freq = freq

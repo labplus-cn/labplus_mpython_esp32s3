@@ -16,7 +16,6 @@ import ustruct, array
 from neopixel import NeoPixel
 # from esp import dht_readinto
 from time import sleep_ms, sleep_us, sleep
-import framebuf 
 # import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
@@ -311,7 +310,7 @@ class PinMode(object):
 # P3: 阻性器件 P5: A P10: sound P11: B P12: buzzer P7: RGB LED
 #                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21    P23 P24 P25 P26 P27 P28
 #                                  *     *          *  *   *                          scl  sda *       P  Y   T   H   O   N
-pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 43, 44,     -1, 9, 10, 11, 12, 13, 14)
+pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, -1, 6, 46, 21, -1, -1, 48, -1, -1, -1, 43, 44,     -1, -1, -1, -1, -1, -1, -1)
 
 class MPythonPin():
     def __init__(self, pin, mode=PinMode.IN, pull=None):
@@ -319,10 +318,14 @@ class MPythonPin():
             raise TypeError("mode must be 'IN, OUT, PWM, ANALOG,OUT_DRAIN'")
         if pin == 10:
             raise TypeError("P10 is used for internalsound sensor")
+        if pin == 4 or pin == 6:
+            raise TypeError("P4 or P6 is used for internal IR.")
         if pin == 5 or pin == 11:
             raise TypeError("P5 or P11 is used for internal A B key.")
         if pin == 7:
             raise TypeError("P21 is used for internal RGB LED.")
+        if pin == 8:
+            raise TypeError("P8 is used for internal servo.")
         if pin == 12:
             raise TypeError("P12 is used for internal buzzer.")
         try:
@@ -465,23 +468,10 @@ sound = ADC(Pin(6))
 sound.atten(sound.ATTN_11DB)
 
 # IR
-class IR():
-    def __init__(self, num = 1):
-        self.p12 = Pin(12, Pin.OUT, value=0)
-        if(num == 1):
-            self.ir = ADC(Pin(5))
-            self.ir.atten(self.ir.ATTN_11DB)
-        elif num == 2:
-            self.ir = ADC(Pin(7))
-            self.ir.atten(self.ir.ATTN_11DB)
-        
-    def read(self):
-        self.p12.on()
-        time.sleep_us(100)
-        val = self.ir.read()
-        self.p12.off()
-        time.sleep_ms(5) 
-        return val           
+ir1 = ADC(Pin(5))
+ir1.atten(ir1.ATTN_11DB)
+ir2 = ADC(Pin(7))
+ir2.atten(ir2.ATTN_11DB)        
 
 # buttons
 class Button:
@@ -550,6 +540,46 @@ class Button:
 button_a = Button(0)
 button_b = Button(46)
 
+class SHT20(object):
+    """
+    温湿度模块SHT20控制类
+
+    :param i2c: I2C实例对象,默认i2c=i2c.
+    """
+
+    def __init__(self, i2c=i2c):
+        self.i2c = i2c
+
+    def temperature(self):
+        """
+        获取温度
+
+        :return: 温度,单位摄氏度
+        """
+        sleep_ms(10)
+        try:
+            self.i2c.writeto(0x40, b'\xf3')
+            sleep_ms(70)
+            t = i2c.readfrom(0x40, 2)
+            return -46.86 + 175.72 * (t[0] * 256 + t[1]) / 65535
+        except Exception as e:
+            return -1
+
+    def humidity(self):
+        """
+        获取湿度
+
+        :return: 湿度,单位%
+        """
+        sleep_ms(10)
+        try:
+            self.i2c.writeto(0x40, b'\xf5')
+            sleep_ms(25)
+            t = i2c.readfrom(0x40, 2)
+            return -6 + 125 * (t[0] * 256 + t[1]) / 65535
+        except Exception as e:
+            return -1
+sht20 = SHT20()
 # shield 
 class Ledong_shield(object):
     def __init__(self):
@@ -576,6 +606,8 @@ class Ledong_shield(object):
         return data
 
 ledong_shield = Ledong_shield()
+
+
 
 # from gui import *
 

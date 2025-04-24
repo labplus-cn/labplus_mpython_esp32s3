@@ -1,14 +1,4 @@
-# 1、超声波
-from hcsr04 import HCSR04
-from mpython import *
-import time
-
-hcsr04 = HCSR04(trigger_pin=Pin.P25, echo_pin=Pin.P24)
-while True:
-    print(hcsr04.distance_mm())
-    time.sleep(1)
-    
-# 2、A B按键
+# 1、A B按键
 from mpython import *
 
 def on_button_a_pressed(_):
@@ -21,19 +11,21 @@ def on_button_b_pressed(_):
 
 button_b.event_pressed = on_button_b_pressed
 
-# 3、温湿度
+# -----------------------------------------------
+# 2、温湿度
 from mpython import *
 
 from bluebit import SHT20
 
 import time
 
-sht20 = SHT20()
+
 while True:
     print(sht20.temperature())
     time.sleep(1)
 
-# 4、数字光线
+# -----------------------------------------------
+# 3、数字光线
 from mpython import *
 import time
 
@@ -41,7 +33,31 @@ while True:
     print(light.read())
     time.sleep(1)
  
-# 5、声音触发   
+# -----------------------------------------------
+# 4、超声波
+from hcsr04 import HCSR04
+from mpython import *
+import time
+
+hcsr04 = HCSR04(trigger_pin=Pin.P25, echo_pin=Pin.P24)
+while True:
+    print(hcsr04.distance_mm())
+    time.sleep(1)
+  
+# -----------------------------------------------
+# 5、红外探测
+from mpython import *
+
+while True:
+    print(ir1.read())
+    time.sleep_ms(300)
+    
+while True:
+    print(ir2.read())
+    time.sleep_ms(300)
+    
+# -----------------------------------------------
+# 6、声音触发   
 from mpython import *
 import time
 
@@ -49,7 +65,8 @@ while True:
     print(sound.read())
     time.sleep_ms(100)
 
-#6、RFID  
+# -----------------------------------------------
+# 7、RFID  1
 from mpython import *
 
 import time
@@ -84,12 +101,23 @@ button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
 
 button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
 
-#7、蜂鸣器
+# -----------------------------------------------
+# 8、rfid 2
+
+
+# -----------------------------------------------
+# 9、加速度计
+
+
+# -----------------------------------------------
+# 10、蜂鸣器
 from mpython import *
 import music
 music.pitch(131, 500, Pin.P12)
 
-# 8、RGB
+
+# -----------------------------------------------
+# 11、RGB
 from mpython import *
 
 import neopixel
@@ -98,26 +126,22 @@ my_rgb = neopixel.NeoPixel(Pin(Pin.P7), n=1, bpp=3, timing=1)
 my_rgb.fill( (255, 0, 0) )
 my_rgb.write()
 
-#9、舵机
+# -----------------------------------------------
+# 12、舵机
 from mpython import *
 from servo import Servo
 
 servo_0 = Servo(23, min_us=500, max_us=2500, actuation_range=180)
 servo_0.write_angle(60)
 
-# 10、红外探测
-from mpython import *
-
-ir1 = IR(2)
-while True:
-    print(ir1.read())
-    time.sleep_ms(100)
-    
-# 11、电机
+# -----------------------------------------------
+# 13、电机
 from mpython import ledong_shield
+ledong_shield.set_motor(1, 60)
 ledong_shield.set_motor(2, 60)
 
-# 12、录音
+# -----------------------------------------------
+# 14、录音、播放
 from mpython import *
 import audio
 
