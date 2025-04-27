@@ -12,12 +12,10 @@
 from machine import I2C, PWM, Pin, ADC
 # from ssd1106 import SSD1106_I2C
 import esp, math, time, network
-import ustruct, array
+import ustruct
 from neopixel import NeoPixel
 # from esp import dht_readinto
-from time import sleep_ms, sleep_us, sleep
-import framebuf 
-import calibrate_img
+import time
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
@@ -660,10 +658,14 @@ class PinMode(object):
     PWM = 3
     ANALOG = 4
     OUT_DRAIN = 5
-# P3: 阻性器件 P5: A P10: sound P11: B P12: buzzer P7: RGB LED
-#                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21    P23 P24 P25 P26 P27 P28
-#                                  *     *          *  *   *                          scl  sda *       P  Y   T   H   O   N
-pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 43, 44,     -1, 9, 10, 11, 12, 13, 14)
+
+# P5: A  P11: B 
+# P7: RGB LED
+# P10: sound
+# P12: buzzer
+#                   P0 P1 P2 P3 P4 P5 P6 P7  P8 P9 P10 P11 P12 P13 P14 P15 P16         P19  P20 P21    P23 P24 P25 P26 P27 P28
+#                                  *     *         *   *   *   *   *   *   *           scl  sda  *     *   *   *   *   *   *
+pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 16, 8, 9, 6,  46, 21, 17, 18, 48, 47, -1, -1, 43,  44, 45,    15, 10, 11, 12, 13, 14)
 
 class MPythonPin():
     def __init__(self, pin, mode=PinMode.IN, pull=None):
@@ -674,7 +676,7 @@ class MPythonPin():
         if pin == 5 or pin == 11:
             raise TypeError("P5 or P11 is used for internal A B key.")
         if pin == 7:
-            raise TypeError("P21 is used for internal RGB LED.")
+            raise TypeError("P7 is used for internal RGB LED.")
         if pin == 12:
             raise TypeError("P12 is used for internal buzzer.")
         try:
@@ -682,29 +684,29 @@ class MPythonPin():
         except IndexError:
             raise IndexError("Out of Pin range")
         if mode == PinMode.IN:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9]:
                 raise TypeError('IN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
         if mode == PinMode.OUT:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9]:
                 raise TypeError('OUT not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
-            if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9]:
                 raise TypeError('PWM not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
             sleep_ms(1)
             self.pwm = PWM(Pin(self.id), duty=0)
         if mode == PinMode.ANALOG:
-            if pin not in [0, 1, 2, 3, 4, 6, 7]:
+            if pin not in [0, 1, 2, 3, 4, 6, 8, 9]:
                 raise TypeError('ANALOG not supported on P%d' % pin)
             self.adc = ADC(Pin(self.id))
             self.adc.atten(ADC.ATTN_11DB)

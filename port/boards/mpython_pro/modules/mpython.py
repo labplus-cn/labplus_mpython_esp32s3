@@ -12,11 +12,10 @@
 from machine import I2C, PWM, Pin, ADC, TouchPad
 # from ssd1106 import SSD1106_I2C
 import esp, math, time, network
-import ustruct, array
+import ustruct
 from neopixel import NeoPixel
 # from esp import dht_readinto
-from time import sleep_ms, sleep_us, sleep
-import framebuf 
+import time
 # import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
@@ -433,7 +432,7 @@ class Magnetic(object):
                     self.i2c.writeto(self.addr, b'\x1B\x01', True)
                     
                     while True:
-                        sleep_ms(25)
+                        time.sleep_ms(25)
                         buf = self._readReg(0x18, 1)
                         status = buf[0]
                         if(status & 0x40):
@@ -661,21 +660,25 @@ class PinMode(object):
     PWM = 3
     ANALOG = 4
     OUT_DRAIN = 5
-# P3: 阻性器件 P5: A P10: sound P11: B P12: buzzer P7: RGB LED
-#                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21    P23 P24 P25 P26 P27 P28
-#                                  *     *          *  *   *                          scl  sda *       P  Y   T   H   O   N
-pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 43, 44,     -1, 9, 10, 11, 12, 13, 14)
-
+    
+# P3: 阻性器件 
+# P5: A  P11: B 
+# P7: RGB LED
+# P10: sound
+# P12: buzzer
+#                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21 P22    P23 P24 P25 P26 P27 P28
+#                                  *     *          *  *   *                          scl  sda *           P  Y   T   H   O   N
+pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, 16, 6, 46, 21, 17, 18, 48, 47, -1, -1, 43, 44, 45, 33,     9, 10, 11, 12, 13, 14)
 class MPythonPin():
     def __init__(self, pin, mode=PinMode.IN, pull=None):
         if mode not in [PinMode.IN, PinMode.OUT, PinMode.PWM, PinMode.ANALOG, PinMode.OUT_DRAIN]:
             raise TypeError("mode must be 'IN, OUT, PWM, ANALOG,OUT_DRAIN'")
         if pin == 10:
-            raise TypeError("P10 is used for internalsound sensor")
+            raise TypeError("P10 is used for internal sound sensor")
         if pin == 5 or pin == 11:
             raise TypeError("P5 or P11 is used for internal A B key.")
         if pin == 7:
-            raise TypeError("P21 is used for internal RGB LED.")
+            raise TypeError("P7 is used for internal RGB LED.")
         if pin == 12:
             raise TypeError("P12 is used for internal buzzer.")
         try:
@@ -690,22 +693,22 @@ class MPythonPin():
             if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
                 raise TypeError('OUT not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
             if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
             if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
                 raise TypeError('PWM not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.pwm = PWM(Pin(self.id), duty=0)
         if mode == PinMode.ANALOG:
-            if pin not in [0, 1, 2, 3, 4, 6, 7]:
+            if pin not in [0, 1, 2, 3, 4, 6]:
                 raise TypeError('ANALOG not supported on P%d' % pin)
             self.adc = ADC(Pin(self.id))
             self.adc.atten(ADC.ATTN_11DB)
@@ -940,24 +943,4 @@ touchpad_h = touchPad_H = Touch(Pin(12))
 touchpad_o = touchPad_O = Touch(Pin(13))
 touchpad_n = touchPad_N = Touch(Pin(14))
 
-# # shield 
-# class Ledong_shield(object):
-#     def __init__(self):
-#         self.speed = 0 
-#         self.i2c = i2c
-#         self.i2c_addr = 17
-
-#     def power_off(self):
-#         self.i2c.writeto(self.i2c_addr, b'\x06\x01', True)
-
-#     def get_battery_level(self):
-#         self.i2c.writeto(self.i2c_addr, b'\x03', True)
-#         tmp = self.i2c.readfrom(self.i2c_addr, 2)
-#         data = tmp[1] << 8 +  tmp[0]
-#         data = max(min(data, 4200), 3300)
-#         return data
-
-# ledong_shield = Ledong_shield()
-
-# from gui import *
 
