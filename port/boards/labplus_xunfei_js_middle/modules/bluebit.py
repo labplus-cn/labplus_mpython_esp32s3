@@ -27,6 +27,10 @@ from mpython import i2c, sleep_ms, MPythonPin, PinMode, numberMap
 from micropython import const
 from machine import UART, Pin
 import ustruct
+import time
+
+from ATGM336H_5N import GPS
+from max30102 import MAX30102
 
 class Color(object):
     """
@@ -796,3 +800,45 @@ class ASRPRO(object):
         except Exception as e:
             self.identifying_word = -1
             pass
+
+
+'''
+DC01 PM2.5驱动
+'''
+class PM25_DC(object):
+    def __init__(self, tx=Pin.P1, rx=Pin.P0, uart_num=1):
+        self.K = 0.4 # (注:户读取到的灰尘传感器原始 PM2.5，需要参照 TSI仪器光度法标定一个K 值系数，一般建议 0.4)
+        self.uart = UART(uart_num, baudrate=9600, stop=1, tx=tx, rx=rx, timeout=30)
+        sleep_ms(100)
+
+    def read(self): #单位 微克/立方米
+        _pm25 = -1 
+        data = bytes(0x00)
+        time_cnt = time.ticks_ms()
+        while True:
+            sleep_ms(5)
+            if self.uart.any():
+                head = self.uart.read(1)   
+                if(head[0] == 0xA5):
+                    data = head
+                    res = self.uart.read(3)
+                    data = head + res 
+                else:
+                    # print('0000')
+                    pass
+                
+                if len(data)==4:
+                    DATAH = data[1]
+                    DATAL = data[2]
+                    sum = 0xA5 + DATAH + DATAL # 计算校验和
+                    sum = sum ^ 0x80 # ^异或，得到低7位数据
+                    if(sum == data[3]):
+                        # _pm25 = (data[1]*128) + data[2]
+                        _pm25 = self.K * ((DATAH << 7) | (DATAL & 0x7F))   # 校验成功，计算浓度值
+                        break
+                    else:
+                        pass
+            elif time.ticks_ms() - time_cnt > 2000:
+                break
+        return _pm25
+    

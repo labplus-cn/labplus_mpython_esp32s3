@@ -133,10 +133,10 @@ class MAX30102():
     def measurement(self):
         time.sleep(0.5)
         try:
-            print('In the measurement, it takes approximately 10 seconds.\n')
+            print('In the measurement, it takes approximately 30 seconds.\n')
             # print('测量中，将手指放在传感器上保持不动，大约需要30-60秒\n')
             #采样数据，大约30秒钟
-            red, ir = self.read_sequential(100)
+            red, ir = self.read_sequential(1000)
             #进行分析
             ir_avg = []
             red_avg = []
@@ -154,13 +154,15 @@ class MAX30102():
                 self.ir_D = (sum(ir_avg)) // len(ir_avg)
                 self.red_D = (sum(red_avg)) // len(red_avg)
             # print(ir_avg)
-            print('Measurement completed.\n')
+
             self.ir_D = int(self.ir_D)
             self.red_D = int(self.red_D)
-       
+            print('Measurement completed.\n')
+            print('测试完成\n')
+            # print('****************************\n')
         except Exception as e:
             print("An error occurred.\n")
-            # print('测量出错。\n')
+            print('测量出错。\n')
             print(e)
             self.ir_D = None
             self.red_D = None
