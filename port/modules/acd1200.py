@@ -13,6 +13,7 @@ class ACD1200(object):
         co2 = -1 # 单位ppm（百万分比浓度） 在大自然环境里，空气中二氧化碳的正常含量是0.04%（400 PPM)，在大城市里有时候达到500 PPM。室内没有人的情况下，二氧化碳浓度一般在500到1000 PPM左右。
         self.uart.write(bytes([0xFE,0xA6,0x00,0x01,0xA7]))
         time_cnt = time.ticks_ms()
+        sleep_ms(800)
         while True:
             if self.uart.any():
                 data = self.uart.read()
@@ -27,6 +28,7 @@ class ACD1200(object):
     def auto_calibration_mode(self):
         self.uart.write(bytes([0xFE,0xA6,0x02,0x04,0x00,0x01,0xAD]))
         try_num = 0
+        sleep_ms(800)
         while True:
             if try_num >=5:
                 return False
