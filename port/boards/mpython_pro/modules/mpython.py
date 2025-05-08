@@ -813,7 +813,8 @@ rgb = NeoPixel(Pin(8, Pin.OUT), 3, 3, 1, brightness=0.3)
 rgb.write()
 
 # light sensor LTR-308ALS 
-light = LTR_308ALS(i2c)
+if 83 in i2c.scan():    
+    light = LTR_308ALS(i2c)
 
 # sound sensor
 sound = ADC(Pin(6))

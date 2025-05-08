@@ -53,10 +53,6 @@ static const audio_codec_ctrl_if_t *codec_ctrl_if = NULL;
 static const audio_codec_if_t *codec_if = NULL;
 static esp_codec_dev_handle_t codec_dev = NULL;
 
-//static int s_play_sample_rate = 16000;
-//static int s_play_channel_format = 1;
-//static int s_bits_per_chan = 16;
-
 volatile int dev_open_flag = 0;
 
 static esp_err_t bsp_i2s_init(uint32_t sample_rate, int channel_format, int bits_per_sample)
