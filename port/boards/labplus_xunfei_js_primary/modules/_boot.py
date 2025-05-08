@@ -13,6 +13,10 @@ for count in range(3):
     print("=$%#=")
     time.sleep_ms(150)
     
+# mac地址
+mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
+print(mac)
+    
 import lcd
 lcd.draw_logo()
 
@@ -28,8 +32,6 @@ except OSError:
     import inisetup
     vfs = inisetup.setup()
 
-# mac地址
-mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
-print(mac)
+
 
 gc.collect()
