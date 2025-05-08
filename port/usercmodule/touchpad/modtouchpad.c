@@ -195,6 +195,7 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
 
 static mp_obj_t update_fw(mp_obj_t self_in)
 {
+    mtp_obj_t *self = self_in;
     int ret = fts_fwupg_auto_upgrade();
     if(ret < 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("firmware upgrade fails."));

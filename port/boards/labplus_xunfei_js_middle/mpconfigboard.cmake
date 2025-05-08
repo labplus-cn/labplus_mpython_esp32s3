@@ -7,9 +7,9 @@ set(SDKCONFIG_DEFAULTS
     ${SDKCONFIG_IDF_VERSION_SPECIFIC}
     boards/sdkconfig.ble 
     boards/sdkconfig.240mhz
-    boards/mpython_pro/sdkconfig.spiram 
-    boards/mpython_pro/sdkconfig.board
-    # boards/mpython_pro/sdkconfig.usb
+    boards/labplus_xunfei_js_middle/sdkconfig.spiram 
+    boards/labplus_xunfei_js_middle/sdkconfig.board
+    # boards/labplus_xunfei_js_middle/sdkconfig.usb
 )
 
 if(NOT MPY_PORT_DIR)
@@ -37,10 +37,10 @@ set(MICROPY_SOURCE_BOARD
     ${MPY_PORT_DIR}/drivers/audio/simple_file_decoder.c
     ${MPY_PORT_DIR}/drivers/audio/http_stream.c
     ${MPY_PORT_DIR}/drivers/audio/simple_http_decoder.c
-    ${MPY_PORT_DIR}/drivers/startup/logo.c
-    ${MPY_PORT_DIR}/drivers/startup/i2c_master.c
-    ${MPY_PORT_DIR}/drivers/startup/oled.c
-    ${MPY_PORT_DIR}/drivers/startup/startup.c 
+    # ${MPY_PORT_DIR}/drivers/startup/logo.c
+    # ${MPY_PORT_DIR}/drivers/startup/i2c_master.c
+    # ${MPY_PORT_DIR}/drivers/startup/oled.c
+    # ${MPY_PORT_DIR}/drivers/startup/startup.c 
     # ${MPY_PORT_DIR}/lib/utils/pyexec.c
     ${MPY_PORT_DIR}/builtins/modmusictunes.c
     ${MPY_PORT_DIR}/builtins/modmusic.c
