@@ -15,7 +15,7 @@ import esp, math, time, network
 import ustruct, array
 from neopixel import NeoPixel
 # from esp import dht_readinto
-from time import sleep_ms, sleep_us, sleep
+# from time import sleep_ms, sleep_us, sleep
 import framebuf 
 import calibrate_img
 from micropython import schedule,const
@@ -583,7 +583,7 @@ class Magnetic(object):
                     self.i2c.writeto(self.addr, b'\x1B\x01', True)
                     
                     while True:
-                        sleep_ms(25)
+                        time.sleep_ms(25)
                         buf = self._readReg(0x18, 1)
                         status = buf[0]
                         if(status & 0x40):
@@ -844,19 +844,19 @@ class MPythonPin():
             if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
             if pin not in [0, 1, 2, 3, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
             if pin not in [0, 1, 2, 3, 4, 6, 8, 9, 13, 14, 15, 16]:
                 raise TypeError('PWM not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.pwm = PWM(Pin(self.id), duty=0)
         if mode == PinMode.ANALOG:
             if pin not in [0, 1, 2, 3, 4, 6]:

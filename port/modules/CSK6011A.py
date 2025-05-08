@@ -1,6 +1,7 @@
 from machine import UART
 from mpython import *
 import gc
+import time
 
 class utf8_gb2312(object):
     def __init__(self):
@@ -72,7 +73,7 @@ class SpeechSynthesis(object):
             data_len = len(list(r)) + 2 
             revise_cmd = [0xFD, data_len >> 8, data_len & 0xff, 0x01, 0x00] + list(r)
             self.uart.write(bytes(revise_cmd))
-            sleep_ms(wait_ms)
+            time.sleep_ms(wait_ms)
         else:
             print('busy status')
             pass
@@ -80,7 +81,7 @@ class SpeechSynthesis(object):
     def busy_status(self):
         try:
             self.uart.write(bytes([0xFD, 0x00, 0x01, 0x21]))
-            sleep_ms(10)
+            time.sleep_ms(10)
             if (self.uart.any()):
                 tmp = self.uart.read().decode('utf-8').strip()
                 if(tmp=='O'):

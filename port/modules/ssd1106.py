@@ -2,7 +2,7 @@
 
 from micropython import const
 import framebuf
-
+import time
 
 # register definitions
 SET_CONTRAST        = const(0x81)
@@ -63,7 +63,7 @@ class SSD1106(framebuf.FrameBuffer):
 			SET_ENTIRE_ON, # output follows RAM contents
 			SET_NORM_INV,
 			SET_DISP_ON): # on
-			self.write_cmd(cmd)
+            self.write_cmd(cmd)
         self.fill(0)
         self.show()
 

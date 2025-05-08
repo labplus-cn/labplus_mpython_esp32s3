@@ -2,7 +2,7 @@
 educore
 '''
 import gc
-from mpython import MPythonPin,PinMode,Pin,OLED,Image,i2c,I2C,wifi,button_a,button_b,sleep_ms,sleep,numberMap,Magnetic
+from mpython import MPythonPin,PinMode,Pin,OLED,Image,i2c,I2C,wifi,button_a,button_b,numberMap,Magnetic
 from mpython import accelerometer as _accelerometer
 from mpython import rgb as _rgb
 from mpython import light as _light
@@ -289,15 +289,15 @@ class parrot():
             if(speed>=0):
                 speed = int(numberMap(speed, 0, 100, 0, 1023))
                 self.out0.write_analog(speed)
-                sleep_ms(2)
+                time.sleep_ms(2)
                 self.out1.write_analog(0)
-                sleep_ms(2)
+                time.sleep_ms(2)
             elif(speed<0):
                 speed = int(numberMap(math.fabs(speed), 0, 100, 0, 1023))
                 self.out1.write_analog(speed)
-                sleep_ms(2)
+                time.sleep_ms(2)
                 self.out0.write_analog(0)
-                sleep_ms(2)
+                time.sleep_ms(2)
 
 '''
 继承Servo
@@ -535,7 +535,7 @@ class ultrasonic(object):
         :return: 返回测距,单位cm
         """
         self.i2c.writeto(0x0b, bytearray([1]))
-        sleep_ms(2)
+        time.sleep_ms(2)
         temp = self.i2c.readfrom(0x0b, 2)
         distanceCM = int((temp[0] + temp[1] * 256) / 10)
         return distanceCM
@@ -587,7 +587,7 @@ class ds18b20():
         roms = self.ds.scan()
         # print('found devices:', roms)
         self.ds.convert_temp()
-        sleep_ms(750)
+        time.sleep_ms(750)
         temp = self.ds.read_temp(roms[0])
         # print(temp,end='℃\n ')
         return temp
@@ -838,23 +838,23 @@ class rgb():
             for i in index:
                 _rgb[i]=(r,g,b)
                 _rgb.write()
-                sleep_ms(1)
+                time.sleep_ms(1)
         elif(self.type == 2):
             for i in index:
                 self.my_rgb[i]=(r,g,b)
                 self.my_rgb.write()
-                sleep_ms(1)
+                time.sleep_ms(1)
             
         
     def clear(self):
         if(self.type == 1):
             _rgb.fill((0,0,0))
             _rgb.write()
-            sleep_ms(1)
+            time.sleep_ms(1)
         elif(self.type == 2):
             self.my_rgb.fill((0,0,0))
             self.my_rgb.write()
-            sleep_ms(1)
+            time.sleep_ms(1)
 
 
 '''

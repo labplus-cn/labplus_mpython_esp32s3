@@ -23,7 +23,7 @@
 | blue:bit modules library for mPython. 
 | more about with bluebit info browse http://wiki.labplus.cn/index.php?title=Bluebit
 """
-from mpython import i2c, sleep_ms, MPythonPin, PinMode, numberMap
+from mpython import i2c, MPythonPin, PinMode, numberMap
 from micropython import const
 from machine import UART, Pin
 import ustruct
@@ -49,7 +49,7 @@ class Color(object):
         """
         color = [0, 0, 0]
         self.i2c.writeto(0x0a, bytearray([1]))
-        sleep_ms(100)
+        time.sleep_ms(100)
         self.i2c.writeto(0x0a, bytearray([2]))
         state = self.i2c.readfrom(0x0a, 1)
         if state[0] == 3:
@@ -110,9 +110,9 @@ class AmbientLight(object):
         """
         try:
             self.i2c.writeto(0x23, bytearray([0x10]))
-            sleep_ms(120)
+            time.sleep_ms(120)
             t = self.i2c.readfrom(0x23, 2)
-            sleep_ms(10)
+            time.sleep_ms(10)
             return int((t[0] * 256 + t[1]) / 1.2)
         except Exception as e:
             return -1
@@ -133,7 +133,7 @@ class Ultrasonic(object):
         """
         try:
             self.i2c.writeto(0x0b, bytearray([1]))
-            sleep_ms(2)
+            time.sleep_ms(2)
             temp = self.i2c.readfrom(0x0b, 2)
             distanceCM = (temp[0] + temp[1] * 256) / 10
             distanceCM = max(min(distanceCM, 200), 0)
@@ -171,7 +171,7 @@ class MP3_(object):
         self.uart.write(bytearray(pakage))
         # print(len)
         # print(pakage)
-        sleep_ms(100)
+        time.sleep_ms(100)
 
     def play_song(self, num):
         """
@@ -227,7 +227,7 @@ class MP3_(object):
         self._vol = vol
         var = [0xAE, vol]
         self._cmdWrite(var)
-        sleep_ms(50)
+        time.sleep_ms(50)
         # while True:
         #     if(self.uart.any()):
         #         buff = self.uart.read(2)
@@ -311,7 +311,7 @@ class DelveBit(object):
             self.i2c.scan()
             temp = self.i2c.readfrom(self.address, 2)
             data = ustruct.unpack(">h", temp)
-            sleep_ms(20)
+            time.sleep_ms(20)
             return round(data[0] / 100, 2)
         except Exception as e:
             return -1
@@ -787,7 +787,7 @@ class ASRPRO(object):
         self.identifying_word = -1
 
     def any(self):
-        sleep_ms(10)
+        time.sleep_ms(10)
         if(self.uart.any()):
             self.recognition()
             return True
@@ -809,14 +809,14 @@ class PM25_DC(object):
     def __init__(self, tx=Pin.P1, rx=Pin.P0, uart_num=1):
         self.K = 0.4 # (注:户读取到的灰尘传感器原始 PM2.5，需要参照 TSI仪器光度法标定一个K 值系数，一般建议 0.4)
         self.uart = UART(uart_num, baudrate=9600, stop=1, tx=tx, rx=rx, timeout=30)
-        sleep_ms(100)
+        time.sleep_ms(100)
 
     def read(self): #单位 微克/立方米
         _pm25 = -1 
         data = bytes(0x00)
         time_cnt = time.ticks_ms()
         while True:
-            sleep_ms(5)
+            time.sleep_ms(5)
             if self.uart.any():
                 head = self.uart.read(1)   
                 if(head[0] == 0xA5):
