@@ -4,7 +4,7 @@ import uos
 from flashbdev import bdev
 from neopixel import NeoPixel
 import ubinascii
-from machine import I2C, Pin
+from machine import I2C, Pin, unique_id
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
@@ -29,7 +29,7 @@ except OSError:
     vfs = inisetup.setup()
 
 # mac地址
-# mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
-# print(mac)
+mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
+print(mac)
 
 gc.collect()
