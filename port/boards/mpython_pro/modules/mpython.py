@@ -21,7 +21,8 @@ from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
 from ltr308 import *
-from _boot import i2c
+
+i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
 if '_print' not in dir(): _print = print
 

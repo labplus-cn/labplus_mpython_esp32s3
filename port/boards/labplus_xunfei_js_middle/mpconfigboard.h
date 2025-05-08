@@ -1,6 +1,6 @@
 #ifndef MICROPY_HW_BOARD_NAME
 // Can be set by mpconfigboard.cmake.
-#define MICROPY_HW_BOARD_NAME               "labplus_xunfei_ja_middle_board"
+#define MICROPY_HW_BOARD_NAME               "labplus_xunfei_js_middle_board"
 #endif
 #define MICROPY_HW_MCU_NAME                 "ESP32S3"
 

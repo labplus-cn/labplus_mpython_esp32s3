@@ -9,7 +9,7 @@
 # V1.2 add servo/ui class,by tangliufeng
 # labplus_Ledong_v2 202411
 
-from machine import PWM, Pin, ADC
+from machine import I2C,PWM, Pin, ADC
 import time, network
 import struct
 from neopixel import NeoPixel
@@ -18,7 +18,8 @@ from neopixel import NeoPixel
 from micropython import schedule,const
 from _ntptime import *
 from ltr308 import *
-from _boot import i2c
+
+i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
 if '_print' not in dir(): _print = print
 

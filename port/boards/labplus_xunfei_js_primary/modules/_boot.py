@@ -4,9 +4,9 @@ import uos
 from flashbdev import bdev
 from neopixel import NeoPixel
 import ubinascii
-from machine import I2C, Pin, unique_id
+from machine import Pin, unique_id
 
-i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
+Pin(12, Pin.OUT, value=0)
 
 # 硬件复位标志
 for count in range(3):
