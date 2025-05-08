@@ -23,13 +23,15 @@
 | blue:bit modules library for mPython. 
 | more about with bluebit info browse http://wiki.labplus.cn/index.php?title=Bluebit
 """
-from mpython import i2c, sleep_ms, MPythonPin, PinMode, numberMap
+from mpython import i2c, MPythonPin, PinMode, numberMap
 from micropython import const
 from machine import UART, ADC, Pin
 import framebuf
 import ubinascii
 import ustruct
 import math
+import time
+
 from max30102 import MAX30102
 from CSK6011A import SpeechSynthesis
 from acd1200 import ACD1200
@@ -108,10 +110,10 @@ class SHT20(object):
 
         :return: 温度,单位摄氏度
         """
-        sleep_ms(10)
+        time.sleep_ms(10)
         try:
             self.i2c.writeto(0x40, b'\xf3')
-            sleep_ms(70)
+            time.sleep_ms(70)
             t = i2c.readfrom(0x40, 2)
             return -46.86 + 175.72 * (t[0] * 256 + t[1]) / 65535
         except Exception as e:
@@ -123,10 +125,10 @@ class SHT20(object):
 
         :return: 湿度,单位%
         """
-        sleep_ms(10)
+        time.sleep_ms(10)
         try:
             self.i2c.writeto(0x40, b'\xf5')
-            sleep_ms(25)
+            time.sleep_ms(25)
             t = i2c.readfrom(0x40, 2)
             return -6 + 125 * (t[0] * 256 + t[1]) / 65535
         except Exception as e:
@@ -150,7 +152,7 @@ class Color(object):
         """
         color = [0, 0, 0]
         self.i2c.writeto(0x0a, bytearray([1]))
-        sleep_ms(100)
+        time.sleep_ms(100)
         self.i2c.writeto(0x0a, bytearray([2]))
         state = self.i2c.readfrom(0x0a, 1)
         if state[0] == 3:
@@ -212,9 +214,9 @@ class AmbientLight(object):
         """
         try:
             self.i2c.writeto(0x23, bytearray([0x10]))
-            sleep_ms(120)
+            time.sleep_ms(120)
             t = self.i2c.readfrom(0x23, 2)
-            sleep_ms(10)
+            time.sleep_ms(10)
             return int((t[0] * 256 + t[1]) / 1.2)
         except Exception as e:
             return -1
@@ -236,7 +238,7 @@ class Ultrasonic(object):
         """
         try:
             self.i2c.writeto(0x0b, bytearray([1]))
-            sleep_ms(2)
+            time.sleep_ms(2)
             temp = self.i2c.readfrom(0x0b, 2)
             distanceCM = (temp[0] + temp[1] * 256) / 10
             distanceCM = max(min(distanceCM, 200), 0)
@@ -516,7 +518,7 @@ class Ultrasonic(object):
 #         self.uart.write(bytearray([sum_h]))
 #         self.uart.write(bytearray([sum_l]))
 #         self.uart.write(bytearray([0xEF]))
-#         sleep_ms(20)
+#         time.sleep_ms(20)
 
 #     def play_song(self, num):
 #         """
@@ -660,7 +662,7 @@ class MP3_(object):
         self.uart.write(bytearray(pakage))
         # print(len)
         # print(pakage)
-        sleep_ms(100)
+        time.sleep_ms(100)
 
     def play_song(self, num):
         """
@@ -716,7 +718,7 @@ class MP3_(object):
         self._vol = vol
         var = [0xAE, vol]
         self._cmdWrite(var)
-        sleep_ms(50)
+        time.sleep_ms(50)
         # while True:
         #     if(self.uart.any()):
         #         buff = self.uart.read(2)
@@ -802,7 +804,7 @@ class DelveBit(object):
             self.i2c.scan()
             temp = self.i2c.readfrom(self.address, 2)
             data = ustruct.unpack(">h", temp)
-            sleep_ms(20)
+            time.sleep_ms(20)
             return round(data[0] / 100, 2)
         except Exception as e:
             return -1
@@ -876,7 +878,7 @@ class DelveBit(object):
 #         """
 #         write_buf = b'\x00' + mode
 #         self.i2c.writeto(self.address, write_buf)
-#         sleep_ms(10)
+#         time.sleep_ms(10)
 
 #     def motor_stop(self):
 #         """
@@ -884,7 +886,7 @@ class DelveBit(object):
 #         """
 
 #         self.i2c.writeto(self.address, b'\x00\x00')
-#         sleep_ms(10)
+#         time.sleep_ms(10)
 
 #     def set_pwm(self, speed1, speed2):
 #         """
@@ -897,7 +899,7 @@ class DelveBit(object):
 #             raise ValueError("Speed out of range:-1023~1023")
 #         write_buf = b'\x06' + ustruct.pack('>HH', speed1, speed2)
 #         self.i2c.writeto(self.address, write_buf)
-#         sleep_ms(10)
+#         time.sleep_ms(10)
 #         self._effect(self.PWM_MODE)
 
 #     def set_cruise(self, speed1, speed2):
@@ -911,7 +913,7 @@ class DelveBit(object):
 #             raise ValueError("Speed out of range:-1023~1023")
 #         write_buf = b'\x0a' + ustruct.pack('>HH', speed1, speed2)
 #         self.i2c.writeto(self.address, write_buf)
-#         sleep_ms(10)
+#         time.sleep_ms(10)
 #         self._effect(self.CRUISE_MODE)
 
 #     def set_position(self, turn1, turn2):
@@ -925,7 +927,7 @@ class DelveBit(object):
 #             raise ValueError("Position out of range:0~1023")
 #         write_buf = b'\x10' + ustruct.pack('>ll', turn1, turn2)
 #         self.i2c.writeto(self.address, write_buf)
-#         sleep_ms(10)
+#         time.sleep_ms(10)
 #         self._effect(self.POSITION_MODE)
 
 
@@ -1387,7 +1389,7 @@ class ASRPRO(object):
         self.identifying_word = -1
 
     def any(self):
-        sleep_ms(10)
+        time.sleep_ms(10)
         if(self.uart.any()):
             self.recognition()
             return True

@@ -13,7 +13,8 @@ from machine import PWM, Pin, ADC
 import time, network
 import struct
 from neopixel import NeoPixel
-from time import sleep_ms
+# from time import sleep_ms
+
 from micropython import schedule,const
 from _ntptime import *
 from ltr308 import *
@@ -87,19 +88,19 @@ class MPythonPin():
             if pin not in [0, 1, 2, 3, 22]:
                 raise TypeError('OUT not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OUT, pull)
         if mode == PinMode.OUT_DRAIN:
             if pin not in [0, 1, 2, 3, 22]:
                 raise TypeError('OUT_DRAIN not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.Pin = Pin(self.id, Pin.OPEN_DRAIN, pull)
         if mode == PinMode.PWM:
             if pin not in [0, 1, 2, 3, 22]:
                 raise TypeError('PWM not supported on P%d' % pin)
             self.Pin = Pin(self.id, Pin.IN, pull)
-            sleep_ms(1)
+            time.sleep_ms(1)
             self.pwm = PWM(Pin(self.id), duty=0)
         if mode == PinMode.ANALOG:
             if pin not in [0, 1, 2, 3]:
@@ -297,10 +298,10 @@ class SHT20(object):
 
         :return: 温度,单位摄氏度
         """
-        sleep_ms(10)
+        time.sleep_ms(10)
         try:
             self.i2c.writeto(0x40, b'\xf3')
-            sleep_ms(70)
+            time.sleep_ms(70)
             t = i2c.readfrom(0x40, 2)
             return -46.86 + 175.72 * (t[0] * 256 + t[1]) / 65535
         except Exception as e:
@@ -312,10 +313,10 @@ class SHT20(object):
 
         :return: 湿度,单位%
         """
-        sleep_ms(10)
+        time.sleep_ms(10)
         try:
             self.i2c.writeto(0x40, b'\xf5')
-            sleep_ms(25)
+            time.sleep_ms(25)
             t = i2c.readfrom(0x40, 2)
             return -6 + 125 * (t[0] * 256 + t[1]) / 65535
         except Exception as e:
