@@ -8,7 +8,7 @@ set(IDF_VERSION "${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}.${IDF_VERSION_PATCH}"
 
 # Set the board if it's not already set.
 if(NOT MICROPY_BOARD)
-    set(MICROPY_BOARD labplus_Ledong_v2)
+    set(MICROPY_BOARD labplus_xunfei_js_middle)
 endif()
 
 # Set the board directory and check that it exists.

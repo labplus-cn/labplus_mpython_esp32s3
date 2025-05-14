@@ -31,7 +31,7 @@
 # sht20 = SHT20()
 # while True:
 #     print(sht20.temperature())
-#     time.sleep(1)
+#     time.sleep_ms(100)
 
 # # 4、数字光线
 # from mpython import *
@@ -39,7 +39,7 @@
 
 # while True:
 #     print(light.read())
-#     time.sleep(1)
+#     time.sleep_ms(100)
  
 # # 5、声音触发   
 # from mpython import *
@@ -85,30 +85,30 @@
 # button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
 
 # rfid1
-from mpython import *
-import time
-from mfrc import *
+# from mpython import *
+# import time
+# from mfrc import *
 
-def on_button_a_down(_):
-    global cap, frame, ret
-    time.sleep_ms(10)
-    if button_a.value() == 1: return
-    print(rfid.get_serial_num())
-    rfid.set_purse()
+# def on_button_a_down(_):
+#     global cap, frame, ret
+#     time.sleep_ms(10)
+#     if button_a.value() == 1: return
+#     print(rfid.get_serial_num())
+#     rfid.set_purse()
 
-def on_button_b_down(_):
-    global cap, frame, ret
-    time.sleep_ms(10)
-    if button_b.value() == 1: return
+# def on_button_b_down(_):
+#     global cap, frame, ret
+#     time.sleep_ms(10)
+#     if button_b.value() == 1: return
     
-    rfid.increment(10)
-    print(rfid.get_balance())
+#     rfid.increment(10)
+#     print(rfid.get_balance())
 
-rfid = Rfid(i2c = i2c, i2c_addr = 43)
+# rfid = Rfid(i2c = i2c, i2c_addr = 43)
 
-button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
+# button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
 
-button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
+# button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
 
 # #7、蜂鸣器
 # from mpython import *
@@ -150,3 +150,15 @@ button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
 # audio.record('2.wav', 3, 16, 2, 16000)
 # time.sleep(6)
 # audio.play('2.wav')
+
+
+import machine
+import os
+from msa311 import *
+
+acc = MSA311(i2c=i2c, g_range=G_RANGE_2G)
+
+def cb():
+    print('hao')
+
+acc.configure_tap_detection(callback=cb)
