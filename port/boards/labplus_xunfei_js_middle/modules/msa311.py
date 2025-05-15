@@ -133,7 +133,7 @@ FREEFALL_AXIS_Z = const(0x04)
 FREEFALL_AXIS_ALL = const(0x07)
 
 class MSA311:
-    def __init__(self, i2c, addr=MSA311_ADDR, g_range=G_RANGE_2G, odr=ODR_1000HZ):
+    def __init__(self, i2c=i2c, addr=MSA311_ADDR, g_range=G_RANGE_2G, odr=ODR_1000HZ):
         self.i2c = i2c
         self.addr = addr
         self._g_range = g_range  # Default g-range
@@ -233,6 +233,15 @@ class MSA311:
         self.set_power_mode(0x5e)
         self.set_axis_swap_polarity(xy_swap=False, x_pol=True, y_pol=True, z_pol=True)
         self.config_interrupt()
+        
+    def get_x(self):
+        return self.read_accel()[0]
+    
+    def get_y(self):
+        return self.read_accel()[1]
+    
+    def get_z(self):
+        return self.read_accel()[2]    
     
     def read_accel(self):
         # Read raw data
@@ -366,7 +375,7 @@ class MSA311:
         self._set_callback(axes, callback)
     
     def auto_calibrate(self):
-                # Read raw data
+        # Read raw data
         data = self._read_reg(REG_ACC_X_LSB, 6)
         
         # Convert to 16-bit values
@@ -382,11 +391,11 @@ class MSA311:
         self.offset_x = x * self._acc_scale
         self.offset_y = y * self._acc_scale
         self.offset_z = z * self._acc_scale
-        print("offset_x:", self.offset_x)
-        print("offset_y:", self.offset_y) 
-        print("offset_z:", self.offset_z)
+        # print("offset_x:", self.offset_x)
+        # print("offset_y:", self.offset_y) 
+        # print("offset_z:", self.offset_z)
         
-        self._set_nvs_offset(self.offset_x, self.offset_y, self.offset_z)
+        self.set_nvs_offset(self.offset_x, self.offset_y, self.offset_z)
         
     def get_nvs_offset(self):
         try:
@@ -394,18 +403,21 @@ class MSA311:
             self.x_offset = round(tmp.get_i32("x")/1e5, 5)
             self.y_offset = round(tmp.get_i32("y")/1e5, 5)
             self.z_offset = round(tmp.get_i32("z")/1e5, 5)
+            # print(self.x_offset,self.y_offset,self.z_offset)
+            # print('=get_nvs_offset=')
         except OSError as e:
+            print(e)
             self.x_offset = 0
             self.y_offset = 0
             self.z_offset = 0
     
-    def _set_nvs_offset(self, offset_x, offset_y, offset_z):
+    def set_nvs_offset(self, offset_x, offset_y, offset_z):
         try:
             nvs = NVS("offset_a")
-            nvs.set_i32('x', int(offset_x*1e5))
-            nvs.set_i32('y', int(offset_y*1e5))
-            nvs.set_i32('z', int(offset_z*1e5))
+            nvs.set_i32("x", int(offset_x*1e5))
+            nvs.set_i32("y", int(offset_y*1e5))
+            nvs.set_i32("z", int(offset_z*1e5))
             nvs.commit()
         except OSError as e:
-            print('Gyroscope set_nvs_offset error:',e)
+            print('msa311 set_nvs_offset error:',e)
         

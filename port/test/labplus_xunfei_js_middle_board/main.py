@@ -138,6 +138,11 @@
 # while True:
 #     print(ir1.read())
 #     time.sleep_ms(100)
+
+# from mpython import *
+
+# IrObstacle_4 = InfraredDetection(4)
+# IrObstacle_4.set_threshold(1500)
     
 # # 11、电机
 # from mpython import ledong_shield
@@ -152,13 +157,34 @@
 # audio.play('2.wav')
 
 
-import machine
-import os
-from msa311 import *
 
-acc = MSA311(i2c=i2c, g_range=G_RANGE_2G)
+# msa311 三軸
+from mpython import *
+offset_x = 0 
+offset_y = 0
+offset_z = 0
 
-def cb():
-    print('hao')
+accelerometer.auto_calibrate() #自動校準
+accelerometer.set_nvs_offset(offset_x,offset_y,offset_z) #手動校準
+accelerometer.set_g_range(g_range=G_RANGE_2G) #G_RANGE_2G G_RANGE_4G G_RANGE_8G G_RANGE_16G
 
-acc.configure_tap_detection(callback=cb)
+
+def cb1():
+    print('敲擊')
+
+def cb2():
+    print('方向检测')
+    
+def cb3():
+    print('活動')
+
+accelerometer.configure_tap_detection(callback=cb1)
+accelerometer.configure_orientation_detection(callback=cb2)
+accelerometer.configure_active_detection(callback=cb3)
+
+while True:
+    print(accelerometer.read_accel())
+    print(accelerometer.get_x())
+    print(accelerometer.get_y())
+    print(accelerometer.get_z())
+    time.sleep(1)

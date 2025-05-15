@@ -10,7 +10,7 @@
 # ledong_pro 202411
 
 from machine import I2C, PWM, Pin, ADC, TouchPad
-# from ssd1106 import SSD1106_I2C
+i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 import esp, math, time, network
 import ustruct, array
 from neopixel import NeoPixel
@@ -23,7 +23,7 @@ from esp32 import NVS
 from _ntptime import *
 from ltr308 import *
 
-i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
+i2c_addr=i2c.scan()
 
 if '_print' not in dir(): _print = print
 
@@ -141,22 +141,6 @@ class MPythonPin():
         self.pwm.freq(freq)
         self.pwm.duty(duty)
 
-'''
-# to be test
-class LightSensor(ADC):
-    
-    def __init__(self):
-        super().__init__(Pin(pins_remap_esp32[4]))
-        # super().atten(ADC.ATTN_11DB)
-    
-    def value(self):
-        # lux * k * Rc = N * 3.9/ 4096
-        # k = 0.0011mA/Lux
-        # lux = N * 3.9/ 4096 / Rc / k
-        return super().read() * 1.1 / 4095 / 6.81 / 0.011
-    
-'''
-
 class wifi:
     def __init__(self):
         self.sta = network.WLAN(network.STA_IF)
@@ -212,6 +196,11 @@ class wifi:
 rgb = NeoPixel(Pin(8, Pin.OUT), 1, 3, 1, brightness=0.3)
 rgb.write()
 
+# msa311 三軸
+if 98 in i2c_addr:
+    from msa311 import *
+    accelerometer = MSA311(i2c=i2c,g_range=G_RANGE_4G) 
+
 # light sensor LTR-308ALS 
 if 83 in i2c.scan():    
     light = LTR_308ALS(i2c)
@@ -220,11 +209,27 @@ if 83 in i2c.scan():
 sound = ADC(Pin(6))
 sound.atten(sound.ATTN_11DB)
 
-# IR
+# IR 紅外探測
 ir1 = ADC(Pin(5))
 ir1.atten(ir1.ATTN_11DB)
 ir2 = ADC(Pin(7))
 ir2.atten(ir2.ATTN_11DB)        
+
+class InfraredDetection:
+    def __init__(self, pin):
+        self.threshold = 1500
+        self._ir = None
+        if pin == 4: self._ir = ir1
+        elif pin == 6: self._ir = ir2
+
+    def set_threshold(self, val):
+        self.threshold = val
+
+    def get_raw_val(self):
+        return self._ir.read()
+
+    def detect(self):
+        return self._ir.read() <= self.threshold
 
 # buttons
 class Button:
@@ -332,6 +337,7 @@ class SHT20(object):
             return -6 + 125 * (t[0] * 256 + t[1]) / 65535
         except Exception as e:
             return -1
+        
 sht20 = SHT20()
 # shield 
 class Ledong_shield(object):
@@ -358,9 +364,7 @@ class Ledong_shield(object):
         data = max(min(data, 4200), 3300)
         return data
 
+
 ledong_shield = Ledong_shield()
 
-
-
-# from gui import *
 
