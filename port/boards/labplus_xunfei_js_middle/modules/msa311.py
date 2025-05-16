@@ -317,8 +317,8 @@ class MSA311:
         
         self._set_callback(INT_SRC_TAP, callback) 
         
-        print("int_set0: {}".format(self._read_reg(REG_INT_SET0)))
-        print("int_map0: {}".format(self._read_reg(REG_INT_MAP0)))
+        # print("int_set0: {}".format(self._read_reg(REG_INT_SET0)))
+        # print("int_map0: {}".format(self._read_reg(REG_INT_MAP0)))
          
     def configure_orientation_detection(self, int_enable = True, mode=0x18, callback=None):  
         self._write_reg(REG_ORIENT_MODE, mode)
@@ -406,7 +406,7 @@ class MSA311:
             # print(self.x_offset,self.y_offset,self.z_offset)
             # print('=get_nvs_offset=')
         except OSError as e:
-            print(e)
+            # print(e)
             self.x_offset = 0
             self.y_offset = 0
             self.z_offset = 0
