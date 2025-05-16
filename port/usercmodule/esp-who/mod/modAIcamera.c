@@ -66,7 +66,7 @@ static mp_obj_t AI_detect_init(mp_obj_t type, mp_obj_t callback)
                 register_cat_face_detection_wrapper(xQueueAIFrame, NULL, xQueueResult, xQueueLCDFrame, false);
             break;
             case AI_TYPE_MOTION_DEECTION:
-                register_motion_detection_wrapper(xQueueAIFrame, NULL, NULL, xQueueLCDFrame);
+                register_motion_detection_wrapper(xQueueAIFrame, NULL, xQueueResult, xQueueLCDFrame);
             break;
             default:
 
