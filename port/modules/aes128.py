@@ -18,7 +18,7 @@ def aes_128_cbc_encrypt(data):
     # print('padded: {}'.format(padded))    
     cipher = aes(KEY, MODE_CBC, IV)
     encrypted = cipher.encrypt(padded)
-    print('Encrypted: {}'.format(encrypted))
+    # print('Encrypted: {}'.format(encrypted))
     # print(ByteToHex(encrypted))
  
     return encrypted

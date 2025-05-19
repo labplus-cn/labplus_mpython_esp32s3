@@ -332,6 +332,23 @@ ir1.atten(ir1.ATTN_11DB)
 ir2 = ADC(Pin(7))
 ir2.atten(ir2.ATTN_11DB)
 
+class InfraredDetection():
+    def __init__(self, pin):
+        self.threshold = 1500
+        self._ir = None
+        if pin == 4: self._ir = ir1
+        elif pin == 6: self._ir = ir2
+
+    def set_threshold(self, val):
+        self.threshold = val
+
+    def get_raw_val(self):
+        return self._ir.read()
+
+    def detect(self):
+        return self._ir.read() <= self.threshold
+    
+
 # POT
 pot = ADC(Pin(8))
 pot.atten(pot.ATTN_11DB)

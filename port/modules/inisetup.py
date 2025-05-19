@@ -36,7 +36,7 @@ by firmware programming).
 
 def setup():
     check_bootsec()
-    print("Performing initial setup")
+    # print("Performing initial setup")
     if bdev.info()[4] == "vfs":
         vfs.VfsLfs2.mkfs(bdev)
         fs = vfs.VfsLfs2(bdev)

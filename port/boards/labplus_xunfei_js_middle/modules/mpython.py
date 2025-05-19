@@ -202,7 +202,7 @@ if 98 in i2c_addr:
     accelerometer = MSA311(i2c=i2c,g_range=G_RANGE_4G) 
 
 # light sensor LTR-308ALS 
-if 83 in i2c.scan():    
+if 83 in i2c_addr:    
     light = LTR_308ALS(i2c)
 
 # sound sensor
