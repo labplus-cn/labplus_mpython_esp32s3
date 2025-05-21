@@ -543,7 +543,7 @@ class Line_follow(object):
         tmp = struct.unpack('5H', i2c.readfrom(IIC_ADDR, 10))
         list = [0]*5
         for i in range(5):
-            if((tmp[i] > self.threshold[i]) and (tmp[i] < 4096)):
+            if((tmp[i] > self.threshold[i]) and (tmp[i] < 65535)):
                 list[i] = 1
             else:
                 list[i] = 0
