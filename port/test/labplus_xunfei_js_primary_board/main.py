@@ -21,6 +21,7 @@ button_b.event_pressed = on_button_b_pressed
 
 # ----------------------------------------------
 # 2、温湿度
+# 显示温度值
 from mpython import *
 import time
 
@@ -30,6 +31,7 @@ while True:
     
 # ----------------------------------------------
 # 3、数字光线
+# 显示环境光线值
 from mpython import *
 import time
 
@@ -48,15 +50,12 @@ while True:
 # ----------------------------------------------
 
 # 5、红外探测
+# 探测距离约5cm,返回ADC采样值
 from mpython import *
 
 while True:
     print(ir1.read())
-    time.sleep_ms(300)
-    
-while True:
     print(ir2.read())
-    time.sleep_ms(300)
     
 # ----------------------------------------------
 # '''
@@ -72,59 +71,47 @@ while True:
    
 # ----------------------------------------------
 # 7、RFID  
+# 打印读到的卡号
 from mpython import *
 import time
+from mfrc import *
 
-def on_button_a_down(_):
-    global a, b, c, d, DIR
-    time.sleep_ms(10)
-    if button_a.value() == 1: return
-    rf = scan_rfid.scanning()
-    if rf:
-        print(rf.serial_number())
-        rf.set_purse()
-    else:
-        print('未检测到射频卡')
+rfid = Rfid(i2c = i2c, i2c_addr = 47)
 
-def on_button_b_down(_):
-    global a, b, c, d, DIR
-    time.sleep_ms(10)
-    if button_b.value() == 1: return
-    rf = scan_rfid.scanning()
-    if rf:
-        rf.increment(10)
-        print(rf.get_balance())
-    else:
-        print('未检测到射频卡')
-
-scan_rfid = Scan_Rfid()
-
-button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
-
-button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
+while True:
+    print(rfid.get_serial_num())
+    time.sleep(1)
     
 # ----------------------------------------------
 # 8、蜂鸣器
 from mpython import *
 import music
-music.pitch(131, 500, Pin.P12)
+music.play(music.DADADADUM, pin=Pin.P12, wait=False, loop=False)
 
 # ----------------------------------------------
 # 9、RGB
+# 显示白灯
 from mpython import *
 
-rgb.fill((int(255), int(0), int(0)))
+rgb.fill((int(255), int(255), int(255))) 
 rgb.write()
-time.sleep_ms(1)
+
 
 # ----------------------------------------------
 # 10、编码电机
+# 说明：编码电机正转、反转
 from mpython import *
+import time
 
-encoder_motor.move(100,100)
+while True:
+    encoder_motor.move(-60,-60)
+    time.sleep(2)
+    encoder_motor.move(60,60)
+    time.sleep(2)
 
 # ----------------------------------------------
 # 11、超声波
+# 说明：打印超声波距离,要求测量数据稳定、准确，测量范围为0-200mm， 精度：正负5mm
 from mpython import *
 
 import time
@@ -134,6 +121,7 @@ while True:
     
 # ----------------------------------------------
 # 12、电池电量
+# 说明：打印电池电量
 from mpython import *
 
 while True:
@@ -142,34 +130,29 @@ while True:
     
 # ----------------------------------------------
 # 13、循迹
-from mpythonbox import *
+# 说明：打印循迹传感器值,要求每个探头测量数据稳定、准确识别黑白色块
+# get_raw_val()返回的是模拟采样值
+from mpython  import *
 
 l = Line_follow()
 
 import time
 while True:
     print(l.get_val())
+    # print(l.get_raw_val())
     time.sleep(1)
     
 # ----------------------------------------------
 # 14、风扇、水泵
 from mpython import *       
-set_speed(1, 100)
-set_speed(2, 100)   
+set_speed(1, 60)
+set_speed(2, 60)   
 
 # ----------------------------------------------
 # 15、摄像头
 '''
 人脸、猫脸检测
 '''
-import AIcamera
-
-isDetect = False
-
-def cb(_):
-    global isDetect
-    isDetect = True
-
 '''
 可选参数：
     AIcamera.FACE_DETECTION      # 人脸检测
@@ -179,14 +162,31 @@ def cb(_):
     AIcamera.MOTION_DEECTION     # 运动检测
     AIcamera.CODE_SCANNER        # 二维码识别
 '''
-AIcamera.init(AIcamera.FACE_DETECTION,cb)
+from mpython import *
+import AIcamera
+
+isDetect = False
+
+def cb(_):
+    global isDetect
+    isDetect = True
+
+AIcamera.init(AIcamera.CODE_SCANNER,cb)
 
 while True:
     if isDetect:
-        print(AIcamera.get_result())  #获取识别结果，检测到的人脸框选位置及关键点坐标（口左角，口右角，鼻，左眼，右眼）,数据结构：（{'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}, {'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}, ...)
-        # 用户可以利用识别结果做点别的。
-        isDetect = False  # 清除识别标记
-    time_sleep_ms(100)
+        try:
+            print(AIcamera.get_result()) 
+        except Exception as e:
+            print(e)
+        isDetect = False  
+    time.sleep_ms(100)
+    
+# AIcamera.init(AIcamera.FACE_DETECTION,cb)
+ 
+#获取识别结果，检测到的人脸框选位置及关键点坐标（口左角，口右角，鼻，左眼，右眼）,数据结构：（{'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}, {'box': (x1, y1, x2, y2）, 'keypoint': (a0, ... , a9)}, ...)
+# 用户可以利用识别结果做点别的。
+# 清除识别标记
 
 
 # ----------------------------------------------
@@ -209,3 +209,50 @@ import audio
 audio.record('2.wav', 5, 16, 2, 16000)
 time.sleep(5)
 audio.play('2.wav')
+
+# 18 屏幕显示
+# 说明：屏幕显示红色、绿色、蓝色
+import time
+import lcd 
+while True:
+    lcd.draw_color(lcd.RED)
+    time.sleep(1)
+    lcd.draw_color(lcd.GREEN)
+    time.sleep(1)
+    lcd.draw_color(lcd.BLUE)
+    time.sleep(1)
+    
+# 舵机
+# 说明：舵机0-120度切换
+from mpython import *
+from servo import Servo
+import time
+servo_22 = Servo(22, min_us=500, max_us=2500, actuation_range=180)
+while True:
+    servo_22.write_angle(0)
+    time.sleep(2)
+    servo_22.write_angle(120)
+    time.sleep(2)
+    
+# 接口
+# 说明：接口0-3输出高低电平，可接一个LED灯显示结果。
+# IIC接口用一个IIC模块测试，使用i2c.scan()测试，能扫到模块地址
+from mpython import *
+
+p0 = MPythonPin(0, PinMode.OUT)
+p1 = MPythonPin(1, PinMode.OUT)
+p2 = MPythonPin(2, PinMode.OUT)
+p3 = MPythonPin(3, PinMode.OUT)
+while True:
+    p0.write_digital(0)
+    p1.write_digital(0)
+    p2.write_digital(0)
+    p3.write_digital(0)
+    time.sleep(1)
+    p0.write_digital(1)
+    p1.write_digital(1)
+    p2.write_digital(1)
+    p3.write_digital(1)
+    time.sleep(1)
+
+    
