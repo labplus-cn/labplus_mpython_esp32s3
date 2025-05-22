@@ -10,8 +10,12 @@ Pin(12, Pin.OUT, value=0)
 # 硬件复位标志
 for count in range(3):
     print("=$%#=")
-    time.sleep_ms(150)
-    
+    time.sleep_ms(50)
+
+# mac地址
+# mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
+# print(mac)
+
 import lcd
 lcd.draw_logo()
 
@@ -26,9 +30,5 @@ try:
 except OSError:
     import inisetup
     vfs = inisetup.setup()
-
-# mac地址
-# mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
-# print(mac)
 
 gc.collect()

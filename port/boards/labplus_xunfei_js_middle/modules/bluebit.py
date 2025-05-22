@@ -29,7 +29,7 @@ from machine import UART, Pin
 import ustruct
 import time
 
-from ATGM336H_5N import GPS
+from ATGM336H_5N import GPS,BDS
 from max30102 import MAX30102
 
 class Color(object):

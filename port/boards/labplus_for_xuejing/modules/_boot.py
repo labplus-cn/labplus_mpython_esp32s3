@@ -11,21 +11,22 @@ _rgb = NeoPixel(machine.Pin(33, machine.Pin.OUT), 4, 3, 1,0.1)
 _rgb.write()
 del _rgb
 
+# 硬件复位标志
+for count in range(3):
+    print("=$%#=")
+    time.sleep_ms(50)
+
+
+# mac地址
+mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
+print(mac)
+
+
 try:
     if bdev:
         uos.mount(bdev, "/")
 except OSError:
     import inisetup
     vfs = inisetup.setup()
-
-# 硬件复位标志
-for count in range(3):
-    print("=$%#=")
-    time.sleep_ms(150)
-
-
-# mac地址
-mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
-print(mac)
 
 gc.collect()
