@@ -9,9 +9,11 @@ class BDS():
         self.UTC_Time = ""
         self.latitude = ""
         self.latitude_f = -1 #维度 度分ddmm.mmmm 2233.3344 ddmm.mmmm
+        self.latitude_dm = -1 
         self.N_S = "" # 北纬南纬
         self.longitude = ""
         self.longitude_f = -1 #经度
+        self.longitude_dm = -1 #经度
         self.E_W = "" # 东经西经
         self.speed_to_groud = ""
         self.speed_to_groud_kh = 0
@@ -111,12 +113,14 @@ class BDS():
                 if temp[3] == "":
                     self.latitude = "-1"
                     self.latitude_f = -1
+                    self.latitude_dm = -1
                 else:
                     self.latitude = temp[3]
                     self.latitude = self.latitude[0:2]+' degree '+self.latitude[2:]+'\''
                     # self.latitude_f = float(temp[3][0:2]) + float(temp[3][2:])
                     if(len(temp[3])>=8):
                         self.latitude_f = float(temp[3])
+                        self.latitude_dm = float(temp[3][0:2]) + float(temp[3][2:])/60
                     
 
                 self.N_S = temp[4]
@@ -124,6 +128,7 @@ class BDS():
                 if temp[5] == "":
                     self.longitude = "-1"
                     self.longitude_f = -1
+                    self.longitude_dm = -1
                 else:
                     self.longitude = temp[5]
                     #self.longitude = self.longitude[0:3]+'°'+self.latitude[3:]
@@ -131,6 +136,7 @@ class BDS():
                     # self.longitude_list = [float(temp[5][0:3]),float(temp[5][3:])]
                     if(len(temp[5])>=8):
                         self.longitude_f = float(temp[5])
+                        self.longitude_dm = float(temp[5][0:3]) + float(temp[5][3:])/60 
 
                 self.E_W = temp[6]
                 
