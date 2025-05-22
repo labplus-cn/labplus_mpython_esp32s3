@@ -1,164 +1,137 @@
 # # 1、超声波
-# from hcsr04 import HCSR04
-# from mpython import *
-# import time
+# 11、超声波
+# 说明：打印超声波距离,要求测量数据稳定、准确，测量范围为0-200mm， 精度：正负5mm
 
-# hcsr04 = HCSR04(trigger_pin=Pin.P25, echo_pin=Pin.P24)
-# while True:
-#     print(hcsr04.distance_mm())
-#     time.sleep(1)
+from hcsr04 import HCSR04
+from mpython import *
+import time
+
+hcsr04 = HCSR04(trigger_pin=Pin.P25, echo_pin=Pin.P24)
+while True:
+    print(hcsr04.distance_mm())
+    time.sleep(1)
     
 # # 2、A B按键
-# from mpython import *
+# 说明：按A键，终端打印A，B键，打印B
+from mpython import *
 
-# def on_button_a_pressed(_):
-#     print('A')
+def on_button_a_pressed(_):
+    print('A')
 
-# button_a.event_pressed = on_button_a_pressed
+button_a.event_pressed = on_button_a_pressed
 
-# def on_button_b_pressed(_):
-#     print('B')
+def on_button_b_pressed(_):
+    print('B')
 
-# button_b.event_pressed = on_button_b_pressed
+button_b.event_pressed = on_button_b_pressed
 
 # # 3、温湿度
-# from mpython import *
+# 显示温度值
+from mpython import *
 
-# from bluebit import SHT20
+from bluebit import SHT20
 
-# import time
+import time
 
-# sht20 = SHT20()
-# while True:
-#     print(sht20.temperature())
-#     time.sleep_ms(100)
+sht20 = SHT20()
+while True:
+    print(sht20.temperature())
+    time.sleep_ms(100)
 
 # # 4、数字光线
-# from mpython import *
-# import time
+# 显示环境光线值
+from mpython import *
+import time
 
-# while True:
-#     print(light.read())
-#     time.sleep_ms(100)
+while True:
+    print(light.read())
+    time.sleep_ms(100)
  
 # # 5、声音触发   
-# from mpython import *
-# import time
+# 说明：打印声音采样值
+from mpython import *
+import time
 
-# while True:
-#     print(sound.read())
-#     time.sleep_ms(100)
+while True:
+    print(sound.read())
+    time.sleep_ms(100)
 
-# #6、RFID  
-# from mpython import *
+# #6、RFID2 
+# 打印读到的卡号
+from mpython import *
+import time
+from mfrc import *
 
-# import time
+rfid2 = Rfid(i2c = i2c, i2c_addr = 47)
 
-# from bluebit import *
-
-# def on_button_a_down(_):
-#     global a, b, c, d, DIR
-#     time.sleep_ms(10)
-#     if button_a.value() == 1: return
-#     rf = scan_rfid.scanning()
-#     if rf:
-#         print(rf.serial_number())
-#         rf.set_purse()
-#     else:
-#         print('未检测到射频卡')
-
-# def on_button_b_down(_):
-#     global a, b, c, d, DIR
-#     time.sleep_ms(10)
-#     if button_b.value() == 1: return
-#     rf = scan_rfid.scanning()
-#     if rf:
-#         rf.increment(10)
-#         print(rf.get_balance())
-#     else:
-#         print('未检测到射频卡')
-
-# scan_rfid = Scan_Rfid()
-
-# button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
-
-# button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
-
-# rfid1
-# from mpython import *
-# import time
-# from mfrc import *
-
-# def on_button_a_down(_):
-#     global cap, frame, ret
-#     time.sleep_ms(10)
-#     if button_a.value() == 1: return
-#     print(rfid.get_serial_num())
-#     rfid.set_purse()
-
-# def on_button_b_down(_):
-#     global cap, frame, ret
-#     time.sleep_ms(10)
-#     if button_b.value() == 1: return
+while True:
+    print(rfid2.get_serial_num())
+    time.sleep(1)
     
-#     rfid.increment(10)
-#     print(rfid.get_balance())
+# #6、RFID1 
+# 打印读到的卡号
+from mpython import *
+import time
+from mfrc import *
 
-# rfid = Rfid(i2c = i2c, i2c_addr = 43)
+rfid1 = Rfid(i2c = i2c, i2c_addr = 43)
 
-# button_a.irq(trigger=Pin.IRQ_FALLING, handler=on_button_a_down)
+while True:
+    print(rfid1.get_serial_num())
+    time.sleep(1)
 
-# button_b.irq(trigger=Pin.IRQ_FALLING, handler=on_button_b_down)
+# #8、蜂鸣器
+from mpython import *
+import music
+music.play(music.DADADADUM, pin=Pin.P12, wait=False, loop=False)
 
-# #7、蜂鸣器
-# from mpython import *
-# import music
-# music.pitch(131, 500, Pin.P12)
+# # 9、RGB
+# 显示白灯
+from mpython import *
 
-# # 8、RGB
-# from mpython import *
+import neopixel
 
-# import neopixel
+my_rgb = neopixel.NeoPixel(Pin(Pin.P7), n=1, bpp=3, timing=1)
+my_rgb.fill( (100, 100, 100) )
+my_rgb.write()
 
-# my_rgb = neopixel.NeoPixel(Pin(Pin.P7), n=1, bpp=3, timing=1)
-# my_rgb.fill( (255, 0, 0) )
-# my_rgb.write()
+# #10、舵机
+from mpython import *
+from servo import Servo
 
-# #9、舵机
-# from mpython import *
-# from servo import Servo
+servo_0 = Servo(23, min_us=500, max_us=2500, actuation_range=180)
+while True:
+    servo_0.write_angle(60)
+    time.sleep(1)
+    servo_0.write_angle(0)
+    time.sleep(1)
 
-# servo_0 = Servo(23, min_us=500, max_us=2500, actuation_range=180)
-# servo_0.write_angle(60)
+# # 11、红外探测
+# 两个红外探测的实例分别为ir1 ir2
 
-# # 10、红外探测
-# from mpython import *
-
-# ir1 = IR(2)
-# while True:
-#     print(ir1.read())
-#     time.sleep_ms(100)
-
-# from mpython import *
-
-# IrObstacle_4 = InfraredDetection(4)
-# IrObstacle_4.set_threshold(1500)
+from mpython import *
+while True:
+    print(ir1.read())
+    time.sleep_ms(100)
     
-# # 11、电机
-# from mpython import ledong_shield
-# ledong_shield.set_motor(2, 60)
+# # 12、电机
+# 1为拓展接口电机，需要外接电机
+# 2为板载风扇
+from mpython import ledong_shield
+ledong_shield.set_motor(2, 60)
+ledong_shield.set_motor(1, 60)
 
-# # 12、录音
-# from mpython import *
-# import audio
+# # 13、录音
+from mpython import *
+import audio
 
-# audio.record('2.wav', 3, 16, 2, 16000)
-# time.sleep(6)
-# audio.play('2.wav')
+audio.record('2.wav', 3, 16, 2, 16000)
+time.sleep(6)
+audio.play('2.wav')
 
 
 
-# msa311 三軸
+# 13 msa311 三軸
 from mpython import *
 offset_x = 0 
 offset_y = 0
@@ -188,3 +161,37 @@ while True:
     print(accelerometer.get_y())
     print(accelerometer.get_z())
     time.sleep(1)
+    
+# 14 接口
+# 说明：接口0-3输出高低电平，可接一个LED灯显示结果。
+# IIC接口用一个IIC模块测试，使用i2c.scan()测试，能扫到模块地址
+from mpython import *
+
+p0 = MPythonPin(0, PinMode.OUT)
+p1 = MPythonPin(1, PinMode.OUT)
+p2 = MPythonPin(2, PinMode.OUT)
+p3 = MPythonPin(3, PinMode.OUT)
+while True:
+    p0.write_digital(0)
+    p1.write_digital(0)
+    p2.write_digital(0)
+    p3.write_digital(0)
+    time.sleep(1)
+    p0.write_digital(1)
+    p1.write_digital(1)
+    p2.write_digital(1)
+    p3.write_digital(1)
+    time.sleep(1)
+    
+# 15 屏幕显示
+# 说明：屏幕显示红色、绿色、蓝色
+import time
+import lcd 
+while True:
+    lcd.draw_color(lcd.RED)
+    time.sleep(1)
+    lcd.draw_color(lcd.GREEN)
+    time.sleep(1)
+    lcd.draw_color(lcd.BLUE)
+    time.sleep(1)
+    

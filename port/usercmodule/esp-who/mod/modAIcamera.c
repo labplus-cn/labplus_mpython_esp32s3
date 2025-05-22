@@ -7,6 +7,13 @@
 #include "who_lcd.h"
 #include "who_c_wrapper.h"
 #include "who_human_face_recognition.hpp"
+#include "who_code_scanner.h"
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
 static bool ai_module_initialized = false;
 static QueueHandle_t xQueueAIFrame = NULL;
@@ -15,15 +22,6 @@ static QueueHandle_t xQueueResult = NULL;
 static QueueHandle_t xQueueEvent = NULL;
 static mp_obj_t ai_callback = MP_OBJ_NULL;
 ai_msg_t msg;
-
-extern void register_human_face_recognition_wrapper(QueueHandle_t frame_i,
-    QueueHandle_t event,
-    QueueHandle_t result,
-    QueueHandle_t frame_o,
-    const bool camera_fb_return);
-
-// static QueueHandle_t xQueueEvent = NULL;
-// static int gEvent;
 
 static void task_resault_handler(void *arg)
 {
@@ -68,6 +66,8 @@ static mp_obj_t AI_detect_init(mp_obj_t type, mp_obj_t callback)
             case AI_TYPE_MOTION_DEECTION:
                 register_motion_detection_wrapper(xQueueAIFrame, NULL, xQueueResult, xQueueLCDFrame);
             break;
+            case AI_TYPE_CODE_SCANNER:
+                register_code_scanner(xQueueAIFrame, NULL, xQueueResult, xQueueLCDFrame, false);
             default:
 
             break;
@@ -137,6 +137,8 @@ static mp_obj_t mp_get_result(void)
     }else if(msg.type == AI_TYPE_COLOR_DETECTION){
 
         return mp_const_none;
+    }else if(msg.type == AI_TYPE_CODE_SCANNER){
+        return mp_obj_new_str(msg.data, strlen(msg.data));
     }else{
         return mp_const_none;
     }
@@ -154,6 +156,7 @@ static const mp_rom_map_elem_t AIcamera_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_FACE_RECOGNITION), MP_ROM_INT(AI_TYPE_FACE_RECOGNITION) },
     { MP_ROM_QSTR(MP_QSTR_CAT_FACE_DETECTION), MP_ROM_INT(AI_TYPE_CAT_FACE_DETECTION) },
     { MP_ROM_QSTR(MP_QSTR_MOTION_DEECTION), MP_ROM_INT(AI_TYPE_MOTION_DEECTION) },
+    { MP_ROM_QSTR(MP_QSTR_CODE_SCANNER), MP_ROM_INT(AI_TYPE_CODE_SCANNER) },
     { MP_ROM_QSTR(MP_QSTR_ENROLL), MP_ROM_INT(ENROLL) },
     { MP_ROM_QSTR(MP_QSTR_RECOGNIZE), MP_ROM_INT(RECOGNIZE) },
     { MP_ROM_QSTR(MP_QSTR_DELETE), MP_ROM_INT(DELETE) },
