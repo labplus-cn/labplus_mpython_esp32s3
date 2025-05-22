@@ -2,7 +2,7 @@ from machine import UART, Pin
 import time
 
 class BDS():
-    def __init__(self,uart_num=1, pin_tx=Pin.P14, pin_rx=Pin.P13):
+    def __init__(self,uart_num=1, pin_tx=Pin.P1, pin_rx=Pin.P0):
         self.__uart_port = UART(uart_num, baudrate=9600, tx=pin_tx, rx=pin_rx)
         self.GNSS_RX_Buffer = ""
         self.GNSS_Buffer = ""
@@ -48,11 +48,6 @@ class BDS():
         # print("This is GNSS_Buffer, after decoding:")
         # print(self.GNSS_Buffer)
         # print("*"*20)
-        # 写入数据
-        # with open('test.txt', 'a') as f:
-        #     f.write('{}\n'.format(self.GNSS_RX_Buffer))
-        #     f.write('{}\n'.format(self.GNSS_Buffer))
-        #     f.write('{}\n'.format("*"*20))
 
         # 模块输出的信息很多，为了简便起见我们只选择 RMC 最小定位信息，此部分代码用于从 GNSS_Buffer 中截取 RMC 部分
         GNSS_BufferHead = self.GNSS_Buffer.find("$GPRMC,")
@@ -201,16 +196,18 @@ class BDS():
 
 
 class GPS():
-    def __init__(self,uart_num=1, pin_tx=Pin.P14, pin_rx=Pin.P13):
+    def __init__(self,uart_num=1, pin_tx=Pin.P1, pin_rx=Pin.P0):
         self.__uart_port = UART(uart_num, baudrate=9600, tx=pin_tx, rx=pin_rx)
         self.GNSS_RX_Buffer = ""
         self.GNSS_Buffer = ""
         self.UTC_Time = ""
         self.latitude = ""
         self.latitude_f = -1 #维度 度分ddmm.mmmm 2233.3344 ddmm.mmmm
+        self.latitude_dm = -1 
         self.N_S = "" # 北纬南纬
         self.longitude = ""
         self.longitude_f = -1 #经度
+        self.longitude_dm = -1 #经度
         self.E_W = "" # 东经西经
         self.speed_to_groud = ""
         self.speed_to_groud_kh = 0
@@ -245,11 +242,6 @@ class GPS():
         # print("This is GNSS_Buffer, after decoding:")
         # print(self.GNSS_Buffer)
         # print("*"*20)
-        # 写入数据
-        # with open('test.txt', 'a') as f:
-        #     f.write('{}\n'.format(self.GNSS_RX_Buffer))
-        #     f.write('{}\n'.format(self.GNSS_Buffer))
-        #     f.write('{}\n'.format("*"*20))
 
         # 模块输出的信息很多，为了简便起见我们只选择 RMC 最小定位信息，此部分代码用于从 GNSS_Buffer 中截取 RMC 部分
         GNSS_BufferHead = self.GNSS_Buffer.find("$GPRMC,")
@@ -260,7 +252,7 @@ class GPS():
             GNSS_BufferHead = self.GNSS_Buffer.find("GNRMC,")
         #print(GNSS_BufferHead)
         if GNSS_BufferHead == -1:
-            print("Cannot read the GPS , RMC imformation")
+            print("Cannot read the BDS , RMC imformation")
             self.isDecodeData = False
         else:
             GNSS_BufferTail = self.GNSS_Buffer[GNSS_BufferHead:].find("\r\n")
@@ -310,12 +302,14 @@ class GPS():
                 if temp[3] == "":
                     self.latitude = "-1"
                     self.latitude_f = -1
+                    self.latitude_dm = -1
                 else:
                     self.latitude = temp[3]
                     self.latitude = self.latitude[0:2]+' degree '+self.latitude[2:]+'\''
                     # self.latitude_f = float(temp[3][0:2]) + float(temp[3][2:])
                     if(len(temp[3])>=8):
                         self.latitude_f = float(temp[3])
+                        self.latitude_dm = float(temp[3][0:2]) + float(temp[3][2:])/60
                     
 
                 self.N_S = temp[4]
@@ -323,6 +317,7 @@ class GPS():
                 if temp[5] == "":
                     self.longitude = "-1"
                     self.longitude_f = -1
+                    self.longitude_dm = -1
                 else:
                     self.longitude = temp[5]
                     #self.longitude = self.longitude[0:3]+'°'+self.latitude[3:]
@@ -330,6 +325,7 @@ class GPS():
                     # self.longitude_list = [float(temp[5][0:3]),float(temp[5][3:])]
                     if(len(temp[5])>=8):
                         self.longitude_f = float(temp[5])
+                        self.longitude_dm = float(temp[5][0:3]) + float(temp[5][3:])/60 
 
                 self.E_W = temp[6]
                 
