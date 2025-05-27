@@ -28,7 +28,7 @@ from micropython import const
 from machine import UART, ADC, Pin
 import framebuf
 import ubinascii
-import ustruct
+import struct
 import math
 import time 
 
@@ -38,69 +38,69 @@ from acd1200 import ACD1200
 
 from spl06_001 import Barometric
 from apds9960 import Gesture
-from ATGM336H_5N import GPS
+from ATGM336H_5N import GPS,BDS
 from weather import WEATHER
 from pm25 import PM25
 from solar import SolarPanel
 from paj7620 import  PAJ7620
 
-# class Thermistor:
-#     """
-#     NTC 模块。也适用于其他的热敏电阻。
+class Thermistor:
+    """
+    NTC 模块。也适用于其他的热敏电阻。
 
-#     :param pin: 掌控板引脚号,如使用P0,pin=0.
-#     :param series_resistor: 与热敏电阻连接的串联电阻器的值。默认是10K电阻。
-#     :param nominal_resistance: 在标称温度下热敏电阻的阻值。
-#     :param nominal_temperature: 在标称电阻值下热敏电阻的温度值(以摄氏度为单位)。默认使用25.0摄氏度。
-#     :param b_coefficient: 热敏电阻的温度系数。
-#     :param high_side: 表示热敏电阻是连接在电阻分压器的高侧还是低侧。默认high_side为True。
-#     """
+    :param pin: 掌控板引脚号,如使用P0,pin=0.
+    :param series_resistor: 与热敏电阻连接的串联电阻器的值。默认是10K电阻。
+    :param nominal_resistance: 在标称温度下热敏电阻的阻值。
+    :param nominal_temperature: 在标称电阻值下热敏电阻的温度值(以摄氏度为单位)。默认使用25.0摄氏度。
+    :param b_coefficient: 热敏电阻的温度系数。
+    :param high_side: 表示热敏电阻是连接在电阻分压器的高侧还是低侧。默认high_side为True。
+    """
 
-#     def __init__(
-#         self,
-#         pin,
-#         series_resistor=10000.0,
-#         nominal_resistance=10000.0,
-#         nominal_temperature=25.0,
-#         b_coefficient=3935.0,
-#         high_side=True
-#     ):
-#         self.adc = ADC(Pin(eval("Pin.P{}".format(pin))))
-#         self.adc.atten(ADC.ATTN_11DB)
-#         self.series_resistor = series_resistor
-#         self.nominal_resistance = nominal_resistance
-#         self.nominal_temperature = nominal_temperature
-#         self.b_coefficient = b_coefficient
-#         self.high_side = high_side
+    def __init__(
+        self,
+        pin,
+        series_resistor=10000.0,
+        nominal_resistance=10000.0,
+        nominal_temperature=25.0,
+        b_coefficient=3935.0,
+        high_side=True
+    ):
+        self.adc = ADC(Pin(eval("Pin.P{}".format(pin))))
+        self.adc.atten(ADC.ATTN_11DB)
+        self.series_resistor = series_resistor
+        self.nominal_resistance = nominal_resistance
+        self.nominal_temperature = nominal_temperature
+        self.b_coefficient = b_coefficient
+        self.high_side = high_side
     
-#     def getTemper(self):
-#         """
-#         获取温度,读取异常则返回None
+    def getTemper(self):
+        """
+        获取温度,读取异常则返回None
 
-#         :return: 温度,单位摄氏度
-#         """
-#         try:
-#             if self.high_side:
-#                 # Thermistor connected from analog input to high logic level.
-#                 reading = self.adc.read_u16() / 64
-#                 reading = (1023 * self.series_resistor) / reading
-#                 reading -= self.series_resistor
-#             else:
-#                 # Thermistor connected from analog input to ground.
-#                 reading = self.series_resistor / (65535.0 / self.adc.read_u16() - 1.0)
-#             steinhart = reading / self.nominal_resistance  # (R/Ro)
-#             steinhart = math.log(steinhart)  # ln(R/Ro)
-#             steinhart /= self.b_coefficient  # 1/B * ln(R/Ro)
-#             steinhart += 1.0 / (self.nominal_temperature + 273.15)  # + (1/To)
-#             steinhart = 1.0 / steinhart  # Invert
-#             steinhart -= 273.15  # convert to C
+        :return: 温度,单位摄氏度
+        """
+        try:
+            if self.high_side:
+                # Thermistor connected from analog input to high logic level.
+                reading = self.adc.read_u16() / 64
+                reading = (1023 * self.series_resistor) / reading
+                reading -= self.series_resistor
+            else:
+                # Thermistor connected from analog input to ground.
+                reading = self.series_resistor / (65535.0 / self.adc.read_u16() - 1.0)
+            steinhart = reading / self.nominal_resistance  # (R/Ro)
+            steinhart = math.log(steinhart)  # ln(R/Ro)
+            steinhart /= self.b_coefficient  # 1/B * ln(R/Ro)
+            steinhart += 1.0 / (self.nominal_temperature + 273.15)  # + (1/To)
+            steinhart = 1.0 / steinhart  # Invert
+            steinhart -= 273.15  # convert to C
 
-#             return steinhart
-#         except:
-#             return None
+            return steinhart
+        except:
+            return None
 
-# # 兼容以前旧接口
-# NTC = Thermistor
+# 兼容以前旧接口
+NTC = Thermistor
 
 class SHT20(object):
     """
@@ -254,253 +254,253 @@ class Ultrasonic(object):
         except Exception as e:
             return -1
 
-# class SEGdisplay(object):
-#     """
-#     4段数码管模块tm1650控制类
+class SEGdisplay(object):
+    """
+    4段数码管模块tm1650控制类
 
-#     :param i2c: I2C实例对象,默认i2c=i2c.
-#     """
+    :param i2c: I2C实例对象,默认i2c=i2c.
+    """
 
-#     def __init__(self, i2c=i2c):
-#         self.i2c = i2c
-#         addr = self.i2c.scan()
-#         if 36 in addr:
-#             self.chip = 1  # TM1650
-#         elif 112 in addr:
-#             self.chip = 2  # HT16K33
-#         else:
-#             raise OSError("Can not find 7-seg-display module.")
-#         if self.chip == 1:
-#             self.i2c.writeto(0x24, bytearray([0x01]))
-#             self._TubeTab = [
-#                 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x77,
-#                 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x00, 0x40
-#             ]
-#         elif self.chip == 2:
-#             self.ht16k33 = HT16K33_SEG()
+    def __init__(self, i2c=i2c):
+        self.i2c = i2c
+        addr = self.i2c.scan()
+        if 36 in addr:
+            self.chip = 1  # TM1650
+        elif 112 in addr:
+            self.chip = 2  # HT16K33
+        else:
+            raise OSError("Can not find 7-seg-display module.")
+        if self.chip == 1:
+            self.i2c.writeto(0x24, bytearray([0x01]))
+            self._TubeTab = [
+                0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x77,
+                0x7C, 0x39, 0x5E, 0x79, 0x71, 0x00, 0x40
+            ]
+        elif self.chip == 2:
+            self.ht16k33 = HT16K33_SEG()
 
-#     def _uint(self, x):
-#         """ display unsigned int number """
-#         charTemp = [0, 0, 0, 0]
-#         x = (x if x < 10000 else 9999)
-#         charTemp[3] = x % 10
-#         charTemp[2] = (x // 10) % 10
-#         charTemp[1] = (x // 100) % 10
-#         charTemp[0] = (x // 1000) % 10
-#         if x < 1000:
-#             charTemp[0] = 0x10
-#             if x < 100:
-#                 charTemp[1] = 0x10
-#             if x < 10:
-#                 charTemp[2] = 0x10
-#         if self.chip == 1:
-#             for i in range(0, 4):
-#                 self.i2c.writeto(0x34 + i, bytearray([self._TubeTab[charTemp[i]]]))
-#         elif self.chip == 2:
-#             for i in range(0, 4):
-#                 self.ht16k33.buffer[i*2] = self.ht16k33._TubeTab[charTemp[i]]
-#             self.ht16k33.show()
+    def _uint(self, x):
+        """ display unsigned int number """
+        charTemp = [0, 0, 0, 0]
+        x = (x if x < 10000 else 9999)
+        charTemp[3] = x % 10
+        charTemp[2] = (x // 10) % 10
+        charTemp[1] = (x // 100) % 10
+        charTemp[0] = (x // 1000) % 10
+        if x < 1000:
+            charTemp[0] = 0x10
+            if x < 100:
+                charTemp[1] = 0x10
+            if x < 10:
+                charTemp[2] = 0x10
+        if self.chip == 1:
+            for i in range(0, 4):
+                self.i2c.writeto(0x34 + i, bytearray([self._TubeTab[charTemp[i]]]))
+        elif self.chip == 2:
+            for i in range(0, 4):
+                self.ht16k33.buffer[i*2] = self.ht16k33._TubeTab[charTemp[i]]
+            self.ht16k33.show()
 
-#     def numbers(self, x):
-#         """
-#         数字显示-999~9999
+    def numbers(self, x):
+        """
+        数字显示-999~9999
 
-#         :param int x: 数字,范围-999~9999
-#         """
-#         x = round(x)
-#         if x >= 0:
-#             self._uint(x)
-#         else:
-#             temp = (x if x > -999 else -999)
-#             temp = abs(temp)
-#             self._uint(temp)
-#             if temp < 10:
-#                 if self.chip == 1:
-#                     self.i2c.writeto(0x36, bytearray([self._TubeTab[0x11]]))
-#                 elif self.chip == 2:
-#                     self.ht16k33.buffer[4] = self.ht16k33._TubeTab[17]
-#                     self.ht16k33.show()
-#             elif temp < 100:
-#                 if self.chip == 1:
-#                     self.i2c.writeto(0x35, bytearray([self._TubeTab[0x11]]))
-#                 elif self.chip == 2:
-#                     self.ht16k33.buffer[2] = self.ht16k33._TubeTab[17]
-#                     self.ht16k33.show()
-#             elif temp < 1000:
-#                 if self.chip == 1:
-#                     self.i2c.writeto(0x34, bytearray([self._TubeTab[0x11]]))
-#                 elif self.chip == 2:
-#                     self.ht16k33.buffer[0] = self.ht16k33._TubeTab[17]
-#                     self.ht16k33.show()
+        :param int x: 数字,范围-999~9999
+        """
+        x = round(x)
+        if x >= 0:
+            self._uint(x)
+        else:
+            temp = (x if x > -999 else -999)
+            temp = abs(temp)
+            self._uint(temp)
+            if temp < 10:
+                if self.chip == 1:
+                    self.i2c.writeto(0x36, bytearray([self._TubeTab[0x11]]))
+                elif self.chip == 2:
+                    self.ht16k33.buffer[4] = self.ht16k33._TubeTab[17]
+                    self.ht16k33.show()
+            elif temp < 100:
+                if self.chip == 1:
+                    self.i2c.writeto(0x35, bytearray([self._TubeTab[0x11]]))
+                elif self.chip == 2:
+                    self.ht16k33.buffer[2] = self.ht16k33._TubeTab[17]
+                    self.ht16k33.show()
+            elif temp < 1000:
+                if self.chip == 1:
+                    self.i2c.writeto(0x34, bytearray([self._TubeTab[0x11]]))
+                elif self.chip == 2:
+                    self.ht16k33.buffer[0] = self.ht16k33._TubeTab[17]
+                    self.ht16k33.show()
 
-#     def Clear(self):
-#         """
-#         数码管清屏
-#         """
-#         if self.chip == 1:
-#             for i in range(0, 4):
-#                 self.i2c.writeto(0x34 + i, bytearray([self._TubeTab[0x10]]))
-#         elif self.chip == 2:
-#             self.ht16k33.fill(0)
-#             self.ht16k33.show()
-
-
-# _HT16K33_BLINK_CMD = const(0x80)
-# _HT16K33_BLINK_DISPLAYON = const(0x01)
-# _HT16K33_CMD_BRIGHTNESS = const(0xE0)
-# _HT16K33_OSCILATOR_ON = const(0x21)
-# _HT16K33_ADDR = const(0x70)
+    def Clear(self):
+        """
+        数码管清屏
+        """
+        if self.chip == 1:
+            for i in range(0, 4):
+                self.i2c.writeto(0x34 + i, bytearray([self._TubeTab[0x10]]))
+        elif self.chip == 2:
+            self.ht16k33.fill(0)
+            self.ht16k33.show()
 
 
-# class HT16K33:
-#     def __init__(self, i2c=i2c):
-#         self.i2c = i2c
-#         self.address = _HT16K33_ADDR
-#         self._temp = bytearray(1)
-
-#         self.buffer = bytearray(16)
-#         self._write_cmd(_HT16K33_OSCILATOR_ON)
-#         self.blink_rate(0)
-#         self.brightness(15)
-
-#     def _write_cmd(self, byte):
-#         self._temp[0] = byte
-#         self.i2c.writeto(self.address, self._temp)
-
-#     def blink_rate(self, rate=None):
-#         """
-#         设置像素点闪烁率
-
-#         :param rate: 闪烁间隔时间,单位秒.默认None,常亮.
-#         """
-
-#         if rate is None:
-#             return self._blink_rate
-#         rate = rate & 0x03
-#         self._blink_rate = rate
-#         self._write_cmd(_HT16K33_BLINK_CMD | _HT16K33_BLINK_DISPLAYON
-#                         | rate << 1)
-
-#     def brightness(self, brightness):
-#         """
-#         设置像素点亮度
-
-#         :param brightness: 亮度级别,范围0~15.
-#         """
-#         if brightness < 0 or brightness > 15:
-#             raise ValueError("out of range,the brightness in 0~15")
-#         brightness = brightness & 0x0F
-#         self._brightness = brightness
-#         self._write_cmd(_HT16K33_CMD_BRIGHTNESS | brightness)
-
-#     def show(self):
-#         """
-#         显示生效
-#         """
-#         self.i2c.writeto_mem(self.address, 0x00, self.buffer)
-
-#     def fill(self, color):
-#         """
-#         填充所有
-
-#         :param color: 1亮;0灭
-#         """
-#         fill = 0xff if color else 0x00
-#         for i in range(16):
-#             self.buffer[i] = fill
+_HT16K33_BLINK_CMD = const(0x80)
+_HT16K33_BLINK_DISPLAYON = const(0x01)
+_HT16K33_CMD_BRIGHTNESS = const(0xE0)
+_HT16K33_OSCILATOR_ON = const(0x21)
+_HT16K33_ADDR = const(0x70)
 
 
-# class HT16K33Matrix(HT16K33):
-#     def __init__(self, i2c=i2c):
-#         super().__init__(i2c)
+class HT16K33:
+    def __init__(self, i2c=i2c):
+        self.i2c = i2c
+        self.address = _HT16K33_ADDR
+        self._temp = bytearray(1)
 
-#         self._fb_buffer = bytearray(self.WIDTH * self.HEIGHT * self.FB_BPP //
-#                                     8)
-#         self.framebuffer = framebuf.FrameBuffer(self._fb_buffer, self.WIDTH,
-#                                                 self.HEIGHT, self.FORMAT)
+        self.buffer = bytearray(16)
+        self._write_cmd(_HT16K33_OSCILATOR_ON)
+        self.blink_rate(0)
+        self.brightness(15)
 
-#         self.framebuffer.fill(0)
-#         self.pixel = self.framebuffer.pixel
-#         self.fill = self.framebuffer.fill
-#         self.text = self.framebuffer.text
-#         self.fill(0)
-#         self.show()
+    def _write_cmd(self, byte):
+        self._temp[0] = byte
+        self.i2c.writeto(self.address, self._temp)
 
-#     def show(self):
-#         self._copy_buf()
-#         super().show()
+    def blink_rate(self, rate=None):
+        """
+        设置像素点闪烁率
 
-#     def bitmap(self, bitmap):
-#         for j in range(self.HEIGHT):
-#             for i in range(self.WIDTH):
-#                 if bitmap[j] >> (7 - i) & 0x01:
-#                     self.pixel(i, j, 1)
+        :param rate: 闪烁间隔时间,单位秒.默认None,常亮.
+        """
 
+        if rate is None:
+            return self._blink_rate
+        rate = rate & 0x03
+        self._blink_rate = rate
+        self._write_cmd(_HT16K33_BLINK_CMD | _HT16K33_BLINK_DISPLAYON
+                        | rate << 1)
 
-# class Matrix(HT16K33Matrix):
-#     """
-#     8x8点阵模块控制类
+    def brightness(self, brightness):
+        """
+        设置像素点亮度
 
-#     :param i2c: I2C实例对象,默认i2c=i2c.
-#     """
-#     WIDTH = 8
-#     HEIGHT = 8
-#     FORMAT = framebuf.MONO_HLSB
-#     FB_BPP = 1
+        :param brightness: 亮度级别,范围0~15.
+        """
+        if brightness < 0 or brightness > 15:
+            raise ValueError("out of range,the brightness in 0~15")
+        brightness = brightness & 0x0F
+        self._brightness = brightness
+        self._write_cmd(_HT16K33_CMD_BRIGHTNESS | brightness)
 
-#     def _copy_buf(self):
-#         for y in range(8):
-#             b = 0x00
-#             for i in range(8):
+    def show(self):
+        """
+        显示生效
+        """
+        self.i2c.writeto_mem(self.address, 0x00, self.buffer)
 
-#                 b = ((self._fb_buffer[y] >> i) & 0x01) | b
-#                 if i < 7:
-#                     b = b << 1
+    def fill(self, color):
+        """
+        填充所有
 
-#             self.buffer[y * 2] = b
-
-#     # commands
-#     _LCD_CLEARDISPLAY = const(0x01)
-#     _LCD_RETURNHOME = const(0x02)
-#     _LCD_ENTRYMODESET = const(0x04)
-#     _LCD_DISPLAYCONTROL = const(0x08)
-#     _LCD_CURSORSHIFT = const(0x10)
-#     _LCD_FUNCTIONSET = const(0x20)
-#     _LCD_SETCGRAMADDR = const(0x40)
-#     _LCD_SETDDRAMADDR = const(0x80)
-#     # flags for display entry mode
-#     _LCD_ENTRYRIGHT = const(0x00)
-#     _LCD_ENTRYLEFT = const(0x02)
-#     _LCD_ENTRYSHIFTINCREMENT = const(0x01)
-#     _LCD_ENTRYSHIFTDECREMENT = const(0x00)
-#     #flags for display on/off control
-#     _LCD_DISPLAYON = const(0x04)
-#     _LCD_DISPLAYOFF = const(0x00)
-#     _LCD_CURSORON = const(0x02)
-#     _LCD_CURSOROFF = const(0x00)
-#     _LCD_BLINKON = const(0x01)
-#     _LCD_BLINKOFF = const(0x00)
-#     #flags for display/cursor shift
-#     _LCD_DISPLAYMOVE = const(0x08)
-#     _LCD_CURSORMOVE = const(0x00)
-#     _LCD_MOVERIGHT = const(0x04)
-#     _LCD_MOVELEFT = const(0x00)
-#     #flags for function set
-#     _LCD_8BITMODE = const(0x10)
-#     _LCD_4BITMODE = const(0x00)
-#     _LCD_2LINE = const(0x08)
-#     _LCD_1LINE = const(0x00)
-#     _LCD_5x10DOTS = const(0x04)
-#     _LCD_5x8DOTS = const(0x00)
+        :param color: 1亮;0灭
+        """
+        fill = 0xff if color else 0x00
+        for i in range(16):
+            self.buffer[i] = fill
 
 
-# class HT16K33_SEG(HT16K33):
-#     def __init__(self, i2c=i2c):
-#         super().__init__(i2c)
-#         # 0 1 2 3 4 5 6 7 8 9 a b c d e f ' ' -
-#         self._TubeTab = [
-#             0xFC, 0x60, 0xDA, 0xF2, 0x66, 0xB6, 0xBE, 0xE0, 0xFE, 0xF6, 0xEE,
-#             0x3E, 0x1A, 0x7A, 0xDE, 0x8E, 0x00, 0x02]   
+class HT16K33Matrix(HT16K33):
+    def __init__(self, i2c=i2c):
+        super().__init__(i2c)
+
+        self._fb_buffer = bytearray(self.WIDTH * self.HEIGHT * self.FB_BPP //
+                                    8)
+        self.framebuffer = framebuf.FrameBuffer(self._fb_buffer, self.WIDTH,
+                                                self.HEIGHT, self.FORMAT)
+
+        self.framebuffer.fill(0)
+        self.pixel = self.framebuffer.pixel
+        self.fill = self.framebuffer.fill
+        self.text = self.framebuffer.text
+        self.fill(0)
+        self.show()
+
+    def show(self):
+        self._copy_buf()
+        super().show()
+
+    def bitmap(self, bitmap):
+        for j in range(self.HEIGHT):
+            for i in range(self.WIDTH):
+                if bitmap[j] >> (7 - i) & 0x01:
+                    self.pixel(i, j, 1)
+
+
+class Matrix(HT16K33Matrix):
+    """
+    8x8点阵模块控制类
+
+    :param i2c: I2C实例对象,默认i2c=i2c.
+    """
+    WIDTH = 8
+    HEIGHT = 8
+    FORMAT = framebuf.MONO_HLSB
+    FB_BPP = 1
+
+    def _copy_buf(self):
+        for y in range(8):
+            b = 0x00
+            for i in range(8):
+
+                b = ((self._fb_buffer[y] >> i) & 0x01) | b
+                if i < 7:
+                    b = b << 1
+
+            self.buffer[y * 2] = b
+
+    # commands
+    _LCD_CLEARDISPLAY = const(0x01)
+    _LCD_RETURNHOME = const(0x02)
+    _LCD_ENTRYMODESET = const(0x04)
+    _LCD_DISPLAYCONTROL = const(0x08)
+    _LCD_CURSORSHIFT = const(0x10)
+    _LCD_FUNCTIONSET = const(0x20)
+    _LCD_SETCGRAMADDR = const(0x40)
+    _LCD_SETDDRAMADDR = const(0x80)
+    # flags for display entry mode
+    _LCD_ENTRYRIGHT = const(0x00)
+    _LCD_ENTRYLEFT = const(0x02)
+    _LCD_ENTRYSHIFTINCREMENT = const(0x01)
+    _LCD_ENTRYSHIFTDECREMENT = const(0x00)
+    #flags for display on/off control
+    _LCD_DISPLAYON = const(0x04)
+    _LCD_DISPLAYOFF = const(0x00)
+    _LCD_CURSORON = const(0x02)
+    _LCD_CURSOROFF = const(0x00)
+    _LCD_BLINKON = const(0x01)
+    _LCD_BLINKOFF = const(0x00)
+    #flags for display/cursor shift
+    _LCD_DISPLAYMOVE = const(0x08)
+    _LCD_CURSORMOVE = const(0x00)
+    _LCD_MOVERIGHT = const(0x04)
+    _LCD_MOVELEFT = const(0x00)
+    #flags for function set
+    _LCD_8BITMODE = const(0x10)
+    _LCD_4BITMODE = const(0x00)
+    _LCD_2LINE = const(0x08)
+    _LCD_1LINE = const(0x00)
+    _LCD_5x10DOTS = const(0x04)
+    _LCD_5x8DOTS = const(0x00)
+
+
+class HT16K33_SEG(HT16K33):
+    def __init__(self, i2c=i2c):
+        super().__init__(i2c)
+        # 0 1 2 3 4 5 6 7 8 9 a b c d e f ' ' -
+        self._TubeTab = [
+            0xFC, 0x60, 0xDA, 0xF2, 0x66, 0xB6, 0xBE, 0xE0, 0xFE, 0xF6, 0xEE,
+            0x3E, 0x1A, 0x7A, 0xDE, 0x8E, 0x00, 0x02]   
 
 # class MP3(object):
 #     """
@@ -765,7 +765,7 @@ class IRRecv(object):
         if self.uart.any():
             temp = self.uart.read()
             if temp is not None:
-                return ustruct.unpack("B", temp)[0]
+                return struct.unpack("B", temp)[0]
             else:
                 return None
 
@@ -811,7 +811,7 @@ class DelveBit(object):
         try:
             self.i2c.scan()
             temp = self.i2c.readfrom(self.address, 2)
-            data = ustruct.unpack(">h", temp)
+            data = struct.unpack(">h", temp)
             time.sleep_ms(20)
             return round(data[0] / 100, 2)
         except Exception as e:
@@ -1080,30 +1080,30 @@ class Scan_Rfid():
                 print("find card: {}" .format(serial_num))
                 return Rfid(i2c, serial_num)
 
-# class GasSensor():
-#     '''
-#     乐动模块 烟雾传感器
-#     '''
-#     def __init__(self, pin):
-#         '''初始化参数，引脚'''
-#         self.pin = MPythonPin(pin, PinMode.ANALOG)
-#         self.threshold = 2000 
+class GasSensor():
+    '''
+    乐动模块 烟雾传感器
+    '''
+    def __init__(self, pin):
+        '''初始化参数，引脚'''
+        self.pin = MPythonPin(pin, PinMode.ANALOG)
+        self.threshold = 2000 
 
-#     def detect(self):
-#         '''是否探测到，布尔类型True/False'''
-#         tmp = self.pin.read_analog()
-#         if(tmp>=self.threshold):
-#             return True
-#         else:
-#             return False
+    def detect(self):
+        '''是否探测到，布尔类型True/False'''
+        tmp = self.pin.read_analog()
+        if(tmp>=self.threshold):
+            return True
+        else:
+            return False
 
-#     def get_raw_val(self):
-#         '''获取烟雾传感器裸数据，模拟值'''
-#         return self.pin.read_analog()
+    def get_raw_val(self):
+        '''获取烟雾传感器裸数据，模拟值'''
+        return self.pin.read_analog()
 
-#     def set_threshold(self, threshold):
-#         '''设置烟雾传感器阈值，模拟值'''
-#         self.threshold = threshold
+    def set_threshold(self, threshold):
+        '''设置烟雾传感器阈值，模拟值'''
+        self.threshold = threshold
 
 class IRObstacle():
     '''
@@ -1410,3 +1410,44 @@ class ASRPRO(object):
         except Exception as e:
             self.identifying_word = -1
             pass
+
+'''
+DC01 PM2.5驱动
+'''
+class PM25_DC(object):
+    def __init__(self, tx=Pin.P1, rx=Pin.P0, uart_num=1):
+        self.K = 0.4 # (注:户读取到的灰尘传感器原始 PM2.5，需要参照 TSI仪器光度法标定一个K 值系数，一般建议 0.4)
+        self.uart = UART(uart_num, baudrate=9600, stop=1, tx=tx, rx=rx, timeout=30)
+        time.sleep_ms(100)
+
+    def read(self): #单位 微克/立方米
+        _pm25 = -1 
+        data = bytes(0x00)
+        time_cnt = time.ticks_ms()
+        while True:
+            time.sleep_ms(5)
+            if self.uart.any():
+                head = self.uart.read(1)   
+                if(head[0] == 0xA5):
+                    data = head
+                    res = self.uart.read(3)
+                    data = head + res 
+                else:
+                    # print('0000')
+                    pass
+                
+                if len(data)==4:
+                    DATAH = data[1]
+                    DATAL = data[2]
+                    sum = 0xA5 + DATAH + DATAL # 计算校验和
+                    sum = sum ^ 0x80 # ^异或，得到低7位数据
+                    if(sum == data[3]):
+                        # _pm25 = (data[1]*128) + data[2]
+                        _pm25 = self.K * ((DATAH << 7) | (DATAL & 0x7F))   # 校验成功，计算浓度值
+                        break
+                    else:
+                        pass
+            elif time.ticks_ms() - time_cnt > 2000:
+                break
+        return _pm25
+    
