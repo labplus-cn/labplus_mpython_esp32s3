@@ -51,6 +51,9 @@ class Rfid():
         else:
             print("未检测到射频卡")
             return False
+        
+    def serial_number(self):
+        return self.get_serial_num()
     
     def read_block(self, block_number = 2):
         if self._judge_block(block_number):
