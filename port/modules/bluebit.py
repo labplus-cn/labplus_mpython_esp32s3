@@ -42,7 +42,7 @@ from ATGM336H_5N import GPS,BDS
 from weather import WEATHER
 from pm25 import PM25
 from solar import SolarPanel
-from paj7620 import  PAJ7620
+from paj7620 import PAJ7620
 
 class Thermistor:
     """

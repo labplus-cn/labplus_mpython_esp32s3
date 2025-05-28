@@ -56,6 +56,7 @@ from mpython import *
 while True:
     print(ir1.read())
     print(ir2.read())
+    time.sleep(1)
     
 # ----------------------------------------------
 # '''
