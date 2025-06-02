@@ -156,13 +156,14 @@ static void machine_touchpad_timer_cb(void *args)
     int inactive_pad_num = 0;
     for (int i = 0; i < MP_ARRAY_SIZE(touchpad_obj);i++) {
         if (touchpad_inactive_timeout[i]) {
-            touchpad_inactive_timeout[i]--;
-            if (touchpad_inactive_timeout[i] == 0) {
-                mp_obj_t handler = MP_STATE_PORT(machine_touchpad_irq_handler)[i + 1];
-                if(handler){
-                    mp_sched_schedule(handler, mp_obj_new_int(0));
+            touchpad_inactive_timeout[i]--;  
+            //如果持续触摸，则不会触发触摸释放事件，因为中断里会重置非活动超时计数器为10
+            if (touchpad_inactive_timeout[i] == 0) {  
+                mp_obj_t handler = MP_STATE_PORT(machine_touchpad_irq_handler)[i + 1];  // 获取对应触摸板的中断处理程序
+                if(handler){  // 如果存在处理程序
+                    mp_sched_schedule(handler, mp_obj_new_int(0));  // 调度处理程序,传入参数0表示触摸释放
                 }
-                inactive_pad_num++;
+                inactive_pad_num++; 
             }
         }
     }
@@ -189,10 +190,14 @@ static void machine_touchpad_isr_handler(void *arg)
     for (int i = 0; i < MP_ARRAY_SIZE(touchpad_obj); i++) {
         mp_obj_t handler = MP_STATE_PORT(machine_touchpad_irq_handler)[i + 1];
         if ((pad_intr >> (i + 1)) & 0x01 && handler != MP_OBJ_NULL) {
+            // 如果触摸板的非活动超时计数器为0,说明之前没有触摸事件
             if (touchpad_inactive_timeout[i] == 0) {
+                // 调度处理程序,传入参数1表示触摸事件发生
                 mp_sched_schedule(handler, mp_obj_new_int(1));
             }
-            touchpad_inactive_timeout[i] = 10;   // 50ms
+            // 设置非活动超时计数器为10,相当于100ms
+            // 在这100ms内不会重复触发同一个触摸按键的事件
+            touchpad_inactive_timeout[i] = 10;   // 100ms
         }
     } 
 
@@ -208,7 +213,7 @@ static mp_obj_t machine_touchpad_irq(size_t n_args, const mp_obj_t *pos_args, mp
     enum { ARG_handler, ARG_threshold};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_handler, MP_ARG_OBJ, {.u_obj = mp_const_none} },
-        { MP_QSTR_threshold, MP_ARG_INT, {.u_int = 400} },
+        { MP_QSTR_threshold, MP_ARG_INT, {.u_int = 4500} },
     };
     mtp_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
