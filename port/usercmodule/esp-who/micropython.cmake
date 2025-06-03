@@ -3,7 +3,9 @@ add_library(usermod_lcd INTERFACE)
 if(LABPLUS_LEDONG_V2_BOARD OR LABPLUS_XUNFEI_JS_PRIMARY_BOARD)
         set(WHO_LCD_SRC)
 elseif(MPYTHON_PRO_BOARD OR LABPLUS_XUNFEI_JS_MIDDLE_BOARD)
-        set(WHO_LCD_SRC ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/lcd/who_lcd.c)
+        set(WHO_LCD_SRC 
+                ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/lcd/who_lcd.c
+                ${CMAKE_CURRENT_LIST_DIR}/esp-who/components/modules/lcd/esp_lcd_panel_jd9853.c)
 endif()
 
 target_sources(usermod_lcd INTERFACE
@@ -13,6 +15,7 @@ target_sources(usermod_lcd INTERFACE
 
 set(ESP_COMPONENTS_LCD_INCLUDEDIRS
         ${IDF_PATH}/components/esp_lcd/include/
+        ${IDF_PATH}/components/esp_lcd/interface/
 )
 
 set(MODULES_INCLUDEDIRS 
