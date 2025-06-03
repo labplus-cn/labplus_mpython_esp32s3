@@ -36,6 +36,14 @@ from max30102 import MAX30102
 from CSK6011A import SpeechSynthesis
 from acd1200 import ACD1200
 
+# from spl06_001 import Barometric
+# from apds9960 import Gesture
+# from ATGM336H_5N import GPS
+# from weather import WEATHER
+# from pm25 import PM25
+# from solar import SolarPanel
+# from paj7620 import  PAJ7620
+
 # class Thermistor:
 #     """
 #     NTC 模块。也适用于其他的热敏电阻。
