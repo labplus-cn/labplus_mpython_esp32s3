@@ -505,6 +505,8 @@ _speed_buf = {}
 
 def set_speed(motor_no, speed): #motor_num 1：风扇 2:水泵
     global _speed_buf
+    if(motor_no==1):
+        speed = int(numberMap(speed,0,100,0,70))
     speed = max(min(speed, 100), -100)
     _speed_buf.update({motor_no: speed})
     attempts = 0
@@ -705,4 +707,4 @@ class EncoderMotor(object):
                 break
 
 encoder_motor = EncoderMotor()
-# from gui import *
+
