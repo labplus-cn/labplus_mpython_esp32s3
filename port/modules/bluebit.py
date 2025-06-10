@@ -644,14 +644,16 @@ class MP3_(object):
     """
     MP3模块
     WT2003H4-16S
-    2022.02.12
+    2022.02.12 
+    2024.8 去除rx引脚参数
+    2025.6.3 音量调节0-100
     """
     def __init__(self, tx=-1, rx=0, uart_num=1):
         self.uart = UART(uart_num, 9600, stop=2, tx=tx, rx=rx)
-        self._vol = 15
+        self._vol = 60
         self.is_paused = False
         self.set_output_mode(1)
-        self.volume(15)
+        self.volume(60)
 
     def _cmdWrite(self, cmd):
         sum = 0
@@ -722,8 +724,9 @@ class MP3_(object):
         self._cmdWrite(var)
 
     def volume(self, vol):
-        """设置音量 0~30"""
+        """设置音量 0~100"""
         self._vol = vol
+        vol = int(numberMap(vol,0,100,0,30)) # 0~30
         var = [0xAE, vol]
         self._cmdWrite(var)
         time.sleep_ms(50)
