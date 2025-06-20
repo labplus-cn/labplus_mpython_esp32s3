@@ -4,6 +4,7 @@ import uos
 from flashbdev import bdev
 from neopixel import NeoPixel
 import ubinascii
+import machine
 from machine import Pin
 
 Pin(12, Pin.OUT, value=0)
@@ -14,8 +15,10 @@ for count in range(3):
     time.sleep_ms(50)
 
 # mac地址
-# mac = '$#mac:{}#$'.format(ubinascii.hexlify(unique_id()).decode().upper())
-# print(mac)
+# mac地址
+mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
+print(mac)
+
     
 # 上电后立即关闭rgb,防止随机灯亮问题
 _rgb = NeoPixel(Pin(8, Pin.OUT), 4, 3, 1,0.1)

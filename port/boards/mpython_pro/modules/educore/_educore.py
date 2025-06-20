@@ -2,7 +2,7 @@
 educore
 '''
 import gc
-from mpython import MPythonPin,PinMode,Pin,OLED,Image,i2c,I2C,wifi,button_a,button_b,numberMap,Magnetic
+from mpython import MPythonPin,PinMode,Pin,Image,i2c,I2C,wifi,button_a,button_b,numberMap,Magnetic
 from mpython import accelerometer as _accelerometer
 from mpython import rgb as _rgb
 from mpython import light as _light
@@ -201,40 +201,40 @@ class Accelerometer():
 '''
 继承OLED
 '''
-class OLED(OLED):
-    def print(self, _str):
-        try:
-            self.fill(0)
-            _str = str(_str)
-            if "\n" in _str:
-                # print("字符串中包含换行符")
-                _str = _str.split("\n") 
-                if(len(_str)<4):
-                    for i in range(len(_str)):
-                        self.DispChar(str(_str[i]), 0, i*16, 1, False)
-                else:
-                    for i in range(4):
-                        self.DispChar(str(_str[i]), 0, i*16, 1, False)
-            elif "\:" in _str:
-                # print("显示图像")
-                _str = _str[2:]
-                # print(_str)
-                if(_str=='HAPPY'):
-                    self.image_picture = Image()
-                    self.blit(self.image_picture.load('face/4.pbm', 0), 32, 0)
-                elif(_str=='SAD'):
-                    self.image_picture = Image()
-                    self.blit(self.image_picture.load('face/5.pbm', 0), 32, 0)
-            else:
-                # print("字符串中不包含换行符")
-                self.DispChar(str(_str), 0, 0, 1, True)
-            self.show()
-        except Exception as e:
-            print('oled print err:'+str(e))
+# class OLED(OLED):
+#     def print(self, _str):
+#         try:
+#             self.fill(0)
+#             _str = str(_str)
+#             if "\n" in _str:
+#                 # print("字符串中包含换行符")
+#                 _str = _str.split("\n") 
+#                 if(len(_str)<4):
+#                     for i in range(len(_str)):
+#                         self.DispChar(str(_str[i]), 0, i*16, 1, False)
+#                 else:
+#                     for i in range(4):
+#                         self.DispChar(str(_str[i]), 0, i*16, 1, False)
+#             elif "\:" in _str:
+#                 # print("显示图像")
+#                 _str = _str[2:]
+#                 # print(_str)
+#                 if(_str=='HAPPY'):
+#                     self.image_picture = Image()
+#                     self.blit(self.image_picture.load('face/4.pbm', 0), 32, 0)
+#                 elif(_str=='SAD'):
+#                     self.image_picture = Image()
+#                     self.blit(self.image_picture.load('face/5.pbm', 0), 32, 0)
+#             else:
+#                 # print("字符串中不包含换行符")
+#                 self.DispChar(str(_str), 0, 0, 1, True)
+#             self.show()
+#         except Exception as e:
+#             print('oled print err:'+str(e))
 
-    def clear(self):
-        self.fill(0)
-        self.show()
+#     def clear(self):
+#         self.fill(0)
+#         self.show()
 
 '''
 电机控制

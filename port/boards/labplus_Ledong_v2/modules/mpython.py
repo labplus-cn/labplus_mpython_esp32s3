@@ -922,5 +922,3 @@ class Ledong_shield(object):
 
 ledong_shield = Ledong_shield()
 
-# from gui import *
-

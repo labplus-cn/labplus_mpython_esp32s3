@@ -1,6 +1,6 @@
 import gc
 import _thread
-from time import sleep,sleep_ms
+import time
 
 AI ={
     'reset':[0xff, 0x01, 0x02],
@@ -185,7 +185,7 @@ class TASK:
             if self.sec < 0 or not self.enable:
                 self.stop_lock.release()
             else:
-                sleep(self.sec)
+                time.sleep(self.sec)
                 self.lock.release()
 
     def start(self):
