@@ -126,13 +126,6 @@ static mp_obj_t audio_recorder_init(size_t n_args, const mp_obj_t *args)
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(audio_recorder_init_obj, 0, 1, audio_recorder_init);
 
-static mp_obj_t audio_loudness(void)
-{
-    // uint32_t loud = recorder_loudness();
-    return MP_OBJ_NEW_SMALL_INT(0); 
-}
-static MP_DEFINE_CONST_FUN_OBJ_0(audio_loudness_obj, audio_loudness);
-
 static mp_obj_t audio_record(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     enum { ARG_file_name, ARG_record_time, ARG_bits_per_sample, ARG_channels, ARG_sampleRate};
@@ -158,6 +151,20 @@ static mp_obj_t audio_record(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(audio_record_obj, 0, audio_record);
 
+static mp_obj_t audio_loudness(void)
+{
+    uint16_t loudness = record_loudness();
+    return MP_OBJ_NEW_SMALL_INT(loudness);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(audio_loudness_obj, audio_loudness);
+
+static mp_obj_t audio_loudness_stop(void)
+{
+    record_loudness_stop();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(audio_loudness_stop_obj, audio_loudness_stop);
+
 static mp_obj_t audio_recorder_deinit(void)
 {
     // recorder_deinit();
@@ -181,6 +188,7 @@ static const mp_map_elem_t mpython_audio_locals_dict_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR_player_status), (mp_obj_t)&audio_get_status_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_recorder_init), (mp_obj_t)&audio_recorder_init_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_loudness), (mp_obj_t)&audio_loudness_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_loudness_stop), (mp_obj_t)&audio_loudness_stop_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_record), (mp_obj_t)&audio_record_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_recorder_deinit), (mp_obj_t)&audio_recorder_deinit_obj},
 };

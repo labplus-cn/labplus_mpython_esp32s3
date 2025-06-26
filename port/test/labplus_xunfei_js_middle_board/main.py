@@ -36,7 +36,8 @@ import time
 sht20 = SHT20()
 while True:
     print(sht20.temperature())
-    time.sleep_ms(100)
+    print(sht20.humidity())
+    time.sleep_ms(1000)
 
 # # 4、数字光线
 # 显示环境光线值
@@ -101,7 +102,7 @@ from servo import Servo
 
 servo_0 = Servo(23, min_us=500, max_us=2500, actuation_range=180)
 while True:
-    servo_0.write_angle(60)
+    servo_0.write_angle(180)
     time.sleep(1)
     servo_0.write_angle(0)
     time.sleep(1)
@@ -112,7 +113,8 @@ while True:
 from mpython import *
 while True:
     print(ir1.read())
-    time.sleep_ms(100)
+    print(ir2.read())
+    time.sleep_ms(1000)
     
 # # 12、电机
 # 1为拓展接口电机，需要外接电机
@@ -125,7 +127,7 @@ ledong_shield.set_motor(1, 60)
 from mpython import *
 import audio
 
-audio.record('2.wav', 3, 16, 2, 16000)
+audio.record('2.wav', 5, 16, 2, 16000)
 time.sleep(6)
 audio.play('2.wav')
 

@@ -26,6 +26,8 @@ typedef struct
 
 // typedef void* recorder_handle;
 void recorder_record(const char *filename, wav_fmt_t fmt, int time);
+uint16_t record_loudness(void);
+void record_loudness_stop(void);
 
 extern recorder_handle_t *recorder;
 extern SemaphoreHandle_t xBinarySemaphore;

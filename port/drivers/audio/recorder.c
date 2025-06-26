@@ -28,9 +28,12 @@
 #include "sc.h"
 #include "bsp_audio.h"
 
+#define ABS(x) ((x) < 0 ? -(x) : (x))
 // #define TAG "recorder"
 
 recorder_handle_t *recorder = NULL;
+bool is_record_open = false;
+int8_t *stream_buff = NULL;
 
 /*
 static void example_disp_buf(uint8_t* buf, int length)
@@ -85,4 +88,41 @@ void recorder_record(const char *filename, wav_fmt_t fmt, int time)
 void record_deinit(void)
 {
 
+}
+
+uint16_t record_loudness(void)
+{
+    double loudness = 0.0;
+
+    if(!stream_buff){
+        stream_buff = calloc(100, sizeof(int8_t));
+    }
+
+    sc_stop_flag = 1;
+    if(!is_record_open){
+        bsp_codec_dev_open(8000, 1, 16);
+        bsp_audio_set_play_vol(0);
+        is_record_open = true;
+    }
+    
+    bsp_get_feed_data(true, stream_buff, 100);
+    for(int i = 0; i < 50; i++){
+        // loudness += *((int16_t *)stream_buff + i) < 0 ? -*((int16_t *)stream_buff + i) : *((int16_t *)stream_buff + i);
+        loudness += (double)(pow(*((int16_t *)stream_buff + i), 2));
+    }
+    return (uint16_t)(20 * log10(sqrt(loudness / 50) * 5)); //+ 1e-9)); // 5 is the gain of the microphone,校正倍数
+}
+
+void record_loudness_stop(void)
+{
+    if(is_record_open){
+        bsp_codec_dev_close();
+        is_record_open = false;
+        sc_stop_flag = 0;
+    }
+
+    if(stream_buff){
+        free(stream_buff);
+        stream_buff = NULL;
+    }
 }
