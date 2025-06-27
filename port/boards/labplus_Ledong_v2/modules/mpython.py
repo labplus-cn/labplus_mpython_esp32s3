@@ -49,6 +49,59 @@ def try_connect_wifi(_wifi, _ssid, _pass, _times):
         time.sleep(5)
         return try_connect_wifi(_wifi, _ssid, _pass, _times-1)
 
+
+class wifi:
+    def __init__(self):
+        self.sta = network.WLAN(network.STA_IF)
+        self.ap = network.WLAN(network.AP_IF)
+
+    def connectWiFi(self, ssid, passwd, timeout=10):
+        if self.sta.isconnected():
+            self.sta.disconnect()
+        self.sta.active(True)
+        list = self.sta.scan()
+        for i, wifi_info in enumerate(list):
+            try:
+                if wifi_info[0].decode() == ssid:
+                    self.sta.connect(ssid, passwd)
+                    wifi_dbm = wifi_info[3]
+                    break
+            except UnicodeError:
+                self.sta.connect(ssid, passwd)
+                wifi_dbm = '?'
+                break
+            if i == len(list) - 1:
+                raise OSError("SSID invalid / failed to scan this wifi")
+        start = time.time()
+        print("Connection WiFi", end="")
+        while (self.sta.ifconfig()[0] == '0.0.0.0'):
+            if time.ticks_diff(time.time(), start) > timeout:
+                print("")
+                raise OSError("Timeout!,check your wifi password and keep your network unblocked")
+            print(".", end="")
+            time.sleep_ms(500)
+        print("")
+        print('WiFi(%s,%sdBm) Connection Successful, Config:%s' % (ssid, str(wifi_dbm), str(self.sta.ifconfig())))
+
+    def disconnectWiFi(self):
+        if self.sta.isconnected():
+            self.sta.disconnect()
+        self.sta.active(False)
+        print('disconnect WiFi...')
+
+    def enable_APWiFi(self, essid, password=b'',channel=10):
+        self.ap.active(True)
+        if password:
+            authmode=4
+        else:
+            authmode=0
+        self.ap.config(essid=essid,password=password,authmode=authmode, channel=channel)
+
+    def disable_APWiFi(self):
+        self.ap.active(False)
+        print('disable AP WiFi...')
+
+
 class MOTION(object):
     def __init__(self):
         self.i2c = i2c
@@ -737,72 +790,7 @@ class MPythonPin():
         self.pwm.freq(freq)
         self.pwm.duty(duty)
 
-'''
-# to be test
-class LightSensor(ADC):
-    
-    def __init__(self):
-        super().__init__(Pin(pins_remap_esp32[4]))
-        # super().atten(ADC.ATTN_11DB)
-    
-    def value(self):
-        # lux * k * Rc = N * 3.9/ 4096
-        # k = 0.0011mA/Lux
-        # lux = N * 3.9/ 4096 / Rc / k
-        return super().read() * 1.1 / 4095 / 6.81 / 0.011
-    
-'''
 
-class wifi:
-    def __init__(self):
-        self.sta = network.WLAN(network.STA_IF)
-        self.ap = network.WLAN(network.AP_IF)
-
-    def connectWiFi(self, ssid, passwd, timeout=10):
-        if self.sta.isconnected():
-            self.sta.disconnect()
-        self.sta.active(True)
-        list = self.sta.scan()
-        for i, wifi_info in enumerate(list):
-            try:
-                if wifi_info[0].decode() == ssid:
-                    self.sta.connect(ssid, passwd)
-                    wifi_dbm = wifi_info[3]
-                    break
-            except UnicodeError:
-                self.sta.connect(ssid, passwd)
-                wifi_dbm = '?'
-                break
-            if i == len(list) - 1:
-                raise OSError("SSID invalid / failed to scan this wifi")
-        start = time.time()
-        print("Connection WiFi", end="")
-        while (self.sta.ifconfig()[0] == '0.0.0.0'):
-            if time.ticks_diff(time.time(), start) > timeout:
-                print("")
-                raise OSError("Timeout!,check your wifi password and keep your network unblocked")
-            print(".", end="")
-            time.sleep_ms(500)
-        print("")
-        print('WiFi(%s,%sdBm) Connection Successful, Config:%s' % (ssid, str(wifi_dbm), str(self.sta.ifconfig())))
-
-    def disconnectWiFi(self):
-        if self.sta.isconnected():
-            self.sta.disconnect()
-        self.sta.active(False)
-        print('disconnect WiFi...')
-
-    def enable_APWiFi(self, essid, password=b'',channel=10):
-        self.ap.active(True)
-        if password:
-            authmode=4
-        else:
-            authmode=0
-        self.ap.config(essid=essid,password=password,authmode=authmode, channel=channel)
-
-    def disable_APWiFi(self):
-        self.ap.active(False)
-        print('disable AP WiFi...')
 
 # 3 rgb leds
 rgb = NeoPixel(Pin(16, Pin.OUT), 3, 3, 1, brightness=0.3)
@@ -922,3 +910,20 @@ class Ledong_shield(object):
 
 ledong_shield = Ledong_shield()
 
+
+"""
+uuid
+"""
+def uuid():
+    import ubinascii
+    import machine
+    uuid = ''
+    try:
+        uuid = ubinascii.hexlify(machine.unique_id_custom()).decode().upper()
+    except Exception as e:
+        uuid = ubinascii.hexlify(machine.unique_id()).decode().upper()
+    
+    if(uuid=='ffffffffffff'.upper()):
+        uuid = ubinascii.hexlify(machine.unique_id()).decode().upper()
+
+    return uuid

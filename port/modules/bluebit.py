@@ -952,6 +952,15 @@ class Scan_Rfid():
     def scanning(self):
         return self.rf
 
+class Scan_Rfid_Edu():
+    """扫描Rfid卡类.
+    """
+    def __init__(self, i2c=i2c, i2c_addr=47):
+        self.rf = Rfid(i2c, i2c_addr)
+        
+    def scanning(self):
+        return self.rf
+
 class GasSensor():
     '''
     乐动模块 烟雾传感器

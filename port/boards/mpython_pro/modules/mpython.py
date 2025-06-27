@@ -946,3 +946,10 @@ touchpad_o = touchPad_O = Touch(Pin(13))
 touchpad_n = touchPad_N = Touch(Pin(14))
 
 
+"""
+uuid
+"""
+def uuid():
+    import ubinascii,machine
+    return ubinascii.hexlify(machine.unique_id()).decode().upper()
+

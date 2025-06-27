@@ -6,9 +6,9 @@ cmake_minimum_required(VERSION 3.12)
 include($ENV{IDF_PATH}/tools/cmake/version.cmake)
 set(IDF_VERSION "${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}.${IDF_VERSION_PATCH}")
 
-# Set the board if it's not already set.
+# Set the board if it's not already set.   mpython_pro labplus_Ledong_v2 labplus_xunfei_js_middle labplus_xunfei_js_primary
 if(NOT MICROPY_BOARD)
-    set(MICROPY_BOARD labplus_xunfei_js_middle)
+    set(MICROPY_BOARD labplus_Ledong_v2)
 endif()
 
 # Set the board directory and check that it exists.

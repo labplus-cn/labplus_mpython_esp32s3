@@ -11,3 +11,6 @@ require("ds18x20")
 # require("neopixel")
 require("onewire")
 require("upysh")
+
+
+require("collections")
