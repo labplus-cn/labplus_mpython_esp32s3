@@ -54,6 +54,7 @@ typedef struct _mtp_obj_t {
     tp_id_t tp_num;
     bool was_pressed;  
     bool is_released;
+    bool is_pressed;
     uint8_t pressed_cnt;
 } mtp_obj_t;
 
@@ -81,13 +82,13 @@ static void touchpad_task(void* arg)
     mp_obj_t event_cb = NULL;
     for (;;) {
         if (xQueueReceive(touchpad_gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            // if(io_num == 45){
+            if(io_num == 45){
                 fts_touch_process(key_state_array);
 
                 if(key_state_array[0].type == 1){
                     // ESP_LOGI("touchpad:", "key press. key_id %d\r\n", key_state_array[0].key_id);
                     touchpad_obj[key_state_array[0].key_id].was_pressed = true;
-                    touchpad_obj[key_state_array[0].key_id].is_released = true;
+                    touchpad_obj[key_state_array[0].key_id].is_pressed = true;
                     touchpad_obj[key_state_array[0].key_id].pressed_cnt++;
                     event_cb = MP_STATE_PORT(mtp_etent_cb_array)[key_state_array[0].key_id];
                     if(event_cb){
@@ -96,14 +97,15 @@ static void touchpad_task(void* arg)
 
                 }else if(key_state_array[0].type == 2){
                     // ESP_LOGI("touchpad:", "key releasekey_id %d\r\n", key_state_array[0].key_id);
-                    touchpad_obj[key_state_array[0].key_id].is_released = false;
+                    touchpad_obj[key_state_array[0].key_id].is_pressed = false;
+                    touchpad_obj[key_state_array[0].key_id].is_released = true;
                     event_cb = MP_STATE_PORT(mtp_etent_cb_array)[key_state_array[0].key_id];
                     if(event_cb){
                         mp_sched_schedule(event_cb, mp_obj_new_int(0));
                     }
                 }
-            // }
-            xQueueReset(touchpad_gpio_evt_queue);
+            }
+            // xQueueReset(touchpad_gpio_evt_queue);
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
@@ -120,7 +122,12 @@ static MP_DEFINE_CONST_FUN_OBJ_2(set_event_cb_obj, set_event_cb);
 static mp_obj_t is_pressed(mp_obj_t self_in)
 {
     mtp_obj_t *self = self_in;
-    return mp_obj_new_bool(self->is_released);
+    // return mp_obj_new_bool(self->is_pressed);
+
+    mp_obj_t _was_pressed = mp_obj_new_bool(self->was_pressed); //当前，经常有检测不到按键弹起，所以用was_pressed暂时替代。
+    self->was_pressed = false;
+
+    return _was_pressed;
 
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(is_pressed_obj, is_pressed);
@@ -182,9 +189,9 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
         io_conf.pull_up_en = 1; //enable pull-up mode
         gpio_config(&io_conf);
         gpio_install_isr_service(0);
-        gpio_isr_handler_add(45, int_pin_isr_handler, (void*) NULL);  
+        gpio_isr_handler_add(45, int_pin_isr_handler, (void*) 45);  
     
-        touchpad_gpio_evt_queue = xQueueCreate(5, sizeof(uint32_t));
+        touchpad_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
         xTaskCreatePinnedToCore(touchpad_task, "touchpad_task", 3 * 1024, NULL, 5, NULL, 1);
 
         initialized = 1;
