@@ -71,7 +71,9 @@ mtp_obj_t touchpad_obj[6] = {
 static void int_pin_isr_handler(void *arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(touchpad_gpio_evt_queue, &gpio_num, NULL);
+    if(gpio_num == 45){
+        xQueueSendFromISR(touchpad_gpio_evt_queue, &gpio_num, NULL);
+    }   
 }
 
 static void touchpad_task(void* arg)
@@ -192,7 +194,7 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
         gpio_isr_handler_add(45, int_pin_isr_handler, (void*) 45);  
     
         touchpad_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-        xTaskCreatePinnedToCore(touchpad_task, "touchpad_task", 3 * 1024, NULL, 5, NULL, 1);
+        xTaskCreatePinnedToCore(touchpad_task, "touchpad_task", 4 * 1024, NULL, 2, NULL, 1);
 
         initialized = 1;
     }
