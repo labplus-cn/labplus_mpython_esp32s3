@@ -11,6 +11,7 @@ from mpython import uuid
 import network
 import neopixel
 import machine
+
 from bluebit import Scan_Rfid_Edu,Barometric,DelveBit
 from bluebit import SoilHumiditySensor
 from servo import Servo
@@ -210,9 +211,11 @@ class Accelerometer():
 
 class OLED():
     def __init__(self) :
-        pass
+        gc.collect()
     
     def print(self, _str):
+        gc.collect()
+        time.sleep_ms(50)
         try:
             gui.fill(type=0)
             _str = str(_str)

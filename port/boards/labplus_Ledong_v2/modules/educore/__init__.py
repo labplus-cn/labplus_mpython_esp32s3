@@ -1,5 +1,5 @@
 print('educore init')
-
+import gc
 from ._educore import *
 # from ._camera1956 import Camera1956
 from ._smartcamera import EduSmartCamera
@@ -31,3 +31,6 @@ mqttclient = MqttClient()
 
 # 网页版人工智能摄像头
 webcamera = webcamera()
+
+
+gc.collect()

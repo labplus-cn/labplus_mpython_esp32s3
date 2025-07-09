@@ -111,6 +111,8 @@ class EduSmartCamera:
             self.model_init(31)
         elif(self.model_choose=='FACE_DETECT'):
             self.model_init(1)
+        elif(self.model_choose=='BLINK_OPEN_DETECT'):
+            self.model_init(27)
     
     def result(self):
         d = {"id":None,"similarity":None,"status": 0}
@@ -130,11 +132,17 @@ class EduSmartCamera:
             else:
                 d = {"face_num":None,"similarity":None,"status": 0}
             return d
+        elif(self.mode == FACE_LANDMARK_LIVING_BODY):
+            self.face_living_body.recognize()
+            d = {"blink_counter":None,"mouth_counter":None,"status": 0}
+            if(self.face_living_body.mouth_blink_counter[0]!=0):
+                d = {"blink_counter":self.face_living_body.mouth_blink_counter[0] ,"mouth_counter":self.face_living_body.mouth_blink_counter[1],"status": 1}
+            return d
         else:
             return d
 
     def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.001)
+        self._task = TASK(func=self.uart_thread,sec=0.002)
         self._task.start()
 
     def uart_thread(self):           
@@ -168,6 +176,15 @@ class EduSmartCamera:
                                 self.face_detect.face_num = None
                             else:
                                 self.face_detect.face_num = CMD[5]
+                elif(self.mode==FACE_LANDMARK_LIVING_BODY and self.face_living_body!=None):
+                    if(len(CMD)>0):
+                        if(CMD[3]==FACE_LANDMARK_LIVING_BODY and CMD[4]==0x01):
+                            if(CMD[5]==0xff):
+                                self.face_living_body.lock = True
+                                self.face_living_body.mouth_blink_counter = [0,0]
+                            else:
+                                self.face_living_body.lock = True
+                                self.face_living_body.mouth_blink_counter = CMD[5],CMD[6]
         
         except Exception as e:
             print(e)

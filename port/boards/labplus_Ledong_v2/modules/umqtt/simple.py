@@ -1,31 +1,78 @@
 import usocket as socket
 import ustruct as struct
 from ubinascii import hexlify
+from time import sleep_ms
+from aes128 import *
+
+DICT = {"host":"","protocol":"wss://","hostname":"-1","port":"-1","path":"-1","username":"-1","password":"-1","clientId":"-1","schoolId":"-1","classId":"-1","userId":"-1","send":"-1","receive":"-1"}
+
 
 class MQTTException(Exception):
     pass
 
 class MQTTClient:
-
-    def __init__(self, client_id, server, port=0, user=None, password=None, keepalive=0,
-                 ssl=False, ssl_params={}):
+    def __init__(self, client_id=None, server=None, port=0, user=None, password=None, keepalive=0, ssl=False, ssl_params={}, aesparam=None):
+        self.aes_mode = 0
         if port == 0:
             port = 8883 if ssl else 1883
-        self.client_id = client_id
-        self.sock = None
-        self.server = server
-        self.port = port
-        self.ssl = ssl
-        self.ssl_params = ssl_params
-        self.pid = 0
-        self.cb = None
-        self.user = user
-        self.pswd = password
-        self.keepalive = keepalive
-        self.lw_topic = None
-        self.lw_msg = None
-        self.lw_qos = 0
-        self.lw_retain = False
+    
+        if(aesparam): # 解密aes128参数
+            self.aes_dict = self.aes_decrypt(aesparam)
+        else:
+            self.aes_dict = DICT
+        
+        # print(self.aes_dict)
+
+        if((self.aes_dict["hostname"] != DICT["hostname"]) and (client_id == None)):
+            self.client_id = self.aes_dict["clientId"]
+            self.server = self.aes_dict["hostname"]
+            # self.port = int(self.aes_dict["port"])
+            self.port = 1883
+            self.user = self.aes_dict["username"]
+            self.pswd = self.aes_dict["password"]
+            self.schoolId = self.aes_dict["schoolId"]
+            self.classId = self.aes_dict["classId"]
+            self.userId = self.aes_dict["userId"]
+            self.sendId = self.aes_dict["send"]
+            self.fixed_characters = 'EBG_CODE/shengsi/{}/{}/{}/{}/'.format(self.schoolId,self.classId,self.userId,self.sendId)
+            if(self.sendId == "1" or self.sendId == 1 ):
+                self.fixed_characters_sub = 'EBG_CODE/shengsi/{}/{}/{}/{}/'.format("+",self.classId,"+",self.sendId)
+            elif(self.sendId == "0" or self.sendId == 0):
+                self.fixed_characters_sub = 'EBG_CODE/shengsi/{}/{}/{}/{}/'.format("+","+",self.userId,self.sendId)
+            else:
+                self.fixed_characters_sub = 'EBG_CODE/shengsi/{}/{}/{}/{}/'.format("+","+","+","+")
+            self.aes_mode = 1
+            self.ssl = ssl
+            self.ssl_params = ssl_params
+            self.sock = None
+            self.pid = 0
+            self.cb = None
+            self.keepalive = keepalive
+            self.lw_topic = None
+            self.lw_msg = None
+            self.lw_qos = 0
+            self.lw_retain = False
+            # print('client_id:{}\nserver:{}\nport:{}\nusername:{}\npassword:{}'.format(self.client_id,self.server,self.port,self.user,self.pswd))
+            # print('schoolId:{}\nclassId:{}\nuserId:{}\nsendId:{}'.format(self.schoolId,self.classId,self.userId,self.sendId))
+        else:
+            self.client_id = client_id
+            self.sock = None
+            self.server = server
+            self.port = port
+            self.ssl = ssl
+            self.ssl_params = ssl_params
+            self.pid = 0
+            self.cb = None
+            self.user = user
+            self.pswd = password
+            self.keepalive = keepalive
+            self.lw_topic = None
+            self.lw_msg = None
+            self.lw_qos = 0
+            self.lw_retain = False
+            print('no aesparam mode!!!')
+            # print('aes_mode:{}\n'.format(self.aes_mode))
+        self.DELAY_500_MS = 500
 
     def _send_str(self, s):
         self.sock.write(struct.pack("!H", len(s)))
@@ -107,6 +154,10 @@ class MQTTClient:
         self.sock.write(b"\xc0\0")
 
     def publish(self, topic, msg, retain=False, qos=0):
+        sleep_ms(self.DELAY_500_MS) # 延时500ms
+        if(self.aes_mode == 1):
+            topic = self.fixed_characters + str(topic)
+        # print('publish topic:' + topic)
         pkt = bytearray(b"\x30\0\0\0")
         pkt[0] |= qos << 1 | retain
         sz = 2 + len(topic) + len(msg)
@@ -142,6 +193,9 @@ class MQTTClient:
             assert 0
 
     def subscribe(self, topic, qos=0):
+        if(self.aes_mode == 1):
+            topic = self.fixed_characters_sub + str(topic)
+        # print('subscribe topic:' + topic)
         assert self.cb is not None, "Subscribe callback is not set"
         pkt = bytearray(b"\x82\0\0\0")
         self.pid += 1
@@ -182,6 +236,16 @@ class MQTTClient:
         topic_len = self.sock.read(2)
         topic_len = (topic_len[0] << 8) | topic_len[1]
         topic = self.sock.read(topic_len)
+        # print('receive topic:') 
+        # print(topic) 
+        if(self.aes_mode == 1):
+            # 去除特定信息 
+            topic = topic.decode('utf-8', 'ignore')
+            if(topic.find(self.fixed_characters) > -1):
+                topic = topic.split(self.fixed_characters)[1]
+            # topic = topic.encode('utf-8')  # 转为字节和原接口保持一致
+            topic = bytes(topic, 'utf-8')
+
         sz -= topic_len + 2
         if op & 6:
             pid = self.sock.read(2)
@@ -202,3 +266,13 @@ class MQTTClient:
     def check_msg(self):
         self.sock.setblocking(False)
         return self.wait_msg()
+    
+    def aes_decrypt(self,encrypted):
+        try:
+            _encrypted=bytes.fromhex(encrypted)
+            decrypt_str = aes_128_cbc_decrypt(_encrypted)
+            aes_dict = ujson.loads(decrypt_str.strip()) #转为字典
+            return aes_dict
+        except Exception as e:
+            print('aes decrypt erroe:' + str(e))
+            return DICT
