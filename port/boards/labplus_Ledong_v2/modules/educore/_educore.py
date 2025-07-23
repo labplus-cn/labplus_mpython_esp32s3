@@ -24,7 +24,7 @@ import dht as _dht
 from ds18x20 import DS18X20
 import onewire
 import math
-from lv_gui import *
+from lv_gui import GUI
 
 
 gui = GUI()
