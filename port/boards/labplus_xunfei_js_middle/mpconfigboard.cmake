@@ -42,6 +42,7 @@ set(MICROPY_SOURCE_BOARD
     # ${MPY_PORT_DIR}/drivers/startup/oled.c
     # ${MPY_PORT_DIR}/drivers/startup/startup.c 
     # ${MPY_PORT_DIR}/lib/utils/pyexec.c
+    ${MPY_PORT_DIR}/builtins/main.c
     ${MPY_PORT_DIR}/builtins/modmusictunes.c
     ${MPY_PORT_DIR}/builtins/modmusic.c
     ${MPY_PORT_DIR}/builtins/esp32_nvs.c
