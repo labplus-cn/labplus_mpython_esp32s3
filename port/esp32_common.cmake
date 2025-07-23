@@ -93,7 +93,7 @@ endif()
 list(APPEND MICROPY_SOURCE_PORT
     panichandler.c
     adc.c
-    main.c
+    # main.c
     ppp_set_auth.c
     uart.c
     usb.c

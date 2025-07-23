@@ -39,10 +39,10 @@
 #include "esp_task.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_memory_utils.h"
 #include "esp_psram.h"
-#include "startup/oled.h"
 
-#include "py/stackctrl.h"
+#include "py/cstack.h"
 #include "py/nlr.h"
 #include "py/compile.h"
 #include "py/runtime.h"
@@ -53,9 +53,10 @@
 #include "shared/readline/readline.h"
 #include "shared/runtime/pyexec.h"
 #include "shared/timeutils/timeutils.h"
+#include "shared/tinyusb/mp_usbd.h"
 #include "mbedtls/platform_time.h"
 
-#include "driver/uart.h"
+#include "uart.h"
 #include "usb.h"
 #include "usb_serial_jtag.h"
 #include "modmachine.h"
@@ -69,51 +70,21 @@
 #include "modespnow.h"
 #endif
 
-static uint16_t hw_init_flags = 0;
-const char msg_iic_failed[] = "IIC硬件错误(IIC Hardfault),系统无法正常工作!IIC连线是否接反?请移除IIC总线上的所有设备后重试!\n";
-
 // MicroPython runs as a task under FreeRTOS
 #define MP_TASK_PRIORITY        (ESP_TASK_PRIO_MIN + 1)
 
-// Set the margin for detecting stack overflow, depending on the CPU architecture.
-#if CONFIG_IDF_TARGET_ESP32C3
-#define MP_TASK_STACK_LIMIT_MARGIN (2048)
-#else
-#define MP_TASK_STACK_LIMIT_MARGIN (1024)
-#endif
+typedef struct _native_code_node_t {
+    struct _native_code_node_t *next;
+    uint32_t data[];
+} native_code_node_t;
+
+static native_code_node_t *native_code_head = NULL;
+
+static void esp_native_code_free_all(void);
 
 int vprintf_null(const char *format, va_list ap) {
     // do nothing: this is used as a log target during raw repl mode
     return 0;
-}
-
-void mpython_display_exception(mp_obj_t exc_in)
-{
-    size_t n, *values;
-    mp_obj_exception_get_traceback(exc_in, &n, &values);
-    if (1) {
-        vstr_t vstr;
-        mp_print_t print;
-        vstr_init_print(&vstr, 50, &print);
-        #if MICROPY_ENABLE_SOURCE_LINE
-        if (n >= 3) {
-            mp_printf(&print, "line %u\n", values[1]);
-        }
-        #endif
-        if (mp_obj_is_native_exception_instance(exc_in)) {
-            mp_obj_exception_t *exc = (mp_obj_exception_t*)MP_OBJ_TO_PTR(exc_in);
-            mp_printf(&print, "%q:\n  ", exc->base.type->name);
-            if (exc->args != NULL && exc->args->len != 0) {
-                mp_obj_print_helper(&print, exc->args->items[0], PRINT_STR);
-            }
-        }
-        oled_init();
-        oled_clear();
-        oled_print(vstr_null_terminated_str(&vstr), 0, 0);
-        oled_show();
-        vstr_clear(&vstr);
-        oled_deinit();
-    }
 }
 
 time_t platform_mbedtls_time(time_t *timer) {
@@ -130,13 +101,12 @@ void mp_task(void *pvParameter) {
     #if MICROPY_PY_THREAD
     mp_thread_init(pxTaskGetStackStart(NULL), MICROPY_TASK_STACK_SIZE / sizeof(uintptr_t));
     #endif
-    #if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    #if MICROPY_HW_ESP_USB_SERIAL_JTAG
     usb_serial_jtag_init();
-    #elif CONFIG_USB_OTG_SUPPORTED
+    #elif MICROPY_HW_ENABLE_USBDEV
     usb_init();
     #endif
     #if MICROPY_HW_ENABLE_UART_REPL
-    ESP_LOGE("esp_init", "use MICROPY_HW_ENABLE_UART_REPL........................................");
     uart_stdout_init();
     #endif
     machine_init();
@@ -156,28 +126,12 @@ void mp_task(void *pvParameter) {
     }
 
 soft_reset:
-    // hw_init_flags = 0;
-    // startup
-    // iic总线错误,打印提示信息
-    // if (oled_init() == false) { 
-    //     ESP_LOGE("system", "%s", msg_iic_failed);
-    //     hw_init_flags |= 0x0001;
-    // } else {
-    //     oled_drawImg(img_mpython);
-    //     // oled_drawImg(img_InnovaBit);
-    //     oled_show();
-    //     oled_deinit();
-    // }
-
     // initialise the stack pointer for the main thread
-    mp_stack_set_top((void *)sp);
-    mp_stack_set_limit(MICROPY_TASK_STACK_SIZE - MP_TASK_STACK_LIMIT_MARGIN);
+    mp_cstack_init_with_top((void *)sp, MICROPY_TASK_STACK_SIZE);
     gc_init(mp_task_heap, mp_task_heap + MICROPY_GC_INITIAL_HEAP_SIZE);
     mp_init();
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__slash_lib));
     readline_init0();
-
-    MP_STATE_PORT(native_code_pointers) = MP_OBJ_NULL;
 
     // initialise peripherals
     machine_pins_init();
@@ -186,7 +140,7 @@ soft_reset:
     #endif
 
     // run boot-up scripts
-    pyexec_frozen_module("_boot.py", false);
+    pyexec_frozen_module("_boot.py", true);
     int ret = pyexec_file_if_exists("boot.py");
     if (ret & PYEXEC_FORCED_EXIT) {
         goto soft_reset_exit;
@@ -229,17 +183,10 @@ soft_reset_exit:
     mp_thread_deinit();
     #endif
 
-    // Free any native code pointers that point to iRAM.
-    if (MP_STATE_PORT(native_code_pointers) != MP_OBJ_NULL) {
-        size_t len;
-        mp_obj_t *items;
-        mp_obj_list_get(MP_STATE_PORT(native_code_pointers), &len, &items);
-        for (size_t i = 0; i < len; ++i) {
-            heap_caps_free(MP_OBJ_TO_PTR(items[i]));
-        }
-    }
-
     gc_sweep_all();
+
+    // Free any native code pointers that point to iRAM.
+    esp_native_code_free_all();
 
     mp_hal_stdout_tx_str("MPY: soft reboot\r\n");
 
@@ -279,21 +226,34 @@ void nlr_jump_fail(void *val) {
     esp_restart();
 }
 
+static void esp_native_code_free_all(void) {
+    while (native_code_head != NULL) {
+        native_code_node_t *next = native_code_head->next;
+        heap_caps_free(native_code_head);
+        native_code_head = next;
+    }
+}
+
 void *esp_native_code_commit(void *buf, size_t len, void *reloc) {
     len = (len + 3) & ~3;
-    uint32_t *p = heap_caps_malloc(len, MALLOC_CAP_EXEC);
-    if (p == NULL) {
-        m_malloc_fail(len);
+    size_t len_node = sizeof(native_code_node_t) + len;
+    native_code_node_t *node = heap_caps_malloc(len_node, MALLOC_CAP_EXEC);
+    #if CONFIG_IDF_TARGET_ESP32S2
+    // Workaround for ESP-IDF bug https://github.com/espressif/esp-idf/issues/14835
+    if (node != NULL && !esp_ptr_executable(node)) {
+        free(node);
+        node = NULL;
     }
-    if (MP_STATE_PORT(native_code_pointers) == MP_OBJ_NULL) {
-        MP_STATE_PORT(native_code_pointers) = mp_obj_new_list(0, NULL);
+    #endif // CONFIG_IDF_TARGET_ESP32S2
+    if (node == NULL) {
+        m_malloc_fail(len_node);
     }
-    mp_obj_list_append(MP_STATE_PORT(native_code_pointers), MP_OBJ_TO_PTR(p));
+    node->next = native_code_head;
+    native_code_head = node;
+    void *p = node->data;
     if (reloc) {
         mp_native_relocate(reloc, buf, (uintptr_t)p);
     }
     memcpy(p, buf, len);
     return p;
 }
-
-MP_REGISTER_ROOT_POINTER(mp_obj_t native_code_pointers);
