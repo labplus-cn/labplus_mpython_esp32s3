@@ -8,6 +8,16 @@ import machine
 from machine import Pin
 
 Pin(12, Pin.OUT, value=0)
+
+print("boot...")
+
+try:
+    if bdev:
+        uos.mount(bdev, "/")
+except OSError:
+    import inisetup
+    vfs = inisetup.setup()
+
 # 硬件复位标志
 for count in range(3):
     print("=$%#=")
@@ -17,8 +27,6 @@ for count in range(3):
 mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
 print(mac)
 
-
-
 import lcd
 lcd.draw_logo()
 
@@ -26,12 +34,5 @@ lcd.draw_logo()
 _rgb = NeoPixel(Pin(8, Pin.OUT), 4, 3, 1,0.1)
 _rgb.write()
 del _rgb
-
-try:
-    if bdev:
-        uos.mount(bdev, "/")
-except OSError:
-    import inisetup
-    vfs = inisetup.setup()
 
 gc.collect()

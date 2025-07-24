@@ -9,6 +9,15 @@ from machine import Pin
 
 Pin(12, Pin.OUT, value=0)
 
+print("boot...")
+
+try:
+    if bdev:
+        uos.mount(bdev, "/")
+except OSError:
+    import inisetup
+    vfs = inisetup.setup()
+    
 # 硬件复位标志
 for count in range(3):
     print("=$%#=")
@@ -27,13 +36,5 @@ del _rgb
 
 import lcd
 lcd.draw_logo()
-
-try:
-    if bdev:
-        uos.mount(bdev, "/")
-except OSError:
-    import inisetup
-    vfs = inisetup.setup()
-
 
 gc.collect()
