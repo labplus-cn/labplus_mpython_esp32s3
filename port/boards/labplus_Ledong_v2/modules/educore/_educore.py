@@ -55,20 +55,20 @@ class pin():
         self._iqr_func = None
 
     def read_digital(self):
-        # if(pins_state[self.pin_num]!=PinMode.IN):
-        pins_state[self.pin_num]=PinMode.IN
-        self._pin = MPythonPin(self.pin_num, PinMode.IN)
-        return self._pin.read_digital()
-        # else:
-        #     return self._pin.read_digital()
+        if(pins_state[self.pin_num]!=PinMode.IN):
+            pins_state[self.pin_num]=PinMode.IN
+            self._pin = MPythonPin(self.pin_num, PinMode.IN)
+            return self._pin.read_digital()
+        else:
+            return self._pin.read_digital()
 
     def write_digital(self, value):
-        # if(pins_state[self.pin_num]!=PinMode.OUT):
-        pins_state[self.pin_num]=PinMode.OUT
-        self._pin = MPythonPin(self.pin_num, PinMode.OUT, Pin.PULL_UP)
-        return self._pin.write_digital(value)
-        # else:
-        #     return self._pin.write_digital(value)
+        if(pins_state[self.pin_num]!=PinMode.OUT):
+            pins_state[self.pin_num]=PinMode.OUT
+            self._pin = MPythonPin(self.pin_num, PinMode.OUT, Pin.PULL_UP)
+            return self._pin.write_digital(value)
+        else:
+            return self._pin.write_digital(value)
 
     def read_analog(self):
         if self.pin_num not in [0, 1, 2, 3, 4, 6, 8, 9]:
@@ -92,12 +92,10 @@ class pin():
         #     return self._pin.write_analog(duty=value, freq=freq)
 
     def irq(self, handler=None, trigger=Pin.IRQ_RISING):
-        # if(pins_state[self.pin_num]!=PinMode.IN):
         pins_state[self.pin_num]=PinMode.IN
         self._pin = MPythonPin(self.pin_num, PinMode.IN)
         self._pin.irq(trigger=trigger, handler=handler)
-        # else:
-        #     self._pin.irq(trigger=trigger, handler=handler)
+      
     
     @property
     def event_change(self):
