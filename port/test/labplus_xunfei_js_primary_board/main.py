@@ -208,7 +208,7 @@ audio.stop()
 from mpython import *
 import audio
 
-audio.record('2.wav', 5, 16, 1, 8000)
+audio.record('2.wav', 5)
 audio.play('2.wav')
 
 # ----------------------------------------------
@@ -251,7 +251,7 @@ while True:
     lcd.draw_color(lcd.BLUE)
     time.sleep(1)
     
-# 舵机
+# 19 舵机
 # 说明：舵机0-120度切换
 from mpython import *
 from servo import Servo
@@ -263,7 +263,7 @@ while True:
     servo_22.write_angle(120)
     time.sleep(2)
     
-# 接口
+# 20 接口
 # 说明：接口0-3输出高低电平，可接一个LED灯显示结果。
 # IIC接口用一个IIC模块测试，使用i2c.scan()测试，能扫到模块地址
 from mpython import *
@@ -284,4 +284,13 @@ while True:
     p3.write_digital(1)
     time.sleep(1)
 
-    
+# 21 超声波测试IIC接口
+from mpython import *
+from bluebit import *
+
+import time
+
+ultrasonic = Ultrasonic()
+while True:
+    print(ultrasonic.distance())
+    time.sleep(1)
