@@ -14,6 +14,8 @@ class Servo(object):
         self.min_us = min_us
         self.max_us = max_us
         self.actuation_range = actuation_range
+        if pin not in [0, 1, 2, 3, 22]:
+            raise TypeError('Servo not supported on P%d' % pin)
         self.pin_id = pins_remap_esp32[pin]
         self.pwm = PWM(Pin(self.pin_id, Pin.OUT))
         self.pwm.freq(self.freq)

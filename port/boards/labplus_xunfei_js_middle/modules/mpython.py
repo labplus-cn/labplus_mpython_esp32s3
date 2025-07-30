@@ -63,7 +63,7 @@ class PinMode(object):
 # P3: 阻性器件 P5: A P10: sound P11: B P12: buzzer P7: RGB LED
 #                   P0 P1 P2 P3 P4 P5 P6 P7 P8  P9 P10 P11 P12 P13 P14 P15 P16        P19  P20 P21    P23 P24 P25 P26 P27 P28
 #                                  *     *          *  *   *                          scl  sda *       P  Y   T   H   O   N
-pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, -1, 6, 46, 21, -1, -1, 48, -1, -1, -1, 43, 44,     -1, -1, 9, -1, -1, -1, -1)
+pins_remap_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, 15, -1, 6, 46, 21, -1, -1, 48, -1, -1, -1, 43, 44, -1, -1, 9, -1, -1, -1, -1, -1)
 
 class MPythonPin():
     def __init__(self, pin, mode=PinMode.IN, pull=None):

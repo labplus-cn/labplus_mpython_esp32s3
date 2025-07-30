@@ -303,16 +303,24 @@ class parrot():
 继承Servo
 '''
 class servo(Servo):
+    used_pins = []
+    servo_map = [None] * 23
+    
     def __init__(self,pin):
-        super().__init__(pin)
+        if pin in self.used_pins:
+            self.servo = self.servo_map[pin]
+            return
+        
+        self.used_pins.append(pin)
+        self.servo = Servo(pin, min_us=750, max_us=2250, actuation_range=180)
+        self.servo_map[pin] = self.servo
     
     def angle(self, value):
-        value = int(value)
         if(value<0):
             value = 0
         if(value>180):
             value = 180
-        self.write_angle(value)
+        self.servo.write_angle(value)
     
 
 '''继承Scan_Rfid'''

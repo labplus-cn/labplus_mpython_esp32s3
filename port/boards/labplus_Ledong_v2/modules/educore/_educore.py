@@ -316,8 +316,17 @@ class parrot():
 继承Servo
 '''
 class servo(Servo):
+    used_pins = []
+    servo_map = [None] * 10
+    
     def __init__(self,pin):
+        if pin in self.used_pins:
+            self.servo = self.servo_map[pin]
+            return
+        
+        self.used_pins.append(pin)
         self.servo = Servo(pin, min_us=750, max_us=2250, actuation_range=180)
+        self.servo_map[pin] = self.servo
     
     def angle(self, value):
         if(value<0):
