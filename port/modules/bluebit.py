@@ -1308,7 +1308,7 @@ class PM25_DC(object):
         time_cnt = time.ticks_ms()
         
         while True:
-            time.sleep_ms(5)
+            time.sleep_ms(10)
             if self.uart.any():
                 head = self.uart.read(1)   
                 if(head[0] == 0xA5):

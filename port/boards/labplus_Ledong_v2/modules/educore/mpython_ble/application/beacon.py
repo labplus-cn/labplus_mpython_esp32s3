@@ -57,16 +57,18 @@ class Trilateration:
         # 使用最小二乘法求解
         A = []
         b = []
-        
-        # 以第一个信标为基准
-        x1, y1, d1 = beacons[0]['x'], beacons[0]['y'], beacons[0]['distance']
-        
-        for beacon in beacons[1:]:
-            xi, yi, di = beacon['x'], beacon['y'], beacon['distance']
+        try:
+            # 以第一个信标为基准
+            x1, y1, d1 = beacons[0]['x'], beacons[0]['y'], beacons[0]['distance']
             
-            # 构建线性方程组
-            A.append([2*(xi - x1), 2*(yi - y1)])
-            b.append([x1**2 - xi**2 + y1**2 - yi**2 + di**2 - d1**2])
+            for beacon in beacons[1:]:
+                xi, yi, di = beacon['x'], beacon['y'], beacon['distance']
+                
+                # 构建线性方程组
+                A.append([2*(xi - x1), 2*(yi - y1)])
+                b.append([x1**2 - xi**2 + y1**2 - yi**2 + di**2 - d1**2])
+        except Exception as e:
+            print(f"{str(e)}")
         
         # 解线性方程组 Ax = b
         try:
@@ -82,7 +84,85 @@ class Trilateration:
             # 如果矩阵不可逆，返回信标的质心
             avg_x = sum(b['x'] for b in beacons) / len(beacons)
             avg_y = sum(b['y'] for b in beacons) / len(beacons)
+            print("矩阵不可逆，返回信标质心位置")
             return (avg_x, avg_y)
+        
+    @staticmethod
+    def calculate_position_robust(beacons):
+        """不使用numpy的鲁棒三边定位"""
+        if len(beacons) < 3:
+            raise ValueError("至少需要3个信标进行定位")
+        
+        best_error = float('inf')
+        best_position = None
+        
+        # 尝试不同的基准信标
+        for ref_idx in range(min(3, len(beacons))):
+            x_ref, y_ref, d_ref = beacons[ref_idx]['x'], beacons[ref_idx]['y'], beacons[ref_idx]['distance']
+            
+            A = []
+            b = []
+            for i, beacon in enumerate(beacons):
+                if i == ref_idx:
+                    continue
+                xi, yi, di = beacon['x'], beacon['y'], beacon['distance']
+                A.append([2*(xi - x_ref), 2*(yi - y_ref)])
+                b.append(x_ref**2 - xi**2 + y_ref**2 - yi**2 + di**2 - d_ref**2)
+            
+            # 使用最小二乘法求解
+            x = Trilateration.least_squares(A, b)
+            
+            if x is not None:
+                # 计算残差评估解的质量
+                error = 0
+                for i in range(len(A)):
+                    error += (A[i][0]*x[0] + A[i][1]*x[1] - b[i])**2
+                
+                if error < best_error:
+                    best_error = error
+                    best_position = (-x[0], -x[1])
+        
+        if best_position is not None:
+            return best_position
+        
+        # 所有尝试都失败时返回信标质心
+        avg_x = sum(b['x'] for b in beacons) / len(beacons)
+        avg_y = sum(b['y'] for b in beacons) / len(beacons)
+        print("所有方法失败，返回信标质心位置")
+        return (avg_x, avg_y)
+    
+
+    @staticmethod
+    def least_squares(A, b):
+        """手动实现最小二乘法解Ax=b"""
+        # 计算A^T A
+        at_a = [
+            [sum(A[i][0]*A[i][0] for i in range(len(A))), 
+            sum(A[i][0]*A[i][1] for i in range(len(A)))],
+            [sum(A[i][1]*A[i][0] for i in range(len(A))), 
+            sum(A[i][1]*A[i][1] for i in range(len(A)))]
+        ]
+        
+        # 计算A^T b
+        at_b = [
+            sum(A[i][0]*b[i] for i in range(len(A))),
+            sum(A[i][1]*b[i] for i in range(len(A)))
+        ]
+        
+        try:
+            # 求逆
+            inv = Trilateration.invert_2x2(at_a)
+            
+            # 计算解 x = (A^T A)^-1 A^T b
+            x = [
+                inv[0][0]*at_b[0] + inv[0][1]*at_b[1],
+                inv[1][0]*at_b[0] + inv[1][1]*at_b[1]
+            ]
+            return x
+        except ValueError:
+            return None
+
+
     
     @staticmethod
     def invert_2x2(matrix):
@@ -220,6 +300,7 @@ class BeaconScanner:
             return None,None
         
         readings = self.beacon_data[uuid]
+
         tx_power = self.known_beacons[uuid].get('tx_power', -59)
         
         # 计算有效RSSI平均值（排除异常值）
@@ -260,12 +341,13 @@ class BeaconScanner:
         
         if len(beacons_for_positioning) >= 3:
             self.beacons_for_positioning = beacons_for_positioning 
-            return Trilateration.calculate_position(beacons_for_positioning)
+            # return Trilateration.calculate_position(beacons_for_positioning)
+            return Trilateration.calculate_position_robust(beacons_for_positioning)
         else:
             self.beacons_for_positioning = []
             return None
     
-    def scan(self, duration=5):
+    def scan(self, duration=10):
         """
         执行蓝牙信标扫描
         Args:
