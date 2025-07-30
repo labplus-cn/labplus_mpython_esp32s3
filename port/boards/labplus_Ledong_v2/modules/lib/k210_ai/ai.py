@@ -1,5 +1,5 @@
 import time
-from k210_ai.public import *
+from .public import *
 import gc
 
 OBJ_TYPE = ['飞机','自行车','鸟','船','瓶子','公交车','汽车','猫','椅子','奶牛','餐桌','狗','屋子','摩托','人','盆栽','羊','沙发','火车','电视']

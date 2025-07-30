@@ -1,5 +1,5 @@
 import time
-from k230_ai.public import *
+from .public import *
 import gc
 
 class YOLO80(object):

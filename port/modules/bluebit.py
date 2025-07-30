@@ -1299,12 +1299,14 @@ class PM25_DC(object):
     def __init__(self, tx=Pin.P1, rx=Pin.P0, uart_num=1):
         self.K = 0.4 # (注:户读取到的灰尘传感器原始 PM2.5，需要参照 TSI仪器光度法标定一个K 值系数，一般建议 0.4)
         self.uart = UART(uart_num, baudrate=9600, stop=1, tx=tx, rx=rx, timeout=30)
+        self._pm25 = -1
         time.sleep_ms(100)
 
     def read(self): #单位 微克/立方米
-        _pm25 = -1 
+        _pm25 = self._pm25 
         data = bytes(0x00)
         time_cnt = time.ticks_ms()
+        
         while True:
             time.sleep_ms(5)
             if self.uart.any():
@@ -1323,8 +1325,8 @@ class PM25_DC(object):
                     sum = 0xA5 + DATAH + DATAL # 计算校验和
                     sum = sum ^ 0x80 # ^异或，得到低7位数据
                     if(sum == data[3]):
-                        # _pm25 = (data[1]*128) + data[2]
                         _pm25 = self.K * ((DATAH << 7) | (DATAL & 0x7F))   # 校验成功，计算浓度值
+                        self._pm25 = _pm25
                         break
                     else:
                         pass

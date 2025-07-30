@@ -1,6 +1,6 @@
 
 import time
-from k210_ai.public import *
+from .public import *
 
 class Maix_asr(object):
     """ maix语音识别类"""
