@@ -18,7 +18,7 @@ from servo import Servo
 from umqtt.robust import MQTTClient as MQTT
 import ubinascii
 import time
-from machine import Timer
+from machine import Timer,SoftI2C
 from hcsr04 import HCSR04
 import dht as _dht
 from ds18x20 import DS18X20
@@ -342,7 +342,8 @@ class rfid():
         if(sda==20 or scl==19):
             self.i2c_1 = i2c
         else:
-            self.i2c_1 = I2C(1, scl=Pin(_scl), sda=Pin(_sda), freq=200000)
+            # self.i2c_1 = I2C(1, scl=Pin(_scl), sda=Pin(_sda), freq=100000)
+            self.i2c_1 = SoftI2C(scl=Pin(_scl), sda=Pin(_sda), freq=100000)
             time.sleep_ms(100)
         self.scan_rfid = Scan_Rfid_Edu(i2c=self.i2c_1) 
         # print(self.i2c_1.scan())
@@ -554,7 +555,8 @@ class ultrasonic():
             if(sda==20 or scl==19):
                 self.i2c = i2c
             else:
-                self.i2c = I2C(scl=Pin(_scl), sda=Pin(_sda), freq=400000)
+                # self.i2c = I2C(scl=Pin(_scl), sda=Pin(_sda), freq=100000)
+                self.i2c = SoftI2C(sda=Pin(_sda), scl=Pin(_scl), freq=100000)
                 time.sleep_ms(100)
         elif(trig != None and echo != None):
             self.type = 2
@@ -922,7 +924,8 @@ class pressure(object):
             self.dev = Barometric(self.i2c)
             # print(self.i2c)
         else:
-            self.i2c = I2C(scl=Pin(_scl), sda=Pin(_sda), freq=400000)
+            # self.i2c = I2C(scl=Pin(_scl), sda=Pin(_sda), freq=400000)
+            self.i2c = SoftI2C(sda=Pin(_sda), scl=Pin(_scl), freq=100000)
             time.sleep_ms(100)
             self.dev = Barometric(self.i2c)
 
@@ -962,7 +965,8 @@ class force(object):
             self.i2c = i2c
             self.dev = DelveBit(address=0x6F, i2c=self.i2c)
         else:
-            self.i2c = I2C(scl=Pin(_scl), sda=Pin(_sda), freq=400000)
+            # self.i2c = I2C(scl=Pin(_scl), sda=Pin(_sda), freq=400000)
+            self.i2c = SoftI2C(sda=Pin(_sda), scl=Pin(_scl), freq=100000)
             time.sleep_ms(100)
             self.dev = DelveBit(address=0x6F, i2c=self.i2c)
 

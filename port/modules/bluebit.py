@@ -1042,8 +1042,9 @@ class SoilHumiditySensor():
         self.threshold = threshold
 
     def read(self):
-        _soil_humidity =  self.pin.read_analog()
-        return int(numberMap(_soil_humidity,0,4095,4095,0))
+        '''获取土壤湿度传感器裸数据，模拟值:1600-2600 映射 4095-0 '''
+        return self.get_raw_val()
+        
 
 class FanPWM():
     def __init__(self, pin):
