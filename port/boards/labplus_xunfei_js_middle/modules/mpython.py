@@ -368,3 +368,9 @@ class Ledong_shield(object):
 ledong_shield = Ledong_shield()
 
 
+"""
+uuid
+"""
+def uuid():
+    import ubinascii,machine
+    return ubinascii.hexlify(machine.unique_id()).decode().upper()

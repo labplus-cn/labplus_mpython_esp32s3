@@ -1,5 +1,5 @@
-from mpython_ble.hidcode import Mouse as _Mouse
-from mpython_ble.hidcode import KeyboardCode as _KeyboardCode
+from .mpython_ble.hidcode import Mouse as _Mouse
+from .mpython_ble.hidcode import KeyboardCode as _KeyboardCode
 from micropython import const
 import time
 
