@@ -216,3 +216,18 @@ music.play(music.DADADADUM, pin=Pin.P12, wait=False, loop=True)
 # import music
 # music.play(music.DADADADUM, pin=Pin.P12, wait=False, loop=True)
     
+    
+    
+    
+# 新力传感器测试代码
+# from bluebit import Forece
+
+# forece = Forece()  # 初始化力传感器，接口I2C
+
+
+# while True:
+#     sensor_values = forece.read() # 读取传感器数据
+#     print("力:", sensor_values[0])
+#     print("克:", sensor_values[1])
+#     print('-'*10)
+#     time.sleep(1)

@@ -43,6 +43,7 @@ from weather import WEATHER
 from pm25 import PM25
 from solar import SolarPanel
 from paj7620 import PAJ7620
+from forece import Forece
 
 class Thermistor:
     """
