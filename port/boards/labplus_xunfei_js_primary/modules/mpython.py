@@ -21,6 +21,8 @@ from ltr308 import *
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
+i2c_addr=i2c.scan()
+
 if '_print' not in dir(): _print = print
 
 def print(_t, *args, sep=' ', end='\n'):
@@ -586,7 +588,7 @@ class EncoderMotor(object):
     def __init__(self): 
         self.i2c_addr = 18
         self.stop()
-        print(self.i2c_addr)
+        # print(self.i2c_addr)
 
     def stop(self):
         attempts=0
@@ -705,8 +707,13 @@ class EncoderMotor(object):
                     break
             else:
                 break
-
-encoder_motor = EncoderMotor()
+            
+            
+# 如果i2c地址18存在，则初始化编码电机
+if 18 in i2c_addr:
+    encoder_motor = EncoderMotor()
+else:
+    print("Encoder motor not found")
 
 
 """
