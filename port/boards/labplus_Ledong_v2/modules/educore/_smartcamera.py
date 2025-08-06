@@ -134,7 +134,7 @@ class EduSmartCamera:
             return d
         elif(self.mode == FACE_LANDMARK_LIVING_BODY):
             self.face_living_body.recognize()
-            d = {"blink_counter":None,"mouth_counter":None,"status": 0}
+            d = {"blink_counter":0,"mouth_counter":0,"status": 0}
             if(self.face_living_body.mouth_blink_counter[0]!=0):
                 d = {"blink_counter":self.face_living_body.mouth_blink_counter[0] ,"mouth_counter":self.face_living_body.mouth_blink_counter[1],"status": 1}
             return d
