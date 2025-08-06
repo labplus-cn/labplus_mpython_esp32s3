@@ -46,7 +46,9 @@ class event_loop():
 
     def __init__(self, freq=25, timer_id=default_timer_id, max_scheduled=2, refresh_cb=None, asynchronous=False, exception_sink=None):
         if self.is_running():
-            raise RuntimeError("Event loop is already running!")
+            # raise RuntimeError("Event loop is already running!")
+            print("Event loop is already running!!!")
+            return
 
         if not lv.is_initialized():
             lv.init()
