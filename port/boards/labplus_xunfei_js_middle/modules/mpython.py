@@ -17,7 +17,6 @@ from neopixel import NeoPixel
 # from esp import dht_readinto
 # from time import sleep_ms, sleep_us, sleep
 import time
-# import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
@@ -359,6 +358,7 @@ class Ledong_shield(object):
 
     def get_battery_level(self):
         self.i2c.writeto(self.i2c_addr, b'\x03', True)
+        time.sleep_ms(2)
         tmp = self.i2c.readfrom(self.i2c_addr, 2)
         data = tmp[1] << 8 +  tmp[0]
         data = max(min(data, 4200), 3300)

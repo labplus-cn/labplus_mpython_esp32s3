@@ -501,6 +501,7 @@ MOTOR_left = const(0x02)
 
 def get_distance():
     i2c.writeto(IIC_ADDR, bytearray([7]))
+    time.sleep_ms(2)
     return struct.unpack('H', i2c.readfrom(IIC_ADDR, 2))[0]/10
 
 _speed_buf = {}
@@ -544,6 +545,7 @@ class Line_follow(object):
 
     def get_val(self):
         i2c.writeto(IIC_ADDR, bytearray([5]))
+        time.sleep_ms(2)
         tmp = struct.unpack('5H', i2c.readfrom(IIC_ADDR, 10))
         list = [0]*5
         for i in range(5):
@@ -556,6 +558,7 @@ class Line_follow(object):
     def get_raw_val(self):
         '''获取循迹值裸数据，模拟值'''
         i2c.writeto(IIC_ADDR, bytearray([5]))
+        time.sleep_ms(2)
         tmp = struct.unpack('5H', i2c.readfrom(IIC_ADDR, 10))
         return tmp
 
@@ -579,6 +582,7 @@ class Line_follow(object):
 """
 def get_bat_level():
     i2c.writeto(IIC_ADDR, bytearray([4]))
+    time.sleep_ms(2)
     return struct.unpack('H', i2c.readfrom(IIC_ADDR, 2))
 
 '''

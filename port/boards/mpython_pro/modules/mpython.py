@@ -16,7 +16,6 @@ import ustruct
 from neopixel import NeoPixel
 # from esp import dht_readinto
 import time
-# import calibrate_img
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
@@ -517,13 +516,45 @@ class Magnetic(object):
                 return (math.sqrt(math.pow(self.raw_x - self.peeling_x, 2) + pow(self.raw_y - self.peeling_y, 2) + pow(self.raw_z - self.peeling_z , 2)))*0.0625
             return (math.sqrt(math.pow(self.get_x(), 2) + pow(self.get_y(), 2) + pow(self.get_z(), 2)))
 
-    def calibrate(self):
-        # oled.fill(0)
-        # oled.DispChar("步骤1:", 0,0,1)
-        # oled.DispChar("如图",0,26,1)
-        # oled.DispChar("转几周",0,43,1)
-        # oled.bitmap(64,0,calibrate_img.rotate,64,64,1)
-        # oled.show()
+    def calibrate(self): 
+        import lvgl as lv
+        import lcd
+        import lv_displayer
+        from lv_utils import event_loop
+
+        event_loop()
+        
+        data = None
+        data2 = None       
+        scr = lv.screen_active()
+        scr.set_scroll_dir(lv.DIR.NONE)
+        scr.set_style_bg_color(lv.color_hex(0xffffff), lv.PART.MAIN)
+
+        with open('/images/magnetic/1.png','rb') as f:
+            data = f.read()
+        img_src = lv.image_dsc_t({
+            'data_size': len(data),
+            'data': data
+        })
+
+        with open('/images/magnetic/2.png','rb') as f:
+            data2 = f.read()
+        img_src2 = lv.image_dsc_t({
+            'data_size': len(data2),
+            'data': data2
+        })
+        img = lv.image(scr)
+        img.set_src(img_src)
+        img.set_pos(162, 0)
+
+        label = lv.label(scr)
+        label.set_pos(20, 30)
+        label.set_size(320, 100)
+        label.set_text('步骤1:\n如图转几周')
+        label.set_style_text_color(lv.color_hex(0x000000), lv.PART.MAIN)
+        label.set_style_text_font(lv.font_siyuan_heiti_medium_24, lv.PART.MAIN)
+        time.sleep(5)
+        
         self._get_raw()
         min_x = max_x = self.raw_x
         min_y = max_y = self.raw_y
@@ -539,12 +570,9 @@ class Magnetic(object):
         self.cali_offset_x = (max_x + min_x) / 2
         self.cali_offset_y = (max_y + min_y) / 2
         print('cali_offset_x: ' + str(self.cali_offset_x) + '  cali_offset_y: ' + str(self.cali_offset_y))
-        # oled.fill(0)
-        # oled.DispChar("步骤2:", 85,0,1)
-        # oled.DispChar("如图",85,26,1)
-        # oled.DispChar("转几周",85,43,1)
-        # oled.bitmap(0,0,calibrate_img.rotate1,64,64,1)
-        # oled.show()
+        img.set_src(img_src2)
+        label.set_text('步骤2:\n如图转几周')
+        time.sleep(5)
         ticks_start = time.ticks_ms()
         while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
             self._get_raw()
@@ -555,11 +583,13 @@ class Magnetic(object):
   
         print('cali_offset_z: ' + str(self.cali_offset_z))
 
-        # oled.fill(0)
-        # oled.DispChar("校准完成", 40,24,1)
-        # oled.show()
-        # oled.fill(0)
-        print("校准完成")
+        
+        img.delete()
+        label.set_pos(110, 60)
+        label.set_text('校准完成')
+        lv.task_handler()
+        time.sleep(3)
+        label.delete()
 
     def get_heading(self):
         if(self.chip==1):
