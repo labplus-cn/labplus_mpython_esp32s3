@@ -2,7 +2,7 @@
 educore
 '''
 import gc
-from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,ledong_shield
+from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,ledong_shield,sync_ntp
 # from mpython import accelerometer as _accelerometer
 from mpython import rgb as _rgb
 from mpython import light as _light

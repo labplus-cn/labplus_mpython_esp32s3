@@ -14,8 +14,7 @@ i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 import esp, math, time, network
 import ustruct, array
 from neopixel import NeoPixel
-# from esp import dht_readinto
-# from time import sleep_ms, sleep_us, sleep
+
 import time
 from micropython import schedule,const
 from esp32 import NVS

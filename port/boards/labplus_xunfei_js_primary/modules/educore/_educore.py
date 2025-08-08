@@ -3,7 +3,7 @@ educore
 '''
 import gc
 # from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,encoder_motor
-from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap
+from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,sync_ntp
 from mpython import rgb as _rgb
 from mpython import light as _light
 from mpython import sound as _sound
