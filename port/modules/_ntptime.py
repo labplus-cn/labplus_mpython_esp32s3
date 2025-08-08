@@ -28,71 +28,79 @@ import time
 import machine
 import ntptime
 
-def sync_ntp(utc=8,host='ntp1.aliyun.com'):
-    """通过网络校准时间""" 
+def sync_ntp(utc=8, host='ntp1.aliyun.com', max_retries=5, retry_delay=1):
+    """通过网络校准时间，支持错误重试""" 
     print("开始同步网络时间")
-    try:
-        NTP_DELTA = UTC_P8
-        if(utc==0):
-            NTP_DELTA = UTC
-        elif(utc==1):
-            NTP_DELTA = UTC_P1
-        elif(utc==2):
-            NTP_DELTA = UTC_P2
-        elif(utc==3):
-            NTP_DELTA = UTC_P3
-        elif(utc==4):
-            NTP_DELTA = UTC_P4
-        elif(utc==5):
-            NTP_DELTA = UTC_P5
-        elif(utc==6):
-            NTP_DELTA = UTC_P6
-        elif(utc==7):
-            NTP_DELTA = UTC_P7
-        elif(utc==8):
+    
+    for attempt in range(max_retries):
+        try:
             NTP_DELTA = UTC_P8
-        elif(utc==9):
-            NTP_DELTA = UTC_P9
-        elif(utc==10):
-            NTP_DELTA = UTC_P10
-        elif(utc==11):
-            NTP_DELTA = UTC_P11
-        elif(utc==12):
-            NTP_DELTA = UTC_P12
-        elif(utc==-1):
-            NTP_DELTA = UTC_R1
-        elif(utc==-2):
-            NTP_DELTA = UTC_R2
-        elif(utc==-3):
-            NTP_DELTA = UTC_R3
-        elif(utc==-4):
-            NTP_DELTA = UTC_R4
-        elif(utc==-5):
-            NTP_DELTA = UTC_R5
-        elif(utc==-6):
-            NTP_DELTA = UTC_R6
-        elif(utc==-7):
-            NTP_DELTA = UTC_R7
-        elif(utc==-8):
-            NTP_DELTA = UTC_R8
-        elif(utc==-9):
-            NTP_DELTA = UTC_R9
-        elif(utc==-10):
-            NTP_DELTA = UTC_R10
-        elif(utc==-11):
-            NTP_DELTA = UTC_R11
-        elif(utc==-12):
-            NTP_DELTA = UTC_R12
+            if(utc==0):
+                NTP_DELTA = UTC
+            elif(utc==1):
+                NTP_DELTA = UTC_P1
+            elif(utc==2):
+                NTP_DELTA = UTC_P2
+            elif(utc==3):
+                NTP_DELTA = UTC_P3
+            elif(utc==4):
+                NTP_DELTA = UTC_P4
+            elif(utc==5):
+                NTP_DELTA = UTC_P5
+            elif(utc==6):
+                NTP_DELTA = UTC_P6
+            elif(utc==7):
+                NTP_DELTA = UTC_P7
+            elif(utc==8):
+                NTP_DELTA = UTC_P8
+            elif(utc==9):
+                NTP_DELTA = UTC_P9
+            elif(utc==10):
+                NTP_DELTA = UTC_P10
+            elif(utc==11):
+                NTP_DELTA = UTC_P11
+            elif(utc==12):
+                NTP_DELTA = UTC_P12
+            elif(utc==-1):
+                NTP_DELTA = UTC_R1
+            elif(utc==-2):
+                NTP_DELTA = UTC_R2
+            elif(utc==-3):
+                NTP_DELTA = UTC_R3
+            elif(utc==-4):
+                NTP_DELTA = UTC_R4
+            elif(utc==-5):
+                NTP_DELTA = UTC_R5
+            elif(utc==-6):
+                NTP_DELTA = UTC_R6
+            elif(utc==-7):
+                NTP_DELTA = UTC_R7
+            elif(utc==-8):
+                NTP_DELTA = UTC_R8
+            elif(utc==-9):
+                NTP_DELTA = UTC_R9
+            elif(utc==-10):
+                NTP_DELTA = UTC_R10
+            elif(utc==-11):
+                NTP_DELTA = UTC_R11
+            elif(utc==-12):
+                NTP_DELTA = UTC_R12
 
-        ntptime.NTP_DELTA = NTP_DELTA  # 可选 UTC+8偏移时间（秒），不设置就是UTC0
-        ntptime.host = host  # 可选，ntp服务器，默认是"pool.ntp.org" 这里使用阿里服务器
-        ntptime.settime()  # 修改设备时间,到这就已经设置好了
-        
-        mytime=time.localtime()
-        mytime=(mytime[0],mytime[1],mytime[2],mytime[6],mytime[3]+utc,mytime[4],mytime[5],mytime[7])
-        machine.RTC().datetime(mytime)
-        print(mytime)
-        # print(time.localtime())
-    except Exception as e:
-        # print('sync ntp error:{}'.format(e))
-        print("同步ntp时间错误",repr(e))
+            ntptime.NTP_DELTA = NTP_DELTA  # 可选 UTC+8偏移时间（秒），不设置就是UTC0
+            ntptime.host = host  # 可选，ntp服务器，默认是"pool.ntp.org" 这里使用阿里服务器
+            ntptime.settime()  # 修改设备时间,到这就已经设置好了
+            
+            mytime=time.localtime()
+            mytime=(mytime[0],mytime[1],mytime[2],mytime[6],mytime[3]+utc,mytime[4],mytime[5],mytime[7])
+            machine.RTC().datetime(mytime)
+            print(f"时间同步成功: {mytime}")
+            return True  # 同步成功，返回True
+            
+        except Exception as e:
+            print(f"同步ntp时间错误 (尝试 {attempt + 1}/{max_retries}): {repr(e)}")
+            if attempt < max_retries - 1:  # 如果不是最后一次尝试
+                print(f"等待 {retry_delay} 秒后重试...")
+                time.sleep(retry_delay)
+            else:
+                print("所有重试都失败了，时间同步失败")
+                return False  # 所有重试都失败，返回False
