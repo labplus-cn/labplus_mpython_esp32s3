@@ -61,6 +61,7 @@
 #include "usb_serial_jtag.h"
 #include "modmachine.h"
 #include "modnetwork.h"
+#include "who_lcd.h"
 
 #if MICROPY_BLUETOOTH_NIMBLE
 #include "extmod/modbluetooth.h"
@@ -138,6 +139,8 @@ soft_reset:
     #if MICROPY_PY_MACHINE_I2S
     machine_i2s_init0();
     #endif
+    lcd_init();
+    lcd_draw_logo();
 
     // run boot-up scripts
     pyexec_frozen_module("_boot.py", true);

@@ -34,7 +34,7 @@ _rgb = NeoPixel(Pin(8, Pin.OUT), 4, 3, 1,0.1)
 _rgb.write()
 del _rgb
 
-import lcd
-lcd.draw_logo()
+# import lcd
+# lcd.draw_logo()
 
 gc.collect()
