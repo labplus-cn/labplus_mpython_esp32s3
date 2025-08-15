@@ -132,8 +132,12 @@ FREEFALL_AXIS_Y = const(0x02)
 FREEFALL_AXIS_Z = const(0x04)
 FREEFALL_AXIS_ALL = const(0x07)
 
-class MSA311:
+class MSA311():    
     def __init__(self, i2c=i2c, addr=MSA311_ADDR, g_range=G_RANGE_2G, odr=ODR_1000HZ):
+        self.G_RANGE_2G = G_RANGE_2G  
+        self.G_RANGE_4G = const(0x01)
+        self.G_RANGE_8G = const(0x02)
+        self.G_RANGE_16G = const(0x03)
         self.i2c = i2c
         self.addr = addr
         self._g_range = g_range  # Default g-range
@@ -294,7 +298,7 @@ class MSA311:
         if int_type & INT_SRC_ORIENT:
             self.orientation_callback = callback
         
-    def configure_tap_detection(self, int_enable = True, threshold=0x0A, duration=0x04, callback=None):
+    def configure_tap_detection(self, int_enable = True, threshold=0x1A, duration=0x04, callback=None):
         # Configure tap detection
         self._write_reg(REG_TAP_TH, threshold)
         self._write_reg(REG_TAP_DUR, duration)
@@ -357,7 +361,7 @@ class MSA311:
         
         self._set_callback(INT_SRC_FREEFALL, callback)          
         
-    def configure_active_detection(self, int_enable = True, axes=ORIENT_AXIS_ALL, threshold=0x0A, duration=0x00, callback=None):
+    def configure_active_detection(self, int_enable = True, axes=ORIENT_AXIS_ALL, threshold=0x0A, duration=0x01, callback=None):
         self._write_reg(REG_ACTIVE_TH, threshold)
         self._write_reg(REG_ACTIVE_DUR, duration)
 
