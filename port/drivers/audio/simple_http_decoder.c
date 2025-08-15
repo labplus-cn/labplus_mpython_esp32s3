@@ -65,7 +65,7 @@ static void get_simple_decoder_config(esp_audio_simple_dec_cfg_t *cfg)
 
 void simple_http_read_task(void *arg)
 {
-    ESP_LOGE(TAG, "simple_http_read_task begin, RAM left: %ld", esp_get_free_heap_size());
+    // ESP_LOGE(TAG, "simple_http_read_task begin, RAM left: %ld", esp_get_free_heap_size());
     player_handle_t *player = arg;
     size_t ringBufFreeBytes;
     uint8_t *buffer = NULL;
@@ -118,7 +118,7 @@ void simple_http_read_task(void *arg)
     http_close();
     if(buffer){ free(buffer);}
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    ESP_LOGE(TAG, "simple_http_read_task end, RAM left: %ld", esp_get_free_heap_size());
+    // ESP_LOGE(TAG, "simple_http_read_task end, RAM left: %ld", esp_get_free_heap_size());
     vTaskDelete(NULL);
 }
 

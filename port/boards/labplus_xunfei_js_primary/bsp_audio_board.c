@@ -233,7 +233,7 @@ esp_err_t bsp_codec_dev_open(uint32_t sample_rate, int channel_format, int bits_
 
         err = esp_codec_dev_open(codec_dev, &fs);
         esp_codec_dev_set_in_gain(codec_dev, RECORD_VOLUME);  
-        esp_codec_dev_set_out_vol(codec_dev, PLAYER_VOLUME);   
+        // esp_codec_dev_set_out_vol(codec_dev, PLAYER_VOLUME);   
     }
     return err;
 }

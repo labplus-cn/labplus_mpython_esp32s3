@@ -119,7 +119,7 @@ static esp_err_t _http_event_handle(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_ON_HEADER:
             if (strcasecmp(evt->header_key, "Content-Type") == 0) {
-                ESP_LOGE(TAG, "%s = %s", evt->header_key, evt->header_value);
+                // ESP_LOGE(TAG, "%s = %s", evt->header_key, evt->header_value);
                 //配置解码类型;
                 http->stream_type = get_audio_type(evt->header_value);
             }
@@ -199,7 +199,7 @@ esp_err_t http_open(const char *uri)
         ESP_LOGE(TAG, "Error open connection, uri = NULL");
         return ESP_FAIL;
     }
-    ESP_LOGE(TAG, "URI=%s", uri);
+    // ESP_LOGE(TAG, "URI=%s", uri);
 
     http = calloc(1, sizeof(http_stream_t));
     if(!http){  return ESP_ERR_NO_MEM; }
@@ -255,7 +255,7 @@ esp_err_t http_open(const char *uri)
     }
 
     http->content_len = esp_http_client_fetch_headers(http->client);
-    ESP_LOGE(TAG, "content len: %ld", (long int)http->content_len);
+    // ESP_LOGE(TAG, "content len: %ld", (long int)http->content_len);
 
     return ESP_OK;
 }
