@@ -119,14 +119,15 @@ class SHT20(object):
 
         :return: 温度,单位摄氏度
         """
-        time.sleep_ms(10)
+        time.sleep_ms(1)
         try:
             self.i2c.writeto(0x40, b'\xf3')
-            time.sleep_ms(70)
+            time.sleep_ms(100)
             t = i2c.readfrom(0x40, 2)
-            return -46.86 + 175.72 * (t[0] * 256 + t[1]) / 65535
+            temperature = -46.86 + 175.72 * (t[0] * 256 + t[1]) / 65535
+            return max(-20, min(100, temperature))
         except Exception as e:
-            return -1
+            return None
 
     def humidity(self):
         """
@@ -134,14 +135,15 @@ class SHT20(object):
 
         :return: 湿度,单位%
         """
-        time.sleep_ms(10)
+        time.sleep_ms(1)
         try:
             self.i2c.writeto(0x40, b'\xf5')
-            time.sleep_ms(25)
+            time.sleep_ms(50)
             t = i2c.readfrom(0x40, 2)
-            return -6 + 125 * (t[0] * 256 + t[1]) / 65535
+            humidity = -6 + 125 * (t[0] * 256 + t[1]) / 65535
+            return max(0, min(100, humidity))
         except Exception as e:
-            return -1
+            return None
 
 
 class Color(object):
