@@ -1299,42 +1299,58 @@ class ASRPRO(object):
 '''
 DC01 PM2.5驱动
 '''
-class PM25_DC(object):
-    def __init__(self, tx=Pin.P1, rx=Pin.P0, uart_num=1):
-        self.K = 0.4 # (注:户读取到的灰尘传感器原始 PM2.5，需要参照 TSI仪器光度法标定一个K 值系数，一般建议 0.4)
-        self.uart = UART(uart_num, baudrate=9600, stop=1, tx=tx, rx=rx, timeout=30)
-        self._pm25 = -1
-        time.sleep_ms(100)
 
-    def read(self): #单位 微克/立方米
-        _pm25 = self._pm25 
-        data = bytes(0x00)
-        time_cnt = time.ticks_ms()
-        
-        while True:
-            time.sleep_ms(10)
-            if self.uart.any():
-                head = self.uart.read(1)   
-                if(head[0] == 0xA5):
-                    data = head
-                    res = self.uart.read(3)
-                    data = head + res 
-                else:
-                    # print('0000')
-                    pass
-                
-                if len(data)==4:
-                    DATAH = data[1]
-                    DATAL = data[2]
-                    sum = 0xA5 + DATAH + DATAL # 计算校验和
-                    sum = sum ^ 0x80 # ^异或，得到低7位数据
-                    if(sum == data[3]):
-                        _pm25 = self.K * ((DATAH << 7) | (DATAL & 0x7F))   # 校验成功，计算浓度值
-                        self._pm25 = _pm25
-                        break
-                    else:
-                        pass
-            elif time.ticks_ms() - time_cnt > 2000:
-                break
-        return _pm25
-    
+K = 0.4
+MAX_BUFFER = 256  # 最大缓冲区长度，防止异常堆积
+class PM25_DC(object):
+    def __init__(self, tx=Pin.P1, rx=Pin.P0, uart_num=1, debug=False):
+        self.uart = UART(uart_num, baudrate=9600, stop=1, tx=tx, rx=rx, timeout=30)
+        self.buffer = b""   # 缓冲区
+        self.debug = debug  # 调试模式开关
+        self.last_value = -1  # 上一次有效数据
+
+    def read(self):
+        # 读取所有串口数据
+        if self.uart.any():
+            data = self.uart.read()
+            if self.debug:
+                print("接收到:", [hex(x) for x in data])
+            self.buffer += data
+
+        # 缓冲区过大，截取尾部
+        if len(self.buffer) > MAX_BUFFER:
+            self.buffer = self.buffer[-MAX_BUFFER:]
+
+        # 解析数据包
+        while len(self.buffer) >= 4:
+            # 找包头 0xA5
+            if self.buffer[0] != 0xA5:
+                if self.debug:
+                    print("丢弃字节:", hex(self.buffer[0]))
+                self.buffer = self.buffer[1:]
+                continue
+
+            # 取出 4 字节
+            packet = self.buffer[:4]
+            self.buffer = self.buffer[4:]
+
+            DATAH = packet[1]
+            DATAL = packet[2]
+            checksum = (0xA5 + DATAH + DATAL) ^ 0x80
+
+            if checksum == packet[3]:
+                pm25 = K * ((DATAH << 7) | (DATAL & 0x7F))
+                self.last_value = pm25  # 保存最新有效值
+                if self.debug:
+                    print("校验成功:", [hex(x) for x in packet], "=>", pm25)
+                return pm25
+            else:
+                pm25 = K * ((DATAH << 7) | (DATAL & 0x7F))
+                self.last_value = pm25  # 保存最新有效值
+                if self.debug:
+                    print("校验失败:", [hex(x) for x in packet], "应得校验:", hex(checksum))
+                    print(pm25, "ug/m³")
+                return pm25
+
+        # 如果没有解析成功 → 返回上一次成功的数据
+        return self.last_value
