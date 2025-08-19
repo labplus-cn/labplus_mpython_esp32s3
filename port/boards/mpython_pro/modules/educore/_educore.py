@@ -322,7 +322,8 @@ class servo(Servo):
             return
         
         self.used_pins.append(pin)
-        self.servo = Servo(pin, min_us=750, max_us=2250, actuation_range=180)
+        # self.servo = Servo(pin, min_us=750, max_us=2250, actuation_range=180)
+        self.servo = Servo(pin, min_us=500, max_us=2500, actuation_range=180)
         self.servo_map[pin] = self.servo
     
     def angle(self, value):
