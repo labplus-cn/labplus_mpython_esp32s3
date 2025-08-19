@@ -263,7 +263,7 @@ class FaceLivingBodyDetct(object):
     def __init__(self, uart):
         self.uart = uart
         self.CommandList = AI['FACE_LANDMARK_LIVING_BODY']
-        self.mouth_blink_counter = [None,None]
+        self.mouth_blink_counter = [-1,-1]
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
         time.sleep(0.5)

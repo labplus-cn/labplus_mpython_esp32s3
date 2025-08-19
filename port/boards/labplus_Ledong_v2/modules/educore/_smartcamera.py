@@ -8,7 +8,7 @@ class EduSmartCamera:
         self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx ,rxbuf=256)
         self.mode = DEFAULT_MODE
         self.lock = False
-        time.sleep(0.2)
+        time.sleep(0.1)
         self.wait_for_ai_init()
         self.thread_listen()
 
@@ -113,10 +113,11 @@ class EduSmartCamera:
             self.model_init(1)
         elif(self.model_choose=='BLINK_OPEN_DETECT'):
             self.model_init(27)
+        time.sleep(1)
     
     def result(self):
-        d = {"id":None,"similarity":None,"status": 0}
         if(self.mode == FACE_RECOGNITION_MODE):
+            d = {"id":None,"similarity":None,"status": 0}
             self.fcr.recognize()
             d = {"id":None,"similarity":None,"status": 0}
             if(self.fcr.id!=None):
@@ -138,11 +139,9 @@ class EduSmartCamera:
             if(self.face_living_body.mouth_blink_counter[0]!=0):
                 d = {"blink_counter":self.face_living_body.mouth_blink_counter[0] ,"mouth_counter":self.face_living_body.mouth_blink_counter[1],"status": 1}
             return d
-        else:
-            return d
 
     def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.01)
+        self._task = TASK(func=self.uart_thread,sec=0.002)
         self._task.start()
 
     def uart_thread(self):           

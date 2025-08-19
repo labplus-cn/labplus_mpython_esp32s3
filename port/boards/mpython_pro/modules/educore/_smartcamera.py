@@ -113,6 +113,7 @@ class EduSmartCamera:
             self.model_init(1)
         elif(self.model_choose=='BLINK_OPEN_DETECT'):
             self.model_init(27)
+        time.sleep(1)
     
     def result(self):
         d = {"id":None,"similarity":None,"status": 0}

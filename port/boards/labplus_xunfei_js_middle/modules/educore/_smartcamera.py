@@ -113,6 +113,7 @@ class EduSmartCamera:
             self.model_init(1)
         elif(self.model_choose=='BLINK_OPEN_DETECT'):
             self.model_init(27)
+        time.sleep(1)
     
     def result(self):
         d = {"id":None,"similarity":None,"status": 0}
@@ -142,7 +143,7 @@ class EduSmartCamera:
             return d
 
     def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.01)
+        self._task = TASK(func=self.uart_thread,sec=0.002)
         self._task.start()
 
     def uart_thread(self):           
