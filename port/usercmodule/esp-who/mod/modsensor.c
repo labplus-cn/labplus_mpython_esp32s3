@@ -1,6 +1,7 @@
 #include "py/runtime.h"
 #include "who_camera.h"
 #include "esp_camera.h"
+#include "img_converters.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "who_lcd.h"
@@ -43,6 +44,28 @@ static mp_obj_t snapshot(void)
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sensor_snapshot_obj, snapshot);
 
+// static mp_obj_t save_jpg(void)
+// {
+//     uint8_t *jpg_buf = NULL;
+//     size_t jpg_buf_len = 0;
+//     if(!frame2jpg(frame, 80, &jpg_buf, &jpg_buf_len)){
+//         return mp_const_none;
+//     }
+//     return mp_obj_new_bytes(jpg_buf, jpg_buf_len);
+// }
+// static MP_DEFINE_CONST_FUN_OBJ_0(sensor_save_jpg_obj, save_jpg);
+
+static mp_obj_t get_jpg(void)
+{
+    uint8_t *jpg_buf = NULL;
+    size_t jpg_buf_len = 0;
+    if(!frame2jpg(frame, 80, &jpg_buf, &jpg_buf_len)){
+        return mp_const_none;
+    }
+    return mp_obj_new_bytes(jpg_buf, jpg_buf_len);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_jpg_obj, get_jpg);
+
 static mp_obj_t free_fb(void)
 {
     esp_camera_fb_return(frame);
@@ -78,6 +101,8 @@ static const mp_rom_map_elem_t sensor_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&sensor_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&sensor_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&sensor_snapshot_obj) },
+    // { MP_ROM_QSTR(MP_QSTR_save_jpg), MP_ROM_PTR(&sensor_save_jpg_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_jpg), MP_ROM_PTR(&sensor_get_jpg_obj) },
     { MP_ROM_QSTR(MP_QSTR_free_fb), MP_ROM_PTR(&sensor_free_fb_obj) },
 };
 static MP_DEFINE_CONST_DICT(sensor_module_globals, sensor_module_globals_table);
