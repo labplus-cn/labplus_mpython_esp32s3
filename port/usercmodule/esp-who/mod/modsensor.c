@@ -69,36 +69,37 @@ static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_jpg_obj, get_jpg);
 static mp_obj_t free_fb(void)
 {
     esp_camera_fb_return(frame);
+    frame = NULL;
 
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sensor_free_fb_obj, free_fb);
 
-mp_obj_t sensor_init(void)
-{
-    if(!frame){
-        frame = calloc(1, sizeof(camera_fb_t));
-    }
-    return mp_obj_new_int_from_uint(0);
-}
-static MP_DEFINE_CONST_FUN_OBJ_0(sensor_init_obj, sensor_init);
+// mp_obj_t sensor_init(void)
+// {
+//     if(!frame){
+//         frame = calloc(1, sizeof(camera_fb_t));
+//     }
+//     return mp_obj_new_int_from_uint(0);
+// }
+// static MP_DEFINE_CONST_FUN_OBJ_0(sensor_init_obj, sensor_init);
 
-mp_obj_t sensor_deinit(void)
-{
-    if(frame){
-        free(frame);
-    }
-    return mp_obj_new_int_from_uint(0);
-}
-static MP_DEFINE_CONST_FUN_OBJ_0(sensor_deinit_obj, sensor_deinit);
+// mp_obj_t sensor_deinit(void)
+// {
+//     if(frame){
+//         free(frame);
+//     }
+//     return mp_obj_new_int_from_uint(0);
+// }
+// static MP_DEFINE_CONST_FUN_OBJ_0(sensor_deinit_obj, sensor_deinit);
 
 static const mp_rom_map_elem_t sensor_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sensor) },
-    { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&sensor_init_obj) },
-    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&sensor_deinit_obj) },
+    // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&sensor_init_obj) },
+    // { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&sensor_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_frame_width), MP_ROM_PTR(&get_frame_width_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_frame_height), MP_ROM_PTR(&get_frame_height_obj) },
-    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&sensor_deinit_obj) },
+    // { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&sensor_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&sensor_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&sensor_snapshot_obj) },
     // { MP_ROM_QSTR(MP_QSTR_save_jpg), MP_ROM_PTR(&sensor_save_jpg_obj) },

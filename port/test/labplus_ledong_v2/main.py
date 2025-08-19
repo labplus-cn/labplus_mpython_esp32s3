@@ -231,3 +231,18 @@ music.play(music.DADADADUM, pin=Pin.P12, wait=False, loop=True)
 #     print("克:", sensor_values[1])
 #     print('-'*10)
 #     time.sleep(1)
+
+# 摄像头数据抓取
+# 摄像头模块增加get_jpg() api用于抓取摄像头图像，返回jpg格式数据，
+# 数据可保存到文件系统或上传到网络。
+from mpython import i2c
+import sensor
+
+# 抓取摄像头数据保存为jpg文件
+sensor.reset()
+sensor.snapshot()
+f = open('1.jpg', 'wb')
+f.write(sensor.get_jpg())
+f.close()
+sensor.free_fb() # 此行代码不能省，要释放缓存
+
