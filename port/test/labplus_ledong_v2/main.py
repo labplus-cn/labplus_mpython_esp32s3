@@ -235,14 +235,26 @@ music.play(music.DADADADUM, pin=Pin.P12, wait=False, loop=True)
 # 摄像头数据抓取
 # 摄像头模块增加get_jpg() api用于抓取摄像头图像，返回jpg格式数据，
 # 数据可保存到文件系统或上传到网络。
-from mpython import i2c
+from mpython import *
 import sensor
+
+need_save = False
+
+def on_button_a_pressed(_):
+    global need_save
+    need_save = True
+
+button_a.event_pressed = on_button_a_pressed
 
 # 抓取摄像头数据保存为jpg文件
 sensor.reset()
-sensor.snapshot()
-f = open('1.jpg', 'wb')
-f.write(sensor.get_jpg())
-f.close()
-sensor.free_fb() # 此行代码不能省，要释放缓存
 
+while True:
+    sensor.snapshot()
+    if need_save:
+        f = open('1.jpg', 'wb')
+        f.write(sensor.get_jpg())
+        f.close()
+        need_save = False
+    sensor.free_fb() # 此行代码不能省，要释放缓存
+    time.sleep_ms(40)
