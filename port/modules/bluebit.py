@@ -112,6 +112,9 @@ class SHT20(object):
 
     def __init__(self, i2c=i2c):
         self.i2c = i2c
+        addr = self.i2c.scan()
+        if 64 not in addr:
+            raise OSError("Can not find SHT20 module.")
 
     def temperature(self):
         """
@@ -1012,6 +1015,29 @@ class IRObstacle():
 
     def set_threshold(self, threshold):
         '''设置红外探测传感器阈值，模拟值'''
+        self.threshold = threshold
+
+
+class WaterLevelSensor():
+    '''乐动模块 水位传感器'''
+    def __init__(self, pin):
+        self.pin = MPythonPin(pin, PinMode.ANALOG)
+        self.threshold = 1500 
+
+    def detect(self):
+        '''是否探测到，布尔类型True/False'''
+        tmp = self.pin.read_analog()
+        if(tmp>=self.threshold):
+            return True
+        else:
+            return False
+
+    def get_raw_val(self):
+        '''获取水位传感器裸数据，模拟值'''
+        return self.pin.read_analog()
+
+    def set_threshold(self, threshold):
+        '''设置水位传感器阈值，模拟值'''
         self.threshold = threshold
 
 class SoilHumiditySensor():
