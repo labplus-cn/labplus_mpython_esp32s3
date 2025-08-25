@@ -42,3 +42,22 @@ class MQTTClient(simple.MQTTClient):
             except OSError as e:
                 self.log(False, e)
             self.reconnect()
+
+
+import ubinascii
+
+def get_urlSafe(text, type):
+    if type:
+        utf8_bytes = text.encode('utf-8')
+        base64_bytes = ubinascii.b2a_base64(utf8_bytes)
+        base64_str = base64_bytes.decode().strip()
+        url_safe_str = base64_str.replace('+', '-').replace('/', '_').rstrip('=')
+        return url_safe_str
+    else:
+        url_safe_str = text.decode('utf-8', 'ignore')
+        base64_str = url_safe_str.replace('-', '+').replace('_', '/')
+        padding_needed = 4 - (len(base64_str) % 4)
+        if padding_needed != 4:
+            base64_str += '=' * padding_needed
+        utf8_bytes = ubinascii.a2b_base64(base64_str.encode())
+        return utf8_bytes

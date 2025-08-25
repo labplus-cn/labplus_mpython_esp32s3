@@ -1,51 +1,117 @@
 from machine import Pin, UART
-from lib.k230_ai import *
+from .k230_ai import *
 import time
 import gc
 
+DEBUG = False  # 增加全局debug控制变量
+MAX_BUF_SIZE = 1024  # 缓冲区最大字节数
+
 class EduSmartCamera:
-    def __init__(self, rx=Pin.P0, tx=Pin.P1):
-        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx ,rxbuf=256)
+    def __init__(self,tx=Pin.P1,rx=Pin.P0):
+        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx)
         self.mode = DEFAULT_MODE
         self.lock = False
-        time.sleep(0.2)
+        time.sleep(0.1)
         self.wait_for_ai_init()
         self.thread_listen()
 
     def wait_for_ai_init(self): 
         self.lock = True
-        num = 0        
+        num = 0
+        rx_buffer = bytearray()  # 接收缓冲区
+        
         while True:
             gc.collect()
-            time.sleep_ms(50)
-            num +=1
-            CMD_TEMP = []
-            if(num>5000):
+            num += 1
+            
+            if num > 500:
                 print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
                 print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
                 break
-            AI_Uart_CMD(self.uart,0x01,0xFF) # 发送k230
-            if(self.uart.any()):
-                head = self.uart.read(2)
-                if(head and head[0] == 0xBB and head[1] == 0xAA):
-                    CMD_TEMP.extend([0xBB,0xAA])
-                    cmd_type = self.uart.read(1)
-                    CMD_TEMP.append(cmd_type[0])
-                    if(CMD_TEMP[2]==0x01):
-                        res = self.uart.read(9)
-                        if(res[0]==0x01 and res[1]==0xFF):
+                
+            # 发送初始化命令
+            AI_Uart_CMD(self.uart, 0x01, 0xFF)
+            time.sleep_ms(100)
+            
+            # 读取可用数据到缓冲区
+            if self.uart.any():
+                new_data = self.uart.read()
+                if new_data:
+                    rx_buffer.extend(new_data)
+            
+            # 处理缓冲区中的数据包
+            while len(rx_buffer) >= 2:
+                # 查找包头 0xBB 0xAA
+                packet_start = -1
+                for i in range(len(rx_buffer) - 1):
+                    if rx_buffer[i] == 0xBB and rx_buffer[i + 1] == 0xAA:
+                        packet_start = i
+                        break
+                
+                if packet_start == -1:
+                    # 没有找到包头，清除无效数据
+                    rx_buffer = bytearray()
+                    break
+                
+                # 移除包头前的无效数据
+                if packet_start > 0:
+                    rx_buffer = rx_buffer[packet_start:]
+                
+                # 检查是否有足够的数据来解析命令类型
+                if len(rx_buffer) < 3:
+                    break
+                
+                cmd_type = rx_buffer[2]
+                
+                # 处理 0x01 类型命令（固定长度包）
+                if cmd_type == 0x01:
+                    # 0x01 包总长度：2(包头) + 1(命令类型) + 9(数据) = 12字节
+                    if len(rx_buffer) < 12:
+                        break
+                    
+                    # 提取完整的数据包
+                    packet = rx_buffer[:12]
+                    
+                    # 验证校验和
+                    checksum = 0
+                    for i in range(11):  # 前11字节的校验和
+                        checksum += packet[i]
+                    checksum &= 0xFF
+                    
+                    if checksum == packet[11]:  # 校验成功
+                        # 检查是否是期望的初始化响应
+                        if packet[3] == 0x01 and packet[4] == 0xFF:
                             print("AI摄像头4.0初始化完成")
                             print("AI camera 4.0 init end")
-                            time.sleep(0.3)
-                            _cmd = self.uart.read()
-                            del _cmd
+                            time.sleep(0.1)
+                            # 清空缓冲区中的剩余数据
+                       
+                            rx_buffer = self.uart.read()
+                            del rx_buffer
                             gc.collect()
                             self.lock = False
-                            break
+                            return
+                        else:
+                            # 不是期望的响应，移除这个包继续处理
+                            rx_buffer = rx_buffer[12:]
+                    else:
+                        # 校验失败，移除第一个字节继续查找
+                        rx_buffer = rx_buffer[1:]
+                
+                # 不处理 0x02 类型命令，直接跳过
+                elif cmd_type == 0x02:
+                    # 跳过 0x02 包，移除第一个字节继续查找
+                    rx_buffer = rx_buffer[1:]
+                
                 else:
-                    _cmd = self.uart.read()
-                    del _cmd
-                    gc.collect()
+                    # 未知命令类型，移除第一个字节继续查找
+                    rx_buffer = rx_buffer[1:]
+            
+            # 防止缓冲区过大
+            if len(rx_buffer) > MAX_BUF_SIZE:
+                print("警告: 接收缓冲区过大，清空缓冲区")
+                rx_buffer = bytearray()
+                gc.collect()
     
     def model_init(self,cur_state):
         if(self.mode == cur_state):
@@ -143,7 +209,7 @@ class EduSmartCamera:
             return d
 
     def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.002)
+        self._task = TASK(func=self.uart_thread,sec=0.005)
         self._task.start()
 
     def uart_thread(self):           

@@ -101,109 +101,93 @@ def CheckCode(tmp):
         sum += tmp[i]
     return sum & 0xff
 
+
+DEBUG = False  # 增加全局debug控制变量
+MAX_BUF_SIZE = 1024  # 缓冲区最大字节数
+
 def uart_handle(uart):
-    CMD = []
-    HEAD = []
-    # while True:
-    if(uart.any()):
-        head = uart.read(3)
-    
-        if b"\xbb" in head:
-            for i in range(len(head)):
-                HEAD.append(head[i])
+    rx_buf = bytearray()
+
+    # 读取 UART 数据
+    if uart.any():
+        data = uart.read()
+        if data:
+            if DEBUG:
+                print(f"[UART RX] {data.hex(' ').upper()}")
+            rx_buf.extend(data)
+
+            # 缓冲区保护
+            if len(rx_buf) > MAX_BUF_SIZE:
+                if DEBUG:
+                    print(f"[UART] 缓冲区超限({len(rx_buf)} > {MAX_BUF_SIZE})，清空")
+                rx_buf = bytearray()
+
+    while True:
+        # 至少要有包头(2字节) + 命令类型(1字节)
+        if len(rx_buf) < 3:
+            break
+
+        # 检查包头
+        if not (rx_buf[0] == 0xBB and rx_buf[1] == 0xAA):
+            if DEBUG:
+                print(f"[UART] 丢弃无效字节: 0x{rx_buf[0]:02X}")
+            rx_buf = rx_buf[1:]
+            continue
+
+        cmd_type = rx_buf[2]
+
+        # 命令 0x01: 固定长度 2(包头) + 1(命令) + 2 +6(数据) + 1(校验) = 12字节
+        if cmd_type == 0x01:
+            total_len = 12
+            if len(rx_buf) < total_len:
+                if DEBUG:
+                    print("[UART] 等待 0x01 包数据到齐")
+                break
+            pkt = rx_buf[:total_len]
+            checksum = CheckCode(pkt[:11])  # 校验包头+命令+数据(共11字节)
+            if DEBUG:
+                print(f"[UART] 解析到 0x01 包: {pkt.hex(' ').upper()}")
+            if checksum == pkt[11]:
+                if DEBUG:
+                    print("[UART] 校验成功")
+                return pkt  # 返回完整包
+            else:
+                if DEBUG:
+                    print(f"[UART] 校验失败 (计算={checksum:02X}, 接收={pkt[11]:02X})")
+            rx_buf = rx_buf[total_len:]
+
+        # 命令 0x02:  2(包头) + 3(命令) + 15(固定头) +1(字符长度) + N(字符串) + 1(校验)
+        elif cmd_type == 0x02:
+            if len(rx_buf) < 21:  # 至少要有包头+命令+固定头
+                if DEBUG:
+                    print("[UART] 等待 0x02 头部数据到齐")
+                break
+            str_len = rx_buf[20]  # 第21字节，索引20
+            total_len = 21 + str_len + 1
+            if len(rx_buf) < total_len:
+                if DEBUG:
+                    print(f"[UART] 等待 0x02 字符串数据到齐 (len={str_len})")
+                break
+            pkt = rx_buf[:total_len]
+            if pkt[-1] != 0xAB:
+                if DEBUG:
+                    print(f"[UART] 0x02 包尾校验失败 (期望=AB, 接收={pkt[-1]:02X})，丢弃第一个字节")
+                rx_buf = rx_buf[1:]
+                continue
+            if DEBUG:
+                print(f"[UART] 解析到 0x02 包")
+                print(pkt)
+            rx_buf = rx_buf[total_len:]
         
-            if(HEAD[0] == 0xBB):
-                CMD.extend([HEAD[0],HEAD[1],HEAD[2]])
-                if(CMD[2]==0x01):
-                    res = uart.read(9)
-                    
-                    for i in range(9):
-                        CMD.append(res[i])                  
-                    checksum = CheckCode(CMD[:11])
-                    if(res and checksum == CMD[11]):
-                        _cmd = uart.read(12*5)
-                        del _cmd
-                        return CMD
-                elif(CMD[2]==0x02):
-                    res = uart.read(18)
-                    
-                    str_len = res[17]
-                    time.sleep_ms(1)
-                    str_temp = uart.read(str_len)
-                    checksum  = uart.read(1)
-                    for i in range(18):
-                        CMD.append(res[i])
-        
-                    CMD.append(str_temp)
-                    CMD.append(checksum[0])
-                
-                    return CMD
-            elif(HEAD[1] == 0xBB):
-                CMD.extend([HEAD[1],HEAD[2]])
-                CMD.append(uart.read(1))
-                if(CMD[2]==0x01):
-                    res = uart.read(9)
-                    
-                    for i in range(9):
-                        CMD.append(res[i])                  
-                    checksum = CheckCode(CMD[:11])
-                    if(res and checksum == CMD[11]):
-                        _cmd = uart.read(12*5)
-                        del _cmd
-                        return CMD
+            return pkt  # 返回完整包
 
-                elif(CMD[2]==0x02):
-                    res = uart.read(18)
-                    str_len = res[17]
-                    time.sleep_ms(1)
-                    str_temp = uart.read(str_len)
-                    checksum  = uart.read(1)
-
-                    for i in range(18):
-                        CMD.append(res[i])
-                
-                    CMD.append(str_temp)
-                    CMD.append(checksum[0])
-
-                    return CMD
-            elif(HEAD[2] == 0xBB):
-                CMD.append(HEAD[2])
-                tmp = uart.read(2)
-                for i in range(2):
-                    CMD.append(tmp[i]) 
-                if(CMD[2]==0x01):
-                    res = uart.read(9)
-                    
-                    for i in range(9):
-                        CMD.append(res[i])                  
-                    checksum = CheckCode(CMD[:11])
-                    if(res and checksum == CMD[11]):
-                        _cmd = uart.read(12*5)
-                        del _cmd
-                        return CMD
-                
-                elif(CMD[2]==0x02):
-                    res = uart.read(18)
-                    str_len = res[17]
-                    time.sleep_ms(1)
-                    str_temp = uart.read(str_len)
-                    checksum  = uart.read(1)
-
-                    for i in range(18):
-                        CMD.append(res[i])
-                    
-                    CMD.append(str_temp)
-                    CMD.append(checksum[0])
-            
-                    return CMD
         else:
-            # _cmd = uart.read(12*3)
-            # del _cmd
-            # print('&===111===&')
-            return []
-    else:
-        # print('&===222===&')
-        return []
+            if DEBUG:
+                print(f"[UART] 未知命令 0x{cmd_type:02X}，丢弃第一个字节")
+            rx_buf = rx_buf[1:]
+
+            return None  # 无有效包返回
+        
 
 def AI_Uart_CMD(uart, cmd=0, cmd_type=0, cmd_data=[0, 0, 0, 0, 0, 0, 0, 0]):
     gc.collect()
