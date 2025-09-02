@@ -183,6 +183,7 @@ esp_err_t bsp_codec_dev_create(void)
         .dev_type = ESP_CODEC_DEV_TYPE_IN_OUT,
     };
     codec_dev = esp_codec_dev_new(&dev_cfg);
+    esp_codec_dev_set_out_vol(codec_dev, PLAYER_VOLUME); 
 
     return ret_val;
 }
