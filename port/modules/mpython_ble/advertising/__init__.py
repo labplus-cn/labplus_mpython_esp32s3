@@ -85,46 +85,18 @@ def advertising_payload(limited_disc=False, br_edr=False, name=None, services=No
 
 
 def decode_field(payload, adv_type):
-    # i = 0
-    # result = []
-    # while i + 1 < len(payload):
-    #     if payload[i + 1] == adv_type:
-    #         result.append(payload[i + 2:i + payload[i] + 1])
-    #     i += 1 + payload[i]
-    # return result
-    """
-    在广播数据中查找特定类型的广播数据
-    Args:
-        adv_type: 广播数据类型
-        data: 广播数据
-    Returns:
-        找到的广播数据或None
-    """
     i = 0
+    result = []
     while i + 1 < len(payload):
-        ad_structure_len = payload[i]
-        ad_structure_type = payload[i + 1]
-        ad_structure_payload = payload[i + 2: i + ad_structure_len + 1]
-        if ad_structure_type == adv_type:
-            return ad_structure_payload
-        i += ad_structure_len + 1
-    return None
+        if payload[i + 1] == adv_type:
+            result.append(payload[i + 2:i + payload[i] + 1])
+        i += 1 + payload[i]
+    return result
 
 
 def decode_name(payload):
-    """
-    在广播数据中查找设备名称
-    Args:
-        data: 广播数据
-    Returns:
-        设备名称或None
-    """
-    n = decode_field(payload, ADType.AD_TYPE_COMPLETE_LOCAL_NAME)  # 9 表示设备名称类型
-    if n:
-        return str(n, 'UTF-8') 
-    return None
-    # n = decode_field(payload, ADType.AD_TYPE_COMPLETE_LOCAL_NAME)
-    # return n[0] if n else None
+    n = decode_field(payload, ADType.AD_TYPE_COMPLETE_LOCAL_NAME)
+    return n[0] if n else None
 
 
 def decode_services(payload):
@@ -136,13 +108,13 @@ def decode_services(payload):
     return services
 
 
-# def demo():
-#     payload = advertising_payload(name='micropython', services=[bluetooth.UUID(
-#         0x181A), bluetooth.UUID('6E400001-B5A3-F393-E0A9-E50E24DCCA9E')])
-#     print(payload)
-#     print(decode_name(payload))
-#     print(decode_services(payload))
+def demo():
+    payload = advertising_payload(name='micropython', services=[bluetooth.UUID(
+        0x181A), bluetooth.UUID('6E400001-B5A3-F393-E0A9-E50E24DCCA9E')])
+    print(payload)
+    print(decode_name(payload))
+    print(decode_services(payload))
 
 
-# if __name__ == '__main__':
-#     demo()
+if __name__ == '__main__':
+    demo()

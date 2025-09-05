@@ -63,25 +63,20 @@ class Centeral(object):
             print("Event: {}, Data: {}".format(event, data))
         if event == IRQ.IRQ_SCAN_RESULT:
             addr_type, addr, adv_type, rssi, adv_data = data
-            # print(data)
-            print(self._name_param)
-            print(type(self._name_param))
             if self._conn_info is None:
-                name = decode_name(adv_data)
-                if name == self._name_param or addr == self._addr_param:
-                    if adv_type in (AdvType.ADV_IND, AdvType.ADV_DIRECT_IND,):
-                        # Note: The addr buffer is owned by modbluetooth, need to copy it.
-                        self._conn_info = (addr_type, addr, name, adv_type, rssi)
-                        print(self._conn_info)
-                        self.ble.gap_scan(None)
-                        print(' === IRQ_SCAN_RESULT ===')
-                    else:
-                        raise BLEError("{} BLE Device is unconnectable!" .format(name))
+                n = decode_name(adv_data)
+                if n:
+                    name = bytes(n)
+                    if name == self._name_param or addr == self._addr_param:
+                        if adv_type in (AdvType.ADV_IND, AdvType.ADV_DIRECT_IND,):
+                            # Note: The addr buffer is owned by modbluetooth, need to copy it.
+                            self._conn_info = (addr_type, bytes(addr), name, adv_type, rssi)
+                            self.ble.gap_scan(None)
+                        else:
+                            raise BLEError("{} BLE Device is unconnectable!" .format(name))
 
         elif event == IRQ.IRQ_SCAN_DONE:
             # find device
-            print(self._conn_info)
-            print(' IRQ_SCAN_DONE ===')
             if self._conn_info is not None:
                 self.ble.gap_connect(self._conn_info[0], self._conn_info[1])
             else:
@@ -117,7 +112,6 @@ class Centeral(object):
             # Note: Status will be zero on success, implementation-specific value otherwise.
             conn_handle, status = data
             if conn_handle == self.connected_handle:
-                print(data)
                 if status == 0:
                     self._conn_status = 0x02
                 else:
