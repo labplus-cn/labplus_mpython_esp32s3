@@ -54,10 +54,10 @@ static mp_obj_t lv_displayer_init(void)
     
         lv_displayer->lv_display = lv_display_create(BOARD_LCD_H_RES, BOARD_LCD_V_RES);
     
-        lv_displayer->buf_size = BOARD_LCD_H_RES * 20;
-        lv_displayer->buf1 = heap_caps_malloc(lv_displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
+        lv_displayer->buf_size = BOARD_LCD_H_RES * 14;
+        lv_displayer->buf1 = heap_caps_malloc(lv_displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
         assert(lv_displayer->buf1);
-        lv_displayer->buf2 = heap_caps_malloc(lv_displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
+        lv_displayer->buf2 = heap_caps_malloc(lv_displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
         assert(lv_displayer->buf2);
     
         lv_display_set_buffers(lv_displayer->lv_display, lv_displayer->buf1, lv_displayer->buf2, lv_displayer->buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
