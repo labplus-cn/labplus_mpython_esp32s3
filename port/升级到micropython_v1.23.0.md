@@ -2,7 +2,7 @@
 
 micropython v1.23.0
 
-esp-idf v5.0.4
+esp-idf v5.2.5
 
 # esp32项目
 
@@ -44,13 +44,13 @@ esp32项目管理：
    MP_REGISTER_ROOT_POINTER(struct _esp_espnow_obj_t *espnow_singleton);
    ```
 
-2、espnow_make_new()中获取指针
+2. espnow_make_new()中获取指针
 
 ```
 此函数中，esp_espnow_obj_t *self = MP_STATE_PORT(espnow_singleton)获取指针，如果为空，说明对应内存被释放，需新建。
 ```
 
-3、模块使用此变量
+3. 模块使用此变量
 
 ```
 get_singleton()可获取注岫在gc内存管理结构中的本变量指针，然后模块就可以使用它了。get_singleton()内部也是调用MP_STATE_PORT(espnow_singleton)
@@ -166,82 +166,9 @@ _boot.py
 TAG
 板名
 
-# 项目编译
+# 添加一个新板
 
-linux系统按乐鑫要求安装一些库，安装gcc cmake
-
-1. 进入esp-idf，执行./install.sh，安装esp-idf的编译环境。
-2. 执行.
-
-   ```bash
-   cd port
-   ./esp-idf/export.sh # 导出相关环境变量。
-   ```
-3. micropython预编译
-
-   ```bash
-   cd micropython
-   make -C mpy-cross
-   ```
-4. 固件编译
-
-   ```bash
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake merge_bin 
-
-   idf.py -D MICROPY_BOARD=labplus_classroom_kit_nanjing build
-   idf.py -D MICROPY_BOARD=labplus_Ledong_pro build
-   idf.py -D MICROPY_BOARD=mpython build
-   idf.py -D MICROPY_BOARD=labplus_for_xuejing build
-   idf.py -D MICROPY_BOARD=mpython_pro build
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build
-
-   idf.py -D MICROPY_BOARD=mpython_pro -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake build
-
-
-
-
-   合并固件
-   ```
-
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 merge_bin
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build merge_bin
-   idf.py -D MICROPY_BOARD=labplus_for_xuejing build merge_bin
-   idf.py -D MICROPY_BOARD=mpython_pro merge_bin
-   idf.py -D MICROPY_BOARD=mpython_pro build merge_bin
-   idf.py -D MICROPY_BOARD=mpython_pro -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake build merge_bin
-
-idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake merge_bin
-
-```
-5. 固件烧录
-
-```bash
-idf.py -p /dev/ttyACM0 -b 4000000 flash monitor
-idf.py -p /dev/ttyACM0 -b 4000000 monitor
-```
-
-esptool命令：
-
-```bash
-esptool.py \
-        --port $port --baud $baud --before default_reset --after hard_reset write_flash \
-        --flash_mode dio --flash_freq 40m --flash_size detect 0x410000 "$file"
-```
-
-要在wsl下使用USB设备，参阅：[https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb，安装USBIPD-WIN。](https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb%EF%BC%8C%E5%AE%89%E8%A3%85USBIPD-WIN%E3%80%82)
-使用以下指令，实现USB设备共享到wsl。
-
-···bash
-usbipd list # 列出usb设备ID，powershell中执行命令
-usbipd bind --busid <busid> # bind ID，eg:4-4
-usbipd attach --wsl --busid <busid> # 附加USB设备到wsl
-lsusb # wsl下，查看USB设备是否附加。
-usbipd detach --busid <busid> # 解除附加USB设备到wsl
-6. python库调试
-
-vscode安装插件pymakr
-
-# 添加乐动掌控
+添加乐动掌控
 
 按以上步聚创建完mpython项目。
 
@@ -302,3 +229,85 @@ vscode安装插件pymakr
    13. tag
        图片转数组工具：[https://notisrac.github.io/FileToCArray](https://notisrac.github.io/FileToCArray)
        ![alt text](image.png)
+
+
+# 项目编译
+
+linux系统按乐鑫要求安装一些库，安装gcc cmake
+
+1. 进入esp-idf，执行./install.sh，安装esp-idf的编译环境。
+2. 执行.
+
+   ```bash
+   cd port
+   ./esp-idf/export.sh # 导出相关环境变量。
+   ```
+3. micropython预编译
+
+   ```bash
+   cd micropython
+   make -C mpy-cross
+   ```
+4. 固件编译
+
+   ```bash
+   idf.py -D MICROPY_BOARD=mpython_pro build
+   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build
+
+   idf.py -D MICROPY_BOARD=mpython_pro -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake build
+   ```   
+
+   合并固件
+   ```
+
+   idf.py -D MICROPY_BOARD=mpython_pro merge_bin
+   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 merge_bin
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary merge_bin
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle merge_bin
+
+   idf.py -D MICROPY_BOARD=mpython_pro build merge_bin
+   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build merge_bin
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build merge_bin
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build merge_bin
+   ```
+# 固件烧录
+
+## wls下linux使用usb转串口
+
+   要在wsl下使用USB设备，参阅：[https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb，安装USBIPD-WIN。](https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb%EF%BC%8C%E5%AE%89%E8%A3%85USBIPD-WIN%E3%80%82)
+   使用以下指令，实现USB设备共享到wsl。
+
+   ···bash
+   usbipd list # 列出usb设备ID，powershell中执行命令
+   usbipd bind --busid <busid> # bind ID，eg:4-4
+   usbipd attach --wsl --busid <busid> # 附加USB设备到wsl
+   lsusb # wsl下，查看USB设备是否附加。
+   usbipd detach --busid <busid> # 解除附加USB设备到wsl
+
+   1. idf.py烧录
+    
+   idf.py命令只会烧录app分区，不会烧其它分区
+   ```bash
+   idf.py -p /dev/ttyACM0 -b 4000000 flash monitor
+   idf.py -p /dev/ttyACM0 -b 4000000 monitor
+   ```
+
+   2. esptool命令：
+   ```bash
+   esptool.py \
+         --port $port --baud $baud --before default_reset --after hard_reset write_flash \
+         --flash_mode dio --flash_freq 40m --flash_size detect 0x0 "$file"
+   ```
+
+   ```bash
+   esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 4000000 --before default_reset --after hard_reset write_flash \
+          --flash_size detect 0x0 build/labplus_Ledong_v2-5fb5161-dirty-5fb5161_2025-09-19.bin
+   ```
+
+   3. windows使用flash_download_tool烧录
+
+# vscode安装插件pymakr
+
+可以使用pymakr调试，上传、下载用户代码。
