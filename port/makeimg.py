@@ -82,7 +82,12 @@ def load_partition_table(filename):
     with open(filename, "rb") as f:
         return gen_esp32part.PartitionTable.from_binary(f.read())
 
-
+def littlefs_bin_park(file_path, board_name, size):
+    os.system("mkdir -p file_system")
+    os.system(f"cp -r {file_path}/common/*  file_system/")
+    os.system(f"cp -rf {file_path}/{board_name}/*  file_system/")
+    os.system(f"./../mklittlefs -c file_system  -s {size} littlefs.bin")
+            
 # Extract command-line arguments.
 # arg_sdkconfig = sys.argv[1]
 # arg_bootloader_bin = sys.argv[2]
@@ -98,15 +103,18 @@ bin_name = "{}-{}-{}_{}.bin".format(arg_board_name, git_tag, git_hash, build_dat
 uf2_name = "{}-{}-{}_{}.uf2".format(arg_board_name, git_tag, git_hash, build_date)
 print(bin_name)
 
+littlefs_bin_park(f"../file_system", arg_board_name, 0x200000)
+
 arg_sdkconfig = "sdkconfig"
 arg_bootloader_bin = "bootloader/bootloader.bin"
 arg_partitions_bin = "partition_table/partition-table.bin"
 arg_application_bin = "micropython.bin"
+arg_vfs_bin = "littlefs.bin"
 arg_output_bin = bin_name
 arg_output_uf2= uf2_name
 arg_font_bin = "../Noto_Sans_CJK_SC_Light16.bin"
 arg_voice_data_bin = "../managed_components/espressif__esp-sr/esp-tts/esp_tts_chinese/esp_tts_voice_data_xiaoxin.dat"
-arg_sr_bin = "../build/srmodels/srmodels.bin"
+arg_sr_bin = "srmodels/srmodels.bin"
 
 # Load required sdkconfig values.
 idf_target = load_sdkconfig_str_value(arg_sdkconfig, "IDF_TARGET", "").upper()
@@ -125,22 +133,41 @@ max_size_partitions = 0
 offset_application = 0
 max_size_application = 0
 offset_font = 0
-
+max_size_font = 0
+offset_vfs = 0
+max_size_vfs = 0
 offset_voice_data = 0
 max_size_voice_data = 0
 offset_sr = 0
 max_size_sr = 0
 
+# partition table
+# Name,       Type, SubType,   Offset,    Size,      Flags
+# -------------------------------------------------------
+# bootloader, app,  boot,      0x0,       0x7000,
+# partitions, data, partition, 0x8000,    0
+# nvs,        data, nvs,       0x9000,    0x6000,
+# phy_init,   data, phy,       0xf000,    0x1000,
+# factory,    app,  factory,   0x10000,   0x6E0000,
+# vfs,        data, spiffs,    0x6F0000,  0x200000,
+# voice_data, data, fat,       0x8F0000,  0x3CD000,
+# sr_module,  data, spiffs,    0xCBD000,  0x31F000,
+# fr,         data,   ,        0xFDC000,  0x20000
+# user_nvs,   data, nvs,       0xFFC000,  0x4000,
+
 # Inspect the partition table to find offsets and maximum sizes.
 for part in partition_table:
     if part.name == "nvs":
-        max_size_partitions = part.offset - offset_partitions
-    elif part.name == "font":
-        offset_font = part.offset
-        max_size_font = part.size
+        max_size_partitions = part.offset - offset_partitions # partition table size
+    # elif part.name == "font":
+    #     offset_font = part.offset
+    #     max_size_font = part.size
     elif part.type == gen_esp32part.APP_TYPE and offset_application == 0:
         offset_application = part.offset
         max_size_application = part.size
+    elif part.name == "vfs":
+        offset_vfs = part.offset
+        max_size_vfs = part.size
     elif part.name == "voice_data":
         offset_voice_data = part.offset
         max_size_voice_data = part.size
@@ -153,6 +180,7 @@ files_in = [
     ("bootloader", offset_bootloader, max_size_bootloader, arg_bootloader_bin),
     ("partitions", offset_partitions, max_size_partitions, arg_partitions_bin),
     ("application", offset_application, max_size_application, arg_application_bin),
+    ("vfs", offset_vfs, max_size_vfs, arg_vfs_bin),
     ("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin),
     ("sr_module", offset_sr, max_size_sr, arg_sr_bin),
 ]
@@ -183,7 +211,7 @@ with open(file_out, "wb") as fout:
 
 # Generate .uf2 file if the SoC has native USB.
 if idf_target in ("ESP32S2", "ESP32S3"):
-    sys.path.append(os.path.join(os.path.dirname(__file__), "../../micropython/tools"))
+    sys.path.append(os.path.join(os.path.dirname(__file__), "../micropython/tools"))
     import uf2conv
 
     families = uf2conv.load_families()
