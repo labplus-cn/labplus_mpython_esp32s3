@@ -185,12 +185,13 @@ class PersonDetect(object):
     def __init__(self, uart):
         self.uart = uart
         self.flag = False
+        self.person_num = 0
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['PERSON_DETECTION'][0], cmd_type=AI['PERSON_DETECTION'][1])
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(50)
+        time.sleep_ms(20)
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=AI['PERSON_DETECTION'][0], cmd_type=AI['PERSON_DETECTION'][1])
 
@@ -201,7 +202,6 @@ class PersonKeypointDetct(object):
     def __init__(self, uart):
         self.uart = uart
         self.CommandList = AI['PERSON_KEYPOINT_DETECT']
-        self.fallen = None
         self.keypoints = []
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
