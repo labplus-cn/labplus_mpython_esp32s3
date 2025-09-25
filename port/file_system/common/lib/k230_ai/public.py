@@ -182,8 +182,8 @@ def uart_handle(uart):
            
             if pkt[-1] != 0xAB:
                 if DEBUG:
-                    # print(pkt)
-                    # print('pkt==========')
+                    print(pkt)
+                    print('pkt==========')
                     print("[UART] 0x02 包尾校验失败 (期望=AB, 接收={:02X})，丢弃第一个字节".format(pkt[-1]))
                 rx_buf = rx_buf[1:]
                 continue

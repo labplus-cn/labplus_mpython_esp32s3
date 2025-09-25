@@ -132,17 +132,17 @@ class HandDetect(object):
     """手掌检测"""
     def __init__(self, uart):
         self.uart = uart
+        self.hand_num = 0
         self.flag = False
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['HAND_DETECTION'][0], cmd_type=AI['HAND_DETECTION'][1])
         time.sleep(1)
 
     def recognize(self):
+        time.sleep_ms(30)
         if(not self.lock):
-            time.sleep_ms(50)
             AI_Uart_CMD(uart=self.uart, cmd=AI['HAND_DETECTION'][0], cmd_type=AI['HAND_DETECTION'][1])
-        else:
-            time.sleep_ms(20)
+
 
 class HandKeypointClass(object):
     """ 手势识别 """

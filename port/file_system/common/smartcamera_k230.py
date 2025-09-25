@@ -94,7 +94,6 @@ class SmartCameraK230:
                             print("AI camera 4.0 init end")
                             time.sleep(0.1)
                             # 清空缓冲区中的剩余数据
-                       
                             rx_buffer = self.uart.read()
                             del rx_buffer
                             gc.collect()
@@ -236,9 +235,11 @@ class SmartCameraK230:
                             if(CMD[5]==0xff):
                                 self.hand_detect.lock = True
                                 self.hand_detect.flag = False
+                                self.hand_detect.hand_num = 0
                             elif(CMD[5]==0xee):
                                 self.hand_detect.lock = True
                                 self.hand_detect.flag = True
+                                self.hand_detect.hand_num = CMD[6]
                 elif(self.mode==HAND_KEYPOINT_CLASS and self.hand_keypoint_class!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==HAND_KEYPOINT_CLASS and CMD[4]==0x01):
