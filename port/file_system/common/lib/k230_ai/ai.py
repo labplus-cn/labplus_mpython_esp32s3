@@ -1,6 +1,7 @@
 import time
 from k230_ai.public import *
 import gc
+import json
 
 class YOLO80(object):
     '''物体识别'''
@@ -371,7 +372,7 @@ class LABColorCount():
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
      
@@ -385,11 +386,28 @@ class LINEAR_REGRESSION():
         self.line = {"x1":None, "y1":None, "x2":None, "y2":None, "length":None, "magnitude":None, "theta":None, "rho":None}
         self.parameter = str(threshold)
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
-        time.sleep(1)
+        time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             # AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
+            AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
+
+
+class LINEAR_V3_REGRESSION():
+    """ 快速线性回归v3  T字路口 斑马线 识别"""
+    def __init__(self, uart, line_color="black", detect_intersections=True, detect_zebra=True):
+        self.lock = False
+        self.uart = uart
+        self.CommandList = AI['LINEAR_REGRESSION_V3_MODE']
+        self.data = {"cx": None, "cy": None, "angle": None, "is_int": False, "is_zebra": False}
+        self.parameter = json.dumps({"color": line_color,'int':detect_intersections, 'zebra':detect_zebra})
+        AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
+        time.sleep(0.5)
+
+    def recognize(self):
+        time.sleep_ms(10)
+        if(not self.lock):
             AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
      

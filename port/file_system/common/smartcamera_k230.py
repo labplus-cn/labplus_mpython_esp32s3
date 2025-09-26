@@ -188,6 +188,10 @@ class SmartCameraK230:
         self.linear_regression_fast = LINEAR_REGRESSION(self.uart,threshold=threshold)
         self.mode = LINEAR_REGRESSION_MODE 
     
+    def linear_regression_fast_v3_init(self, line_color="black", detect_intersections=True, detect_zebra=True):
+        self.linear_regression_fast_v3 = LINEAR_V3_REGRESSION(self.uart, line_color=line_color, detect_intersections=detect_intersections, detect_zebra=detect_zebra)
+        self.mode = LINEAR_REGRESSION_V3_MODE 
+    
     # def led(self,mode=0):
     #     AI_Uart_CMD(self.uart, 0x01, 0xFA, [0x04,int(mode)])
     #     time.sleep_ms(20)
@@ -278,8 +282,9 @@ class SmartCameraK230:
                                 self.person_keypoint_detect.keypoints = []
                         elif(CMD[2]==0x02 and CMD[3]==PERSON_KEYPOINT_DETECT and CMD[4]==0x01):
                             b = bytes(CMD[22:-1])  
-                            _str = str(b.decode('UTF-8','ignore'))
-                            data = eval(_str)
+                            # _str = str(b.decode('UTF-8','ignore'))
+                            # data = eval(_str)
+                            data = json.loads(b.decode('UTF-8','ignore'))
                             self.person_keypoint_detect.lock = True
                             self.person_keypoint_detect.keypoints = data.get('keypoints',[])
                 elif(self.mode==PERSON_KEYPOINT_DETECT_PLUS and self.person_keypoint_detect_plus!=None):
@@ -408,17 +413,27 @@ class SmartCameraK230:
                             self.bar_code.type = None
                             self.bar_code.info = None
                             self.bar_code.lock = True
-                elif(self.mode==LINEAR_REGRESSION_MODE):
+                elif(self.mode==LINEAR_REGRESSION_MODE and self.linear_regression_fast!=None):
                     if(len(CMD)>0):
                         if(CMD[2]==0x02 and CMD[3]==LINEAR_REGRESSION_MODE and CMD[4]==0x01):
                             b = bytes(CMD[22:-1])  
-                            _str = str(b.decode('UTF-8','ignore'))
-                            data = eval(_str)
+                            data = json.loads(b.decode('UTF-8','ignore'))
                             self.linear_regression_fast.line = data
                             self.linear_regression_fast.lock = True
                         elif(CMD[2]==0x01 and CMD[3]==LINEAR_REGRESSION_MODE and CMD[4]==0x01 and CMD[5]==0xff):
                             self.linear_regression_fast.line = {"x1":None, "y1":None, "x2":None, "y2":None, "length":None, "magnitude":None, "theta":None, "rho":None}
                             self.linear_regression_fast.lock = True
+                elif(self.mode==LINEAR_REGRESSION_V3_MODE and self.linear_regression_fast_v3!=None):
+                    if(len(CMD)>0):
+                        if(CMD[2]==0x02 and CMD[3]==LINEAR_REGRESSION_V3_MODE and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            # _str = str(b.decode('UTF-8','ignore'))
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.linear_regression_fast_v3.data = data
+                            self.linear_regression_fast_v3.lock = True
+                        elif(CMD[2]==0x01 and CMD[3]==LINEAR_REGRESSION_V3_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            self.linear_regression_fast_v3.data = {"cx": None, "cy": None, "angle": None, "is_int": False, "is_zebra": False}
+                            self.linear_regression_fast_v3.lock = True
                 elif(self.mode==CLASSIFY_MODEL_MODE and self.classify_model!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
