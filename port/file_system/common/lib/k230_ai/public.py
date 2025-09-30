@@ -183,8 +183,6 @@ def uart_handle(uart):
            
             if pkt[-1] != 0xAB:
                 if DEBUG:
-                    print(pkt)
-                    print('pkt==========')
                     print("[UART] 0x02 包尾校验失败 (期望=AB, 接收={:02X})，丢弃第一个字节".format(pkt[-1]))
                 rx_buf = rx_buf[1:]
                 continue
@@ -231,10 +229,10 @@ def AI_Uart_CMD_String(uart=None, cmd=0xfe, cmd_type=0xfe, cmd_data=[0, 0, 0], s
     str_temp = bytes(str_buf, 'utf-8')
     str_len = len(str_temp)
     
-    for i in range(len(str_temp)):
-        check_sum = check_sum + str_temp[i]  
+    # for i in range(len(str_temp)):
+    #     check_sum = check_sum + str_temp[i]  
 
-    CMD = bytes(CMD) + bytes([str_len]) + str_temp + bytes([check_sum & 0xFF])
+    CMD = bytes(CMD) + bytes([str_len]) + str_temp + bytes([0xAB])  # 0xAB为结束符
     uart.write(CMD)
 
 

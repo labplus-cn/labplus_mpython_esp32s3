@@ -431,9 +431,11 @@ class SmartCameraK230:
                             data = json.loads(b.decode('UTF-8','ignore'))
                             self.linear_regression_fast_v3.data = data
                             self.linear_regression_fast_v3.lock = True
+                            self.linear_regression_fast_v3.sleep_time_ms = 5
                         elif(CMD[2]==0x01 and CMD[3]==LINEAR_REGRESSION_V3_MODE and CMD[4]==0x01 and CMD[5]==0xff):
                             self.linear_regression_fast_v3.data = {"cx": None, "cy": None, "angle": None, "is_int": False, "is_zebra": False}
                             self.linear_regression_fast_v3.lock = True
+                            self.linear_regression_fast_v3.sleep_time_ms = 5
                 elif(self.mode==CLASSIFY_MODEL_MODE and self.classify_model!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
