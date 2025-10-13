@@ -253,6 +253,7 @@ def hammingWeight(n):
         n >>= 1
     return ans
 
+
 class TASK:
     """创建新线程并循环运行指定函数"""
     def __init__(self, func=lambda: None, sec=-1, *args, **kwargs):
@@ -271,7 +272,7 @@ class TASK:
         self.stop_lock = self._thread.allocate_lock()
         self.lock.acquire()
         self.stop_lock.acquire()
-        self._thread.stack_size(8192)
+        self._thread.stack_size(4096)
         self.thread_id = self._thread.start_new_thread(self.__run, ())
         
     def __run(self):
