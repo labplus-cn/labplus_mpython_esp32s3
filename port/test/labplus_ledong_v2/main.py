@@ -580,6 +580,7 @@ def _ble_get_characteristic(_sid, _cid):
 def _ble_centeral_notify_callback(_value_handle, _notify_data):
     global v
     print(struct.unpack("<i", _notify_data)[0])
+    
 _ble_centeral = Centeral(bytes('mpy_centeral', 'utf-8'))
 print('name: mpy_centeral')
 while True:
