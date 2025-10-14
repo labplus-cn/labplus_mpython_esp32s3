@@ -106,6 +106,7 @@ def change_route(url, destroy=None):
             gc.collect()
         page_obj = import_module(url)
         page_obj.init()
-        lv.screen_load(page_obj.container)
+        if hasattr(page_obj, 'container'):
+            lv.screen_load(page_obj.container)
     except Exception as e:
         print(f"path {url} not found: {e}")
