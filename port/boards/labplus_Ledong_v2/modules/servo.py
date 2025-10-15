@@ -22,7 +22,7 @@ class Servo(object):
         self.pin_id = pins_remap_esp32[pin]
         self.pwm = PWM(Pin(self.pin_id, Pin.OUT))
         self.pwm.freq(self.freq)
-        self.write_angle(0)
+        # self.write_angle(0)
 
     def freq(self, freq = 50):
         self.freq = freq
