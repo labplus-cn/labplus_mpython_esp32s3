@@ -57,15 +57,9 @@ class FACE_DETECT(object):
         time.sleep(1)
 
     def recognize(self):
+        time.sleep_ms(20)
         if(not self.lock):
-            print('===123===')
-            time.sleep_ms(100)
             AI_Uart_CMD(self.uart, data_type=1, cmd=AI['face_detection'][0], cmd_type=AI['face_detection'][2])
-        else:
-            time.sleep_ms(10)
-            print('===456===')
-            pass
-            
 
 
 class Face_recogization(object):
@@ -169,7 +163,7 @@ class QRCode_recognization(object):
         time.sleep_ms(50)
 
     def recognize(self):
-        time.sleep_ms(50)
+        time.sleep_ms(20)
         if(not self.lock):
             AI_Uart_CMD(self.uart, data_type=0x01, cmd=AI['qrcode'][0], cmd_type=AI['qrcode'][3])
 
@@ -366,7 +360,7 @@ class Apriltag(object):
         time.sleep(0.5)
 
     def recognize(self): 
-        time.sleep_ms(50)
+        time.sleep_ms(20)
         if(not self.lock):
             try:
                 AI_Uart_CMD(self.uart, data_type=1, cmd=AI['apriltag'][0], cmd_type=AI['apriltag'][2])

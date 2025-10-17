@@ -124,7 +124,7 @@ class SmartCameraK230:
     def model_init(self,cur_state):
         if(self.mode == cur_state):
             print('模式相同,无需切换')
-            time.sleep_ms(0.5)
+            time.sleep_ms(0.1)
             return
         elif(cur_state==DEFAULT_MODE):
             for i in range(5):
@@ -427,7 +427,6 @@ class SmartCameraK230:
                     if(len(CMD)>0):
                         if(CMD[2]==0x02 and CMD[3]==LINEAR_REGRESSION_V3_MODE and CMD[4]==0x01):
                             b = bytes(CMD[22:-1])  
-                            # _str = str(b.decode('UTF-8','ignore'))
                             data = json.loads(b.decode('UTF-8','ignore'))
                             self.linear_regression_fast_v3.data = data
                             self.linear_regression_fast_v3.lock = True
@@ -438,24 +437,38 @@ class SmartCameraK230:
                             self.linear_regression_fast_v3.sleep_time_ms = 5
                 elif(self.mode==CLASSIFY_MODEL_MODE and self.classify_model!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
-                            if(CMD[5]==0xff):
-                                self.classify_model.lock = True
-                                self.classify_model.id,self.classify_model.score = None,0
-                            else:
-                                self.classify_model.id ,self.classify_model.score = CMD[5],round(int(CMD[6])/100,2)
+                        if(CMD[2]==0x01 and CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            self.classify_model.lock = True
+                            self.classify_model.result = {"id": None, "score": 0}
+                            self.classify_model.id,self.classify_model.score = None,0
+                        elif(CMD[2]==0x02 and CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
+                            self.classify_model.lock = True
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.classify_model.result = data
+                            self.classify_model.id = data.get('id', None)
+                            self.classify_model.score = data.get('score', 0)
+                            # self.classify_model.num = data.get('num', 0)
                     else:
+                        self.classify_model.result = {"id": None, "score": 0}
                         self.classify_model.id,self.classify_model.score = None,0
                 elif(self.mode==DETECT_MODEL_MODE and self.detect_kmodel!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01):
-                            if(CMD[5]==0xff):
-                                self.detect_kmodel.lock = True
-                                self.detect_kmodel.id,self.detect_kmodel.score = None,0
-                            else:
-                                self.detect_kmodel.id ,self.detect_kmodel.score = CMD[5],round(int(CMD[6])/100,2)
+                        if(CMD[2]==0x01 and CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            self.detect_kmodel.lock = True
+                            self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
+                            self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
+                        elif(CMD[2]==0x02 and CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01):
+                            self.detect_kmodel.lock = True
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.detect_kmodel.result = data
+                            self.detect_kmodel.id = data.get('id', None)
+                            self.detect_kmodel.score = data.get('score', 0)
+                            self.detect_kmodel.num = data.get('num', 0)
                     else:
-                        self.detect_kmodel.id,self.detect_kmodel.score = None,0
+                        self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
+                        self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
                 # elif(self.mode==APRILTAG_MODE and self.apriltag!=None):
                 #     if(len(CMD)>0):
                 #         if(CMD[2]==0x01 and CMD[3]==AI['apriltag'][0] and CMD[4]==AI['apriltag'][2] and CMD[5]==0xff):

@@ -43,6 +43,8 @@ class ClassifyMODEL(object):
         self.CommandList = AI['CLASSIFY_MODEL_MODE']
         self.id = None
         self.score = 0
+        self.num = 0
+        self.result = {"id": None, "score": 0}
         self.lock = False
         parameter = str(param)
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=parameter)
@@ -61,6 +63,8 @@ class DetectMODEL(object):
         self.CommandList = AI['DETECT_MODEL_MODE']
         self.id = None
         self.score = 0
+        self.num = 0
+        self.result = {"id": None, "score": 0, "num": 0}
         self.lock = False
         parameter = str(param)
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=parameter)
