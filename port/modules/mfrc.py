@@ -50,7 +50,7 @@ class Rfid():
                 return serial_num
         else:
             print("未检测到射频卡")
-            return False
+            return None
         
     def serial_number(self):
         return self.get_serial_num()

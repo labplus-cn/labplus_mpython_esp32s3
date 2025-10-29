@@ -1,6 +1,7 @@
 import time
 from k230_ai.public import *
 import gc
+import json
 
 class YOLO80(object):
     '''物体识别'''
@@ -42,6 +43,8 @@ class ClassifyMODEL(object):
         self.CommandList = AI['CLASSIFY_MODEL_MODE']
         self.id = None
         self.score = 0
+        self.num = 0
+        self.result = {"id": None, "score": 0}
         self.lock = False
         parameter = str(param)
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=parameter)
@@ -60,6 +63,8 @@ class DetectMODEL(object):
         self.CommandList = AI['DETECT_MODEL_MODE']
         self.id = None
         self.score = 0
+        self.num = 0
+        self.result = {"id": None, "score": 0, "num": 0}
         self.lock = False
         parameter = str(param)
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=parameter)
@@ -108,7 +113,8 @@ class Color_Statistics(object):
         # print(line_grayscale_threshold)
         AI_Uart_CMD(self.uart, AI['color_statistics'][0], AI['color_statistics'][4], cmd_data=[line_grayscale_threshold[0],line_grayscale_threshold[1],0])
         time.sleep_ms(50)
-  
+
+
 class LPR(object):
     """车牌识别 """
     def __init__(self, uart):
@@ -120,7 +126,7 @@ class LPR(object):
         time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
@@ -132,17 +138,17 @@ class HandDetect(object):
     """手掌检测"""
     def __init__(self, uart):
         self.uart = uart
+        self.hand_num = 0
         self.flag = False
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['HAND_DETECTION'][0], cmd_type=AI['HAND_DETECTION'][1])
         time.sleep(1)
 
     def recognize(self):
+        time.sleep_ms(10)
         if(not self.lock):
-            time.sleep_ms(50)
             AI_Uart_CMD(uart=self.uart, cmd=AI['HAND_DETECTION'][0], cmd_type=AI['HAND_DETECTION'][1])
-        else:
-            time.sleep_ms(20)
+
 
 class HandKeypointClass(object):
     """ 手势识别 """
@@ -156,12 +162,13 @@ class HandKeypointClass(object):
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
             except Exception as e:
                 print('err:' + str(e))
+
 
 class DG(object):
     """ 动态手势 """
@@ -175,7 +182,7 @@ class DG(object):
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(50)
+        time.sleep_ms(20)
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
         
@@ -185,15 +192,15 @@ class PersonDetect(object):
     def __init__(self, uart):
         self.uart = uart
         self.flag = False
+        self.person_num = 0
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['PERSON_DETECTION'][0], cmd_type=AI['PERSON_DETECTION'][1])
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(50)
+        time.sleep_ms(20)
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=AI['PERSON_DETECTION'][0], cmd_type=AI['PERSON_DETECTION'][1])
-
 
 
 class PersonKeypointDetct(object):
@@ -201,19 +208,19 @@ class PersonKeypointDetct(object):
     def __init__(self, uart):
         self.uart = uart
         self.CommandList = AI['PERSON_KEYPOINT_DETECT']
-        self.fallen = None
         self.keypoints = []
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
             except Exception as e:
                 print('err:' + str(e))
+
 
 class PersonKeypointDetctPlus(object):
     """ 人体姿势识别 PERSON_KEYPOINT_DETECT_PLUS"""
@@ -227,7 +234,7 @@ class PersonKeypointDetctPlus(object):
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
@@ -247,7 +254,7 @@ class FaceExpressionDetct(object):
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
@@ -265,7 +272,7 @@ class FaceLivingBodyDetct(object):
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
@@ -284,7 +291,7 @@ class QRCodeRecognization(object):
         time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             AI_Uart_CMD(self.uart, self.CommandList[0], self.CommandList[1])
 
@@ -301,7 +308,7 @@ class BarCodeRecognization(object):
         time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             AI_Uart_CMD(self.uart, self.CommandList[0], self.CommandList[1])
 
@@ -317,12 +324,13 @@ class FallDetection(object):
         time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             try:
                 AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
             except Exception as e:
                 print('err:' + str(e))
+
 
 class FaceRecogization(object):
     """ 人脸识别类"""
@@ -341,6 +349,7 @@ class FaceRecogization(object):
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
 
+
 class ColorCount(object):
     """ 颜色计数 """
     def __init__(self, uart, cur_mode=0):
@@ -353,7 +362,7 @@ class ColorCount(object):
         time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1],cmd_data=[self.cur_mode])
 
@@ -371,7 +380,7 @@ class LABColorCount():
         time.sleep(1)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(10)
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
      
@@ -385,11 +394,28 @@ class LINEAR_REGRESSION():
         self.line = {"x1":None, "y1":None, "x2":None, "y2":None, "length":None, "magnitude":None, "theta":None, "rho":None}
         self.parameter = str(threshold)
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
-        time.sleep(1)
+        time.sleep(0.5)
 
     def recognize(self):
-        time.sleep_ms(20)
+        time.sleep_ms(5)
         if(not self.lock):
-            # AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
+            AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
+
+
+class LINEAR_V3_REGRESSION():
+    """ 快速线性回归v3  T字路口 斑马线 识别"""
+    def __init__(self, uart, line_color="black", detect_intersections=True, detect_zebra=True):
+        self.lock = False
+        self.uart = uart
+        self.CommandList = AI['LINEAR_REGRESSION_V3_MODE']
+        self.data = {"cx": None, "cy": None, "angle": None, "is_int": False, "is_zebra": False}
+        self.parameter = json.dumps({"color": line_color,'int':detect_intersections, 'zebra':detect_zebra})
+        self.sleep_time_ms = 100 
+        AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
+        time.sleep(0.5)
+
+    def recognize(self):
+        time.sleep_ms(self.sleep_time_ms)
+        if(not self.lock):
             AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
      

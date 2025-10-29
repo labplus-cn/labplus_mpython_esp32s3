@@ -4,6 +4,7 @@ import time
 
 DISPLAY_WIDTH = 544
 DISPLAY_HEIGHT = 368
+
 DEFAULT_MODE = 0 # 默认UI
 SENSOR_MODE = -1 # 摄像头
 
@@ -22,6 +23,7 @@ PERSON_KEYPOINT_DETECT_PLUS = 11
 COLOR_STATISTICS_MODE = 13 # 颜色的统计信息
 COLOR_EXTRACTO_MODE = 14 # LAB颜色提取器
 APRILTAG_MODE = 15
+
 COLOE_MODE = 16
 SPEECH_RECOGNIZATION_MODE = 17
 SELF_LEARNING_CLASSIFIER_MODE = 18 # 自学习
@@ -33,22 +35,22 @@ BARCODE_MODE = 23
 
 DYNAMIC_GESTURE = 25 #动态手势
 FACE_LANDMARK = 26  # 人脸关键点
-FACE_LANDMARK_LIVING_BODY = 27
-FACE_LANDMARK_EXPRESSION = 28
+FACE_LANDMARK_LIVING_BODY = 27 #活体检测
+FACE_LANDMARK_EXPRESSION = 28 #表情识别
 
-COLOR_OBJECT_COUNT_MODE = 29
-LAB_COLOR_OBJECT_COUNT_MODE = 22 #LAB
+COLOR_OBJECT_COUNT_MODE = 29 #颜色物体计数
+LAB_COLOR_OBJECT_COUNT_MODE = 22 #颜色物体计数
 
 FACE_REG_MODE = 30 # 人脸注册
 FACE_RECOGNITION_MODE = 31 #人脸识别
 CLASSIFY_MODEL_MODE = 32 # 分类模型
 DETECT_MODEL_MODE = 33  # 检测模型
-HAND_KEYPOINT = 34
-FACE_REG_PLUS_MODE = 35 # 人脸拍照+注册
+HAND_KEYPOINT = 34 # 手部关键点
+FACE_REG_PLUS_MODE = 35 # 人脸拍照+注册 
 
 
 LINEAR_REGRESSION_MODE = 40 #快速线性回归
-
+LINEAR_REGRESSION_V3_MODE = 41 #快速线性回归 v3
 
 FACTORY_MODE = 99 
 
@@ -97,6 +99,7 @@ AI ={
     'DETECT_MODEL_MODE':[DETECT_MODEL_MODE,0x01],
     'FACE_REG_PLUS_MODE':[FACE_REG_PLUS_MODE,0x01],
     'LINEAR_REGRESSION_MODE':[LINEAR_REGRESSION_MODE,0x01],
+    'LINEAR_REGRESSION_V3_MODE':[LINEAR_REGRESSION_V3_MODE,0x01],
     'factory':[99,0x01,0x02,0x03,0x04,0x05]
 }
 
@@ -109,7 +112,8 @@ def CheckCode(tmp):
 
 
 DEBUG = False  # 增加全局debug控制变量
-MAX_BUF_SIZE = 1024  # 缓冲区最大字节数
+MAX_BUF_SIZE = 4096  # 缓冲区最大字节数
+
 
 def uart_handle(uart):
     rx_buf = bytearray()
@@ -162,19 +166,21 @@ def uart_handle(uart):
                     print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]))
             rx_buf = rx_buf[total_len:]
 
-        # 命令 0x02:  2(包头) + 3(命令) + 15(固定头) +1(字符长度) + N(字符串) + 1(校验)
+        # 命令 0x02: 2(包头) + 3(命令) + 15(固定头) +2(字符串长度) + N(字符串) + 1(校验)
         elif cmd_type == 0x02:
-            if len(rx_buf) < 21:  # 至少要有包头+命令+固定头
+            if len(rx_buf) < 22:  # 至少要有包头+命令+固定头+2字节长度
                 if DEBUG:
                     print("[UART] 等待 0x02 头部数据到齐")
                 break
-            str_len = rx_buf[20]  # 第21字节，索引20
-            total_len = 21 + str_len + 1
+            # 两字节长度，高字节在前，低字节在后
+            str_len = (rx_buf[20] << 8) | rx_buf[21]
+            total_len = 22 + str_len + 1
             if len(rx_buf) < total_len:
                 if DEBUG:
                     print("[UART] 等待 0x02 字符串数据到齐 (len={})".format(str_len))
                 break
             pkt = rx_buf[:total_len]
+           
             if pkt[-1] != 0xAB:
                 if DEBUG:
                     print("[UART] 0x02 包尾校验失败 (期望=AB, 接收={:02X})，丢弃第一个字节".format(pkt[-1]))
@@ -223,16 +229,18 @@ def AI_Uart_CMD_String(uart=None, cmd=0xfe, cmd_type=0xfe, cmd_data=[0, 0, 0], s
     str_temp = bytes(str_buf, 'utf-8')
     str_len = len(str_temp)
     
-    for i in range(len(str_temp)):
-        check_sum = check_sum + str_temp[i]  
+    # for i in range(len(str_temp)):
+    #     check_sum = check_sum + str_temp[i]  
 
-    CMD = bytes(CMD) + bytes([str_len]) + str_temp + bytes([check_sum & 0xFF])
+    CMD = bytes(CMD) + bytes([str_len]) + str_temp + bytes([0xAB])  # 0xAB为结束符
     uart.write(CMD)
+
 
 def print_x16(date):
     for i in range(len(date)):
         print('{:2x}'.format(date[i]),end=' ')
     print('')
+
 
 def hammingWeight(n):
     '''
@@ -244,6 +252,7 @@ def hammingWeight(n):
           ans = i
         n >>= 1
     return ans
+
 
 class TASK:
     """创建新线程并循环运行指定函数"""
@@ -263,7 +272,7 @@ class TASK:
         self.stop_lock = self._thread.allocate_lock()
         self.lock.acquire()
         self.stop_lock.acquire()
-        self._thread.stack_size(8192)
+        self._thread.stack_size(4096)
         self.thread_id = self._thread.start_new_thread(self.__run, ())
         
     def __run(self):

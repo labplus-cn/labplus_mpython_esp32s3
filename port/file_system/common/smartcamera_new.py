@@ -2,17 +2,20 @@ from machine import Pin, UART
 from lib.k210_ai import *
 import time
 import gc
+from machine import Timer
 gc.collect()
 
 class SmartCamera:
     def __init__(self, rx=Pin.P15, tx=Pin.P16):
         self.sensor_choice = 1
-        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=2048)
+        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
         self.mode = DEFAULT_MODE
         self.lock = False
         time.sleep(0.05)
         self.wait_for_ai_init()
-        self.thread_listen()
+        # self.thread_listen()
+        self.tim9 = Timer(9)
+        self.tim9.init(period=45, mode=Timer.PERIODIC, callback=self.timer9_tick)
         self.slc_parameter = [3, 15, 11, 1]
         self.a_status = 0
         self.b_status = 0
@@ -27,7 +30,7 @@ class SmartCamera:
             time.sleep_ms(100)
             num +=1
             CMD_TEMP = []
-            if(num>5000):
+            if(num>1000):
                 print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
                 print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
                 break
@@ -88,11 +91,11 @@ class SmartCamera:
                                 print('==AI摄像头通信成功==')
                                 print('==AI camera communication successful==')
                                 self.lock = False
-                                time.sleep_ms(200)
+                                time.sleep_ms(50)
                                 _cmd = self.uart.read()
                                 del _cmd
                                 gc.collect()
-                                time.sleep_ms(50)
+                                # time.sleep_ms(50)
                                 break
                     elif(CMD_TEMP[2]==0x02):
                         pass
@@ -226,8 +229,11 @@ class SmartCamera:
         time.sleep(1)
 
     def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.005)
+        self._task = TASK(func=self.uart_thread,sec=0.01)
         self._task.start()
+    
+    def timer9_tick(self,_):
+        self.uart_thread()
 
     def switcher_mode(self, mode, choice):
         '''切换模式'''
@@ -330,9 +336,13 @@ class SmartCamera:
         print('当前模式:\n',MODE[self.mode])
         self.lock = False
 
-    def uart_thread(self):           
+    def uart_thread(self): 
+        gc.collect()
+        CMD = uart_handle(self.uart)
+        if DEBUG:
+            print(CMD)
+            print("===CMD===")          
         if(self.lock==False):
-            CMD = uart_handle(self.uart)
             if(CMD==None):
                 return
 
@@ -414,20 +424,22 @@ class SmartCamera:
             elif(self.mode==QRCODE_MODE and self.qrcode!=None):
                 try:
                     if(len(CMD)>0):
-                        if(CMD[2]==0x01 and CMD[3]==QRCODE_MODE and CMD[4]==0x03):
-                            if(CMD[5]==0xff):
-                                self.qrcode.lock = True
-                                self.qrcode.id = None
+                        if(CMD[2]==0x01 and CMD[3]==QRCODE_MODE and CMD[4]==0x03 and CMD[5]==0xff):#
+                            self.qrcode.lock = True
+                            self.qrcode.id = None
                         elif(CMD[2]==0x02 and CMD[3]==QRCODE_MODE and CMD[4]==0x03):
-                            _str = str(CMD[-2].decode('UTF-8','ignore'))
+                            self.qrcode.lock = True
+                            _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
                             data = eval(_str)
                             self.qrcode.id = data[0]
                             self.qrcode.info = data[1]
                     else:
                         self.qrcode.id = None
                         self.qrcode.info = None
-                except:
+                except Exception as e:
+                    print("QRCODE ERROR:",e)
                     self.qrcode.id = None
+                    self.qrcode.info = None
             elif(self.mode==SPEECH_RECOGNIZATION_MODE and self.asr!=None):
                 try:
                     if(len(CMD)>0):
@@ -475,7 +487,7 @@ class SmartCamera:
                         self.track.x,self.track.y,self.track.cx,self.track.cy,self.track.w,self.track.h,self.track.pixels,self.track.count,self.track.code = None,None,None,None,None,None,None,None,None
                     elif(CMD[2]==0x02 and CMD[3]==TRACK_MODE and CMD[4]==0x02):
                         self.track.lock = True
-                        _str = str(CMD[-2].decode('UTF-8','ignore'))
+                        _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
                         data = _str.split('|')
                         self.track.x,self.track.y,self.track.cx,self.track.cy,self.track.w,self.track.h,self.track.pixels,self.track.count,self.track.code = int(data[0]),int(data[1]),int(data[2]),int(data[3]),int(data[4]),int(data[5]),int(data[6]),int(data[7]),hammingWeight(int(CMD[5]))        
                     else:
@@ -489,7 +501,7 @@ class SmartCamera:
                         self.color_statistics.row_data1,self.color_statistics.row_data2,self.color_statistics.row_data3,self.color_statistics.line_get_regression_data = [None,None,None,None,None],[None,None,None,None,None],[None,None,None,None,None],[None,None,None,None,None,None,None,None]
                     elif(CMD[2]==0x02 and CMD[3]==AI['color_statistics'][0] and CMD[4]==AI['color_statistics'][2]):
                         self.color_statistics.lock = True
-                        _str = str(CMD[-2].decode('UTF-8','ignore'))
+                        _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
                         data = eval(_str)
                         self.color_statistics.row_data1,self.color_statistics.row_data2,self.color_statistics.row_data3,self.color_statistics.line_get_regression_data = [int(CMD[5]),int(CMD[6]),int(CMD[7]),int(CMD[8]),int(CMD[9])],[int(CMD[10]),int(CMD[11]),int(CMD[12]),int(CMD[13]),int(CMD[14])],[int(CMD[15]),int(CMD[16]),int(CMD[17]),int(CMD[18]),int(CMD[19])],[int(data[0]),int(data[1]),int(data[2]),int(data[3]),int(data[4]),int(data[5]),int(data[6]),int(data[7])]
                     self.color_statistics.data = [self.color_statistics.row_data1,self.color_statistics.row_data2,self.color_statistics.row_data3]
@@ -502,7 +514,7 @@ class SmartCamera:
                         self.color_extracto.lock = True
                         self.color_extracto.L,self.color_extracto.A,self.color_extracto.B = None,None,None
                     elif(CMD[2]==0x02 and CMD[3]==AI['color_extracto'][0] and CMD[4]==AI['color_extracto'][2]):
-                        _str = str(CMD[-2].decode('UTF-8','ignore'))
+                        _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
                         data = _str.split('|')
                         self.color_extracto.L,self.color_extracto.A,self.color_extracto.B = int(data[0]),int(data[1]),int(data[2])
                     self.color_extracto.LAB_Data = [self.color_extracto.L,self.color_extracto.A,self.color_extracto.B]
@@ -518,7 +530,7 @@ class SmartCamera:
                     elif(CMD[2]==0x02 and CMD[3]==AI['apriltag'][0] and CMD[4]==AI['apriltag'][2]):
                         self.apriltag.lock = True
                         # _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
-                        _str = str(CMD[-2].decode('UTF-8','ignore'))
+                        _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
                         data = _str.split('|')
                         self.apriltag.tag_family,self.apriltag.tag_id = int(data[0]),int(data[1])
                 else:
@@ -540,7 +552,7 @@ class SmartCamera:
                     # if(CMD[2]==0x01 and CMD[3]==FACTORY_MODE and CMD[4]==0x01):
                     #     self.a_status,self.b_status,self.tf_status = CMD[5],CMD[6],CMD[7]
                     if(CMD[2]==0x02 and CMD[3]==FACTORY_MODE and CMD[4]==0x01):
-                        _str = str(CMD[-2].decode('UTF-8','ignore'))
+                        _str = str(bytes(CMD[21:-1]).decode('UTF-8','ignore'))
                         data = eval(_str)
                         self.a_status,self.b_status,self.tf_status = CMD[5],CMD[6],CMD[7]
                         self.tf_sn = data[0]

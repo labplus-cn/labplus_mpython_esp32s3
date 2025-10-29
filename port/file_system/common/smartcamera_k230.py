@@ -7,8 +7,8 @@ gc.collect()
 
 class SmartCameraK230:
     def __init__(self, tx=Pin.P1, rx=Pin.P0):
-        # self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=512)
-        self.uart = UART(2, baudrate=1152000, tx=tx, rx=rx)
+        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=1024)
+        # self.uart = UART(2, baudrate=1152000, tx=tx, rx=rx)
         self.mode = DEFAULT_MODE
         self.lock = False
         self.slc_parameter = [3, 15, 11, 1]
@@ -21,7 +21,7 @@ class SmartCameraK230:
         time.sleep(0.1)
         self.wait_for_ai_init()
         self.tim9 = Timer(9)
-        self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
+        self.tim9.init(period=35, mode=Timer.PERIODIC, callback=self.timer9_tick)
         # self.thread_listen()
   
     def wait_for_ai_init(self): 
@@ -33,7 +33,7 @@ class SmartCameraK230:
             gc.collect()
             num += 1
             
-            if num > 500:
+            if num > 200:
                 print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
                 print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
                 break
@@ -94,7 +94,6 @@ class SmartCameraK230:
                             print("AI camera 4.0 init end")
                             time.sleep(0.1)
                             # 清空缓冲区中的剩余数据
-                       
                             rx_buffer = self.uart.read()
                             del rx_buffer
                             gc.collect()
@@ -125,6 +124,7 @@ class SmartCameraK230:
     def model_init(self,cur_state):
         if(self.mode == cur_state):
             print('模式相同,无需切换')
+            time.sleep_ms(0.1)
             return
         elif(cur_state==DEFAULT_MODE):
             for i in range(5):
@@ -163,7 +163,6 @@ class SmartCameraK230:
         elif(cur_state==FACE_RECOGNITION_MODE):
             self.fcr = FaceRecogization(self.uart)
         
-            
         self.mode = cur_state
     
     def switcher_mode(self, mode):
@@ -188,6 +187,10 @@ class SmartCameraK230:
     def linear_regression_fast_init(self, threshold=(0,100)):
         self.linear_regression_fast = LINEAR_REGRESSION(self.uart,threshold=threshold)
         self.mode = LINEAR_REGRESSION_MODE 
+    
+    def linear_regression_fast_v3_init(self, line_color="black", detect_intersections=True, detect_zebra=True):
+        self.linear_regression_fast_v3 = LINEAR_V3_REGRESSION(self.uart, line_color=line_color, detect_intersections=detect_intersections, detect_zebra=detect_zebra)
+        self.mode = LINEAR_REGRESSION_V3_MODE 
     
     # def led(self,mode=0):
     #     AI_Uart_CMD(self.uart, 0x01, 0xFA, [0x04,int(mode)])
@@ -236,9 +239,11 @@ class SmartCameraK230:
                             if(CMD[5]==0xff):
                                 self.hand_detect.lock = True
                                 self.hand_detect.flag = False
+                                self.hand_detect.hand_num = 0
                             elif(CMD[5]==0xee):
                                 self.hand_detect.lock = True
                                 self.hand_detect.flag = True
+                                self.hand_detect.hand_num = CMD[6]
                 elif(self.mode==HAND_KEYPOINT_CLASS and self.hand_keypoint_class!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==HAND_KEYPOINT_CLASS and CMD[4]==0x01):
@@ -264,17 +269,24 @@ class SmartCameraK230:
                             if(CMD[5]==0xff):
                                 self.person_detect.lock = True
                                 self.person_detect.flag = False
+                                self.person_detect.person_num = 0 
                             elif(CMD[5]==0xee):
                                 self.person_detect.lock = True
                                 self.person_detect.flag = True
+                                self.person_detect.person_num = CMD[6]
                 elif(self.mode==PERSON_KEYPOINT_DETECT and self.person_keypoint_detect!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==PERSON_KEYPOINT_DETECT and CMD[4]==0x01):
+                        if(CMD[2]==0x01 and CMD[3]==PERSON_KEYPOINT_DETECT and CMD[4]==0x01):
                             if(CMD[5]==0xff):
                                 self.person_keypoint_detect.lock = True
-                                self.person_keypoint_detect.fallen = None
-                            else:
-                                self.person_keypoint_detect.fallen = CMD[5]
+                                self.person_keypoint_detect.keypoints = []
+                        elif(CMD[2]==0x02 and CMD[3]==PERSON_KEYPOINT_DETECT and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            # _str = str(b.decode('UTF-8','ignore'))
+                            # data = eval(_str)
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.person_keypoint_detect.lock = True
+                            self.person_keypoint_detect.keypoints = data.get('keypoints',[])
                 elif(self.mode==PERSON_KEYPOINT_DETECT_PLUS and self.person_keypoint_detect_plus!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==PERSON_KEYPOINT_DETECT_PLUS and CMD[4]==0x01):
@@ -348,7 +360,7 @@ class SmartCameraK230:
                                 self.lab_color_count.flag = True
                                 self.lab_color_count.color_count = CMD[5]
                         elif(CMD[2]==0x02 and CMD[3]==LAB_COLOR_OBJECT_COUNT_MODE and CMD[4]==0x01):
-                            b = bytes(CMD[21:-1])  
+                            b = bytes(CMD[22:-1])  
                             _str = str(b.decode('UTF-8','ignore'))
                             data = eval(_str)
                             if(sum(data)==0):
@@ -367,7 +379,7 @@ class SmartCameraK230:
                                     self.qrcode.lock = True
                                     self.qrcode.info = None
                             elif(CMD[2]==0x02 and CMD[3]==QRCODE_MODE and CMD[4]==0x01):
-                                b = bytes(CMD[21:-1])  
+                                b = bytes(CMD[22:-1])  
                                 _str = str(b.decode('UTF-8','ignore'))
                                 # data = eval(_str)
                                 self.qrcode.lock = True
@@ -380,7 +392,7 @@ class SmartCameraK230:
                     if(len(CMD)>0):
                         if(CMD[2]==0x02 and CMD[3]==LICENSE_PLATE_RECOGNITION and CMD[4]==0x01):
                             # _str = str(CMD[-2].decode('UTF-8','ignore'))
-                            b = bytes(CMD[21:-1])  
+                            b = bytes(CMD[22:-1])  
                             _str = str(b.decode('UTF-8','ignore'))
                             self.lpr.lpr_str = _str
                             self.lpr.lock = True
@@ -391,7 +403,7 @@ class SmartCameraK230:
                     if(len(CMD)>0):
                         if(CMD[2]==0x02 and CMD[3]==BARCODE_MODE and CMD[4]==0x01):
                             # _str = str(CMD[-2].decode('UTF-8','ignore'))
-                            b = bytes(CMD[21:-1])  
+                            b = bytes(CMD[22:-1])  
                             _str = str(b.decode('UTF-8','ignore'))
                             data = eval(_str)
                             self.bar_code.type = data[0]
@@ -401,50 +413,62 @@ class SmartCameraK230:
                             self.bar_code.type = None
                             self.bar_code.info = None
                             self.bar_code.lock = True
-                elif(self.mode==LINEAR_REGRESSION_MODE):
+                elif(self.mode==LINEAR_REGRESSION_MODE and self.linear_regression_fast!=None):
                     if(len(CMD)>0):
                         if(CMD[2]==0x02 and CMD[3]==LINEAR_REGRESSION_MODE and CMD[4]==0x01):
-                            b = bytes(CMD[21:-1])  
-                            _str = str(b.decode('UTF-8','ignore'))
-                            data = eval(_str)
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
                             self.linear_regression_fast.line = data
                             self.linear_regression_fast.lock = True
                         elif(CMD[2]==0x01 and CMD[3]==LINEAR_REGRESSION_MODE and CMD[4]==0x01 and CMD[5]==0xff):
                             self.linear_regression_fast.line = {"x1":None, "y1":None, "x2":None, "y2":None, "length":None, "magnitude":None, "theta":None, "rho":None}
                             self.linear_regression_fast.lock = True
-                # elif(self.mode==GUIDEPOST_MODE and self.guidepost!=None):#10
-                #     if(len(CMD)>0):
-                #         if(CMD[3]==GUIDEPOST_MODE and CMD[4]==0x02):
-                #             if(CMD[5]==0xff):
-                #                 self.guidepost.lock = True
-                #                 self.guidepost.id,self.guidepost.max_score = None,0
-                #             else:
-                #                 max_index,self.guidepost.max_score = CMD[5],round(int(CMD[6])/100,2)
-                #                 self.guidepost.id = self.guidepost.labels[max_index]
-                #         elif(CMD[2]==0x02):
-                #             pass
-                #     else:
-                #         self.guidepost.id,self.guidepost.max_score = None,0
+                elif(self.mode==LINEAR_REGRESSION_V3_MODE and self.linear_regression_fast_v3!=None):
+                    if(len(CMD)>0):
+                        if(CMD[2]==0x02 and CMD[3]==LINEAR_REGRESSION_V3_MODE and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.linear_regression_fast_v3.data = data
+                            self.linear_regression_fast_v3.lock = True
+                            self.linear_regression_fast_v3.sleep_time_ms = 5
+                        elif(CMD[2]==0x01 and CMD[3]==LINEAR_REGRESSION_V3_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            # self.linear_regression_fast_v3.data = {"cx": None, "cy": None, "angle": None, "is_int": False, "is_zebra": False}
+                            self.linear_regression_fast_v3.lock = True
+                            self.linear_regression_fast_v3.sleep_time_ms = 5
                 elif(self.mode==CLASSIFY_MODEL_MODE and self.classify_model!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
-                            if(CMD[5]==0xff):
-                                self.classify_model.lock = True
-                                self.classify_model.id,self.classify_model.score = None,0
-                            else:
-                                self.classify_model.id ,self.classify_model.score = CMD[5],round(int(CMD[6])/100,2)
+                        if(CMD[2]==0x01 and CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            self.classify_model.lock = True
+                            self.classify_model.result = {"id": None, "score": 0}
+                            self.classify_model.id,self.classify_model.score = None,0
+                        elif(CMD[2]==0x02 and CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
+                            self.classify_model.lock = True
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.classify_model.result = data
+                            self.classify_model.id = data.get('id', None)
+                            self.classify_model.score = data.get('score', 0)
+                            # self.classify_model.num = data.get('num', 0)
                     else:
+                        self.classify_model.result = {"id": None, "score": 0}
                         self.classify_model.id,self.classify_model.score = None,0
                 elif(self.mode==DETECT_MODEL_MODE and self.detect_kmodel!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01):
-                            if(CMD[5]==0xff):
-                                self.detect_kmodel.lock = True
-                                self.detect_kmodel.id,self.detect_kmodel.score = None,0
-                            else:
-                                self.detect_kmodel.id ,self.detect_kmodel.score = CMD[5],round(int(CMD[6])/100,2)
+                        if(CMD[2]==0x01 and CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            self.detect_kmodel.lock = True
+                            self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
+                            self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
+                        elif(CMD[2]==0x02 and CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01):
+                            self.detect_kmodel.lock = True
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.detect_kmodel.result = data
+                            self.detect_kmodel.id = data.get('id', None)
+                            self.detect_kmodel.score = data.get('score', 0)
+                            self.detect_kmodel.num = data.get('num', 0)
                     else:
-                        self.detect_kmodel.id,self.detect_kmodel.score = None,0
+                        self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
+                        self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
                 # elif(self.mode==APRILTAG_MODE and self.apriltag!=None):
                 #     if(len(CMD)>0):
                 #         if(CMD[2]==0x01 and CMD[3]==AI['apriltag'][0] and CMD[4]==AI['apriltag'][2] and CMD[5]==0xff):

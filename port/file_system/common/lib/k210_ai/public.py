@@ -53,8 +53,10 @@ VIDEO_MODE = 20 # 采集图像
 
 FACTORY_MODE = 99 
 
-
 MODE=['保留','默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
+
+DEBUG = False  # 是否开启调试模式
+MAX_BUF_SIZE = 1024  # 缓冲区最大字节数
 
 def CheckCode(tmp):
     sum = 0
@@ -63,115 +65,109 @@ def CheckCode(tmp):
     return sum & 0xff
 
 def uart_handle(uart):
-    gc.collect()
-    CMD = []
-    HEAD = []
+    """
+    处理 UART 数据，解析命令并返回完整的命令包。
+    增加粘包处理逻辑。
+    """
+    rx_buf = bytearray()  # 全局接收缓冲区
 
-    if(uart.any()):
-        head = uart.read(3)
-        # print(head)
-        if b"\xbb" in head:
-            for i in range(len(head)):
-                HEAD.append(head[i])
+    # 初始化缓冲区
+    if not hasattr(uart_handle, "rx_buf"):
+        rx_buf = bytearray()
+
+    # 读取 UART 数据
+    if uart.any():
+        data = uart.read()
+        if data:
+            rx_buf.extend(data)
+            # if DEBUG:
+            #     print("[UART RX] " + ' '.join('{:02X}'.format(b) for b in data))
+
+            # 缓冲区保护，防止溢出
+            if len(rx_buf) > MAX_BUF_SIZE:
+                if DEBUG:
+                    print("[UART] 缓冲区超限，清空缓冲区")
+                rx_buf = bytearray()
+
+    # 解析命令包
+    while True:
+        # 至少要有包头(2字节) + 命令类型(1字节)
+        if len(rx_buf) < 3:
+            break
+
+        # 检查包头
+        if not (rx_buf[0] == 0xBB and rx_buf[1] == 0xAA):
+            if DEBUG:
+                print("[UART] 丢弃无效字节: 0x{:02X}".format(rx_buf[0]))
+            rx_buf = rx_buf[1:]
+            continue
+
+        # 获取命令类型
+        cmd_type = rx_buf[2]
+
+        # 处理固定长度命令 (cmd_type == 0x01)
+        if cmd_type == 0x01:
+            total_len = 12  # 固定长度
+            if len(rx_buf) < total_len:
+                if DEBUG:
+                    print("[UART] 等待 0x01 包数据到齐")
+                break
+            pkt = rx_buf[:total_len]
+            checksum = CheckCode(pkt[:11])  # 校验包头+命令+数据(共11字节)
+            if checksum == pkt[11]:
+                if DEBUG:
+                    print("[UART] 校验成功: " + ' '.join('{:02X}'.format(b) for b in pkt))
+                rx_buf = rx_buf[total_len:]  # 移除已处理的数据
+                return pkt
+            else:
+                if DEBUG:
+                    print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]))
+            rx_buf = rx_buf[total_len:]  # 移除已处理的数据
+
+        # 处理可变长度命令 (cmd_type == 0x02)
+        elif cmd_type == 0x02:
+            if len(rx_buf) < 21:  # 至少要有包头+命令+固定头+2字节长度
+                if DEBUG:
+                    print("[UART] 等待 0x02 头部数据到齐")
+                break
+            # 获取字符串长度（2字节，高字节在前，低字节在后）
+            str_len = rx_buf[20]
+            total_len = 21 + str_len + 1  # 包头+命令+固定头+字符串长度+校验
+            if len(rx_buf) < total_len:
+                if DEBUG:
+                    print("[UART] 等待 0x02 字符串数据到齐 (len={})".format(str_len))
+                break
+            pkt = rx_buf[:total_len]
+            if pkt[-1] != 0xAB:  # 校验包尾
+                if DEBUG:
+                    print("[UART] 包尾校验失败 (期望=0xAB, 接收={:02X})".format(pkt[-1]))
+                rx_buf = rx_buf[1:]  # 丢弃第一个字节
+                continue
+            # checksum = CheckCode(pkt[:-1])  # 校验数据
+            # if checksum == pkt[-1]:
+            #     if DEBUG:
+            #         print("[UART] 校验成功: " + pkt.hex(' ').upper())
+            #     rx_buf = rx_buf[total_len:]  # 移除已处理的数据
+            #     return pkt
+            # else:
+            #     if DEBUG:
+            #         print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[-1]))
+            # rx_buf = rx_buf[total_len:]  # 移除已处理的数据
+            else:
+                if DEBUG:
+                    print("[UART] 解析到 0x02 包")
+                    # print("complete packet:", pkt)
+                rx_buf = rx_buf[total_len:]
         
-            if(HEAD[0] == 0xBB):
-                CMD.extend([HEAD[0],HEAD[1],HEAD[2]])
-                if(CMD[2]==0x01):
-                    sleep_ms(1)
-                    res = uart.read(9)
-                    
-                    for i in range(9):
-                        CMD.append(res[i])                  
-                    checksum = CheckCode(CMD[:11])
-                    # print(CMD)
-                    if(res and checksum == CMD[11]):
-                        return CMD
-                    else:
-                        # print(CMD)
-                        pass
-                elif(CMD[2]==0x02):
-                    res = uart.read(18)
-                    
-                    str_len = res[17]
-                    sleep_ms(2)
-                    str_temp = uart.read(str_len)
-                    checksum  = uart.read(1)
-                    for i in range(18):
-                        CMD.append(res[i])
-        
-                    CMD.append(str_temp)
-                    CMD.append(checksum[0])
-                
-                    return CMD
-            elif(HEAD[1] == 0xBB):
-                CMD.extend([HEAD[1],HEAD[2]])
-                CMD.append(uart.read(1))
-                if(CMD[2]==0x01):
-                    sleep_ms(1)
-                    res = uart.read(9)
-                    
-                    for i in range(9):
-                        CMD.append(res[i])     
-                    # print(CMD)             
-                    checksum = CheckCode(CMD[:11])
-                    if(res and checksum == CMD[11]):
-                        return CMD
-                    else:
-                        # print(CMD)
-                        pass
-                elif(CMD[2]==0x02):
-                    res = uart.read(18)
-                    str_len = res[17]
-                    sleep_ms(1)
-                    str_temp = uart.read(str_len)
-                    checksum  = uart.read(1)
+                return pkt  # 返回完整包
 
-                    for i in range(18):
-                        CMD.append(res[i])
-                
-                    CMD.append(str_temp)
-                    CMD.append(checksum[0])
-
-                    return CMD
-            elif(HEAD[2] == 0xBB):
-                CMD.append(HEAD[2])
-                tmp = uart.read(2)
-                for i in range(2):
-                    CMD.append(tmp[i]) 
-                if(CMD[2]==0x01):
-                    sleep_ms(1)
-                    res = uart.read(9)
-                    
-                    for i in range(9):
-                        CMD.append(res[i])                  
-                    checksum = CheckCode(CMD[:11])
-                    # print(CMD)
-                    if(res and checksum == CMD[11]):
-                        return CMD
-                    else:
-                        # print(CMD)
-                        pass
-                elif(CMD[2]==0x02):
-                    res = uart.read(18)
-                    str_len = res[17]
-                    sleep_ms(1)
-                    str_temp = uart.read(str_len)
-                    checksum  = uart.read(1)
-
-                    for i in range(18):
-                        CMD.append(res[i])
-                    
-                    CMD.append(str_temp)
-                    CMD.append(checksum[0])
-            
-                    return CMD
+        # 未知命令类型
         else:
-            # print(head)
-            # print('===111===')
-            return []
-    else:
-        # print('===222===')
-        return []
+            if DEBUG:
+                print("[UART] 未知命令类型 0x{:02X}，丢弃第一个字节".format(cmd_type))
+            rx_buf = rx_buf[1:]
+
+            return None  # 无有效包返回
 
 def AI_Uart_CMD(uart, data_type, cmd, cmd_type, cmd_data=[0, 0, 0, 0, 0, 0, 0, 0]):
     gc.collect()
@@ -185,7 +181,6 @@ def AI_Uart_CMD(uart, data_type, cmd, cmd_type, cmd_data=[0, 0, 0, 0, 0, 0, 0, 0
 
     CMD.append(check_sum & 0xFF)
     uart.write(bytes(CMD))
-    # print('===send cmd===')
 
 
 def AI_Uart_CMD_String(uart=None, cmd=0xfe, cmd_type=0xfe, cmd_data=[0, 0, 0], str_len=0, str_buf=''):
