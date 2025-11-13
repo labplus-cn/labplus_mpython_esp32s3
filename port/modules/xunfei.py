@@ -6,7 +6,7 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 import hashlib
 import ujson
-import ussl
+import ssl as ussl 
 from machine import RTC
 import ubinascii
 import uhashlib

@@ -72,7 +72,7 @@ class SMTP:
         return int(code), resp
 
     def __init__(self, host, port, ssl=False, username=None, password=None):
-        import ussl
+        import ssl as ussl 
         self.username = username
         addr = usocket.getaddrinfo(host, port)[0][-1]
         sock = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)

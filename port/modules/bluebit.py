@@ -956,6 +956,8 @@ class Scan_Rfid():
         self.rf = Rfid(i2c, i2c_addr)
         
     def scanning(self):
+        if self.rf != None:
+            print("find card: {}" .format(self.rf.serial_number()))
         return self.rf
 
 class Scan_Rfid_Edu():
