@@ -6,7 +6,7 @@
 	url = https://github.com/espressif/esp-idf.git
 [submodule "micropython"]
 	path = micropython
-	url = https://github.com/micropython/micropython.git
+	url = https://github.com/labplus-cn/labplus_mpython_esp32s3-micropython.git
 [submodule "port/usercmodule/esp-who/esp-who"]
 	path = port/usercmodule/esp-who/esp-who
 	url = https://github.com/labplus-cn/esp-who.git
