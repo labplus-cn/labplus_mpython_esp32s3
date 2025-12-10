@@ -72,9 +72,6 @@ class SMTP:
         try:
             return int(code), resp
         except:
-            # print(code)
-            # print(resp)
-            # print("smtp=======")
             return code, resp
 
     def __init__(self, host, port, ssl=False, username=None, password=None):
