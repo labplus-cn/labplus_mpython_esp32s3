@@ -1,6 +1,8 @@
 #include "py/runtime.h"
 #include "who_lcd.h"
 #include "esp_camera.h"
+#include "esp_lcd_panel_ops.h"
+#include "lvgl.h"
 
 static mp_obj_t mp_lcd_init(void)
 {
@@ -32,6 +34,18 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mp_lcd_draw_logo_obj, mp_lcd_draw_logo);
 // }
 // static MP_DEFINE_CONST_FUN_OBJ_1(display_draw_image_obj, draw_image);
 
+static mp_obj_t mp_lcd__show(mp_obj_t buf_obj)
+{
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(buf_obj, &bufinfo, MP_BUFFER_WRITE);
+    
+    lcd_t *lcd = get_lcd_handle();
+    esp_lcd_panel_draw_bitmap(lcd->panel, 0, 0, 320, 172, (uint16_t *)bufinfo.buf);
+
+    return mp_obj_new_int_from_uint(0);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mp_lcd__show_obj, mp_lcd__show);
+
 static mp_obj_t mp_lcd_draw_color(mp_obj_t color)
 {
     int _color = mp_obj_get_int(color);
@@ -49,6 +63,7 @@ static const mp_rom_map_elem_t lcd_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mp_lcd_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_draw_logo), MP_ROM_PTR(&mp_lcd_draw_logo_obj) },
     { MP_ROM_QSTR(MP_QSTR_draw_color), MP_ROM_PTR(&mp_lcd_draw_color_obj) },
+    { MP_ROM_QSTR(MP_QSTR_show), MP_ROM_PTR(&mp_lcd__show_obj) },
     { MP_ROM_QSTR(MP_QSTR_PINK), MP_ROM_INT(GUI_Pink) },
     { MP_ROM_QSTR(MP_QSTR_DEEP_PINK), MP_ROM_INT(GUI_DeepPink) },
     { MP_ROM_QSTR(MP_QSTR_PURPLE), MP_ROM_INT(GUI_Purple) },

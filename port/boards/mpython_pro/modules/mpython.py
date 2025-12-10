@@ -19,6 +19,8 @@ from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
 from ltr308 import *
+import framebuf
+import lcd
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=400000)
 
@@ -35,6 +37,21 @@ def numberMap(inputNum, bMin, bMax, cMin, cMax):
     outputNum = 0
     outputNum = ((cMax - cMin) / (bMax - bMin)) * (inputNum - bMin) + cMin
     return outputNum
+
+class TFT_displayer(framebuf.FrameBuffer):
+    def __init__(self):
+        self.buffer = bytearray(110080) # 320*172*2
+        super().__init__(self.buffer, 320, 172, framebuf.RGB565)
+        
+    def DispChar(self, str, x, y, color, buff=None):
+        if buff is None:
+            buff = self.buffer
+        self.dispChar(str, x, y, color, buff)
+
+    def show(self):
+        lcd.show(self.buffer)
+        
+oled = TFT_displayer()
 
 # my_wifi = wifi()
 #多次尝试连接wifi

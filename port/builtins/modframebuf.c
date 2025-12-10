@@ -29,6 +29,8 @@
 
 #include "py/runtime.h"
 #include "py/binary.h"
+#include "lvgl.h"
+#include "esp_log.h"
 
 #if MICROPY_PY_FRAMEBUF
 
@@ -69,6 +71,83 @@ static void _swap(mp_int_t *x,mp_int_t *y){
 	mp_int_t temp=*x;
 	*x=*y;
 	*y=temp;
+}
+
+/**
+ * @brief 从 UTF-8 字符串中提取每个字符的 Unicode 编码
+ * @param str        输入字符串（UTF-8 编码，支持中文、英文、符号等）
+ * @param unicode_buf 输出缓冲区，存储每个字符的 Unicode 编码（32 位）
+ * @param buf_len    输出缓冲区最大长度（避免越界）
+ * @return           实际提取的字符数量
+ * @note             处理失败的字符（如无效 UTF-8）会返回 0xFFFD（替代字符 Unicode）
+ */
+uint32_t get_unicode_from_string(const char *str, uint32_t *unicode_buf, uint32_t buf_len) {
+    if (str == NULL || unicode_buf == NULL || buf_len == 0) {
+        return 0;
+    }
+
+    uint32_t char_count = 0;  // 已提取的字符数
+    const uint8_t *utf8_ptr = (const uint8_t *)str;
+
+    // 遍历 UTF-8 字符串，逐字符解码
+    while (*utf8_ptr != '\0' && char_count < buf_len) {
+        uint8_t byte1 = *utf8_ptr++;
+        uint32_t unicode = 0;
+
+        // UTF-8 解码规则（RFC 3629）
+        if ((byte1 & 0x80) == 0) {
+            // 单字节：0xxxxxxx（ASCII 字符，0~127）
+            unicode = byte1;
+        } else if ((byte1 & 0xE0) == 0xC0) {
+            // 双字节：110xxxxx 10xxxxxx
+            if (*utf8_ptr == '\0') {  // 不完整的 UTF-8 序列
+                unicode = 0xFFFD;
+                break;
+            }
+            uint8_t byte2 = *utf8_ptr++;
+            if ((byte2 & 0xC0) != 0x80) {  // 无效的续字节
+                unicode = 0xFFFD;
+                continue;
+            }
+            unicode = ((byte1 & 0x1F) << 6) | (byte2 & 0x3F);
+        } else if ((byte1 & 0xF0) == 0xE0) {
+            // 三字节：1110xxxx 10xxxxxx 10xxxxxx（中文、日文等常用）
+            if (*utf8_ptr == '\0' || *(utf8_ptr + 1) == '\0') {
+                unicode = 0xFFFD;
+                break;
+            }
+            uint8_t byte2 = *utf8_ptr++;
+            uint8_t byte3 = *utf8_ptr++;
+            if ((byte2 & 0xC0) != 0x80 || (byte3 & 0xC0) != 0x80) {
+                unicode = 0xFFFD;
+                continue;
+            }
+            unicode = ((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F);
+        } else if ((byte1 & 0xF8) == 0xF0) {
+            // 四字节：11110xxx 10xxxxxx 10xxxxxx 10xxxxxx（扩展 Unicode）
+            if (*utf8_ptr == '\0' || *(utf8_ptr + 1) == '\0' || *(utf8_ptr + 2) == '\0') {
+                unicode = 0xFFFD;
+                break;
+            }
+            uint8_t byte2 = *utf8_ptr++;
+            uint8_t byte3 = *utf8_ptr++;
+            uint8_t byte4 = *utf8_ptr++;
+            if ((byte2 & 0xC0) != 0x80 || (byte3 & 0xC0) != 0x80 || (byte4 & 0xC0) != 0x80) {
+                unicode = 0xFFFD;
+                continue;
+            }
+            unicode = ((byte1 & 0x07) << 18) | ((byte2 & 0x3F) << 12) | 
+                      ((byte3 & 0x3F) << 6) | (byte4 & 0x3F);
+        } else {
+            // 无效的 UTF-8 首字节
+            unicode = 0xFFFD;
+        }
+
+        // 存储 Unicode 编码，字符计数+1
+        unicode_buf[char_count++] = unicode;
+    }
+
+    return char_count;
 }
 
 // Functions for MHLSB and MHMSB
@@ -288,23 +367,29 @@ static mp_obj_t framebuf_make_new(const mp_obj_type_t *type, size_t n_args, size
         mp_raise_ValueError(NULL);
     }
 
-    size_t height_required = height;
     size_t bpp = 1;
+    size_t height_required = height;
+    size_t width_required = width;
+    size_t strides_required = height - 1;
 
     switch (format) {
         case FRAMEBUF_MVLSB:
             height_required = (height + 7) & ~7;
+            strides_required = height_required - 8;
             break;
         case FRAMEBUF_MHLSB:
         case FRAMEBUF_MHMSB:
             stride = (stride + 7) & ~7;
+            width_required = (width + 7) & ~7;
             break;
         case FRAMEBUF_GS2_HMSB:
             stride = (stride + 3) & ~3;
+            width_required = (width + 3) & ~3;
             bpp = 2;
             break;
         case FRAMEBUF_GS4_HMSB:
             stride = (stride + 1) & ~1;
+            width_required = (width + 1) & ~1;
             bpp = 4;
             break;
         case FRAMEBUF_GS8:
@@ -320,7 +405,7 @@ static mp_obj_t framebuf_make_new(const mp_obj_type_t *type, size_t n_args, size
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(args_in[0], &bufinfo, MP_BUFFER_WRITE);
 
-    if (height_required * stride * bpp / 8 > bufinfo.len) {
+    if ((strides_required * stride + (height_required - strides_required) * width_required) * bpp / 8 > bufinfo.len) {
         mp_raise_ValueError(NULL);
     }
 
@@ -790,146 +875,6 @@ static mp_obj_t framebuf_round_rect(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_round_rect_obj, 6, 7, framebuf_round_rect);
 
-static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args) {
-    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args[0]);
-    mp_obj_t source_in = mp_obj_cast_to_native_base(args[1], MP_OBJ_FROM_PTR(&mp_type_framebuf));
-    if (source_in == MP_OBJ_NULL) {
-        mp_raise_TypeError(NULL);
-    }
-    mp_obj_framebuf_t *source = MP_OBJ_TO_PTR(source_in);
-
-    mp_int_t x = mp_obj_get_int(args[2]);
-    mp_int_t y = mp_obj_get_int(args[3]);
-    mp_int_t key = -1;
-    if (n_args > 4) {
-        key = mp_obj_get_int(args[4]);
-    }
-
-    if (
-        (x >= self->width) ||
-        (y >= self->height) ||
-        (-x >= source->width) ||
-        (-y >= source->height)
-        ) {
-        // Out of bounds, no-op.
-        return mp_const_none;
-    }
-
-    // Clip.
-    int x0 = MAX(0, x);
-    int y0 = MAX(0, y);
-    int x1 = MAX(0, -x);
-    int y1 = MAX(0, -y);
-    int x0end = MIN(self->width, x + source->width);
-    int y0end = MIN(self->height, y + source->height);
-
-    for (; y0 < y0end; ++y0) {
-        int cx1 = x1;
-        for (int cx0 = x0; cx0 < x0end; ++cx0) {
-            uint32_t col = getpixel(source, cx1, y1);
-            if (col != (uint32_t)key) {
-                setpixel(self, cx0, y0, col);
-            }
-            ++cx1;
-        }
-        ++y1;
-    }
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 5, framebuf_blit);
-
-static mp_obj_t framebuf_bitmap(size_t n_args, const mp_obj_t *args) {
-    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args[0]);
-    mp_obj_t _args[5];
-    _args[0] = args[3];
-    _args[1] = args[4];
-    _args[2] = args[5];
-    _args[3] = mp_obj_new_int(FRAMEBUF_MHLSB);  
-    mp_obj_t o = framebuf_make_new(self->base.type, 4, 0, _args);
-
-    _args[0] = self;
-    _args[1] = o;
-    _args[2] = args[1];
-    _args[3] = args[2];
-    //_args[4] = args[6];
-    framebuf_blit(4, _args);
-
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_bitmap_obj, 7, 7, framebuf_bitmap);
-
-static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ystep_in) {
-    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
-    mp_int_t xstep = mp_obj_get_int(xstep_in);
-    mp_int_t ystep = mp_obj_get_int(ystep_in);
-    int sx, y, xend, yend, dx, dy;
-    if (xstep < 0) {
-        sx = 0;
-        xend = self->width + xstep;
-        dx = 1;
-    } else {
-        sx = self->width - 1;
-        xend = xstep - 1;
-        dx = -1;
-    }
-    if (ystep < 0) {
-        y = 0;
-        yend = self->height + ystep;
-        dy = 1;
-    } else {
-        y = self->height - 1;
-        yend = ystep - 1;
-        dy = -1;
-    }
-    for (; y != yend; y += dy) {
-        for (int x = sx; x != xend; x += dx) {
-            setpixel(self, x, y, getpixel(self, x - xstep, y - ystep));
-        }
-    }
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_3(framebuf_scroll_obj, framebuf_scroll);
-
-static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args) {
-    // extract arguments
-    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args[0]);
-    const char *str = mp_obj_str_get_str(args[1]);
-    mp_int_t x0 = mp_obj_get_int(args[2]);
-    mp_int_t y0 = mp_obj_get_int(args[3]);
-    mp_int_t col = 1;
-    if (n_args >= 5) {
-        col = mp_obj_get_int(args[4]);
-    }
-
-    // loop over chars
-    for (; *str; ++str) {
-        // get char and make sure its in range of font
-        int chr = *(uint8_t *)str;
-        if (chr < 32 || chr > 127) {
-            chr = 127;
-        }
-        // get char data
-        const uint8_t *chr_data = &font_petme128_8x8[(chr - 32) * 8];
-        // loop over char data
-        for (int j = 0; j < 8; j++, x0++) {
-            if (0 <= x0 && x0 < self->width) { // clip x
-                uint vline_data = chr_data[j]; // each byte is a column of 8 pixels, LSB at top
-                for (int y = y0; vline_data; vline_data >>= 1, y++) { // scan over vertical column
-                    if (vline_data & 1) { // only draw if pixel set
-                        if (0 <= y && y < self->height) { // clip y
-                            setpixel(self, x0, y, col);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_text_obj, 4, 5, framebuf_text);
-
-
-
 // Q2 Q1
 // Q3 Q4
 #define ELLIPSE_MASK_FILL (0x10)
@@ -970,6 +915,10 @@ static mp_obj_t framebuf_ellipse(size_t n_args, const mp_obj_t *args_in) {
         mask |= mp_obj_get_int(args_in[7]) & ELLIPSE_MASK_ALL;
     } else {
         mask |= ELLIPSE_MASK_ALL;
+    }
+    if (args[2] == 0 && args[3] == 0) {
+        setpixel_checked(self, args[0], args[1], args[4], mask & ELLIPSE_MASK_ALL);
+        return mp_const_none;
     }
     mp_int_t two_asquare = 2 * args[2] * args[2];
     mp_int_t two_bsquare = 2 * args[3] * args[3];
@@ -1138,7 +1087,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_poly_obj, 5, 6, framebuf_pol
 
 #endif // MICROPY_PY_ARRAY
 
-static mp_obj_t framebuf_blit1(size_t n_args, const mp_obj_t *args_in) {
+static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
     mp_obj_t source_in = mp_obj_cast_to_native_base(args_in[1], MP_OBJ_FROM_PTR(&mp_type_framebuf));
     if (source_in == MP_OBJ_NULL) {
@@ -1191,9 +1140,9 @@ static mp_obj_t framebuf_blit1(size_t n_args, const mp_obj_t *args_in) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit1_obj, 4, 6, framebuf_blit1);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 6, framebuf_blit);
 
-static mp_obj_t framebuf_scroll1(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ystep_in) {
+static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ystep_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
     mp_int_t xstep = mp_obj_get_int(xstep_in);
     mp_int_t ystep = mp_obj_get_int(ystep_in);
@@ -1235,9 +1184,95 @@ static mp_obj_t framebuf_scroll1(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t y
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_3(framebuf_scroll1_obj, framebuf_scroll1);
+static MP_DEFINE_CONST_FUN_OBJ_3(framebuf_scroll_obj, framebuf_scroll);
 
-static mp_obj_t framebuf_text1(size_t n_args, const mp_obj_t *args_in) {
+static mp_obj_t framebuf_disp_char(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_str, ARG_x, ARG_y, ARG_color, ARG_buff };
+    mp_arg_t allowed_args[] = {
+        { MP_QSTR_str, MP_ARG_REQUIRED | MP_ARG_OBJ},
+        { MP_QSTR_x, MP_ARG_REQUIRED | MP_ARG_INT},
+        { MP_QSTR_y, MP_ARG_REQUIRED | MP_ARG_INT },
+        { MP_QSTR_color, MP_ARG_REQUIRED | MP_ARG_INT },
+        { MP_QSTR_buff, MP_ARG_REQUIRED | MP_ARG_OBJ },
+    };
+
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(pos_args[0]);
+    const char *str = mp_obj_str_get_str(args[ARG_str].u_obj);
+    mp_int_t x0 = args[ARG_x].u_int;
+    mp_int_t y0 = args[ARG_y].u_int;
+    mp_int_t col = args[ARG_color].u_int;
+    mp_obj_t buff_in = args[ARG_buff].u_obj;
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(buff_in, &bufinfo, MP_BUFFER_WRITE);
+
+    uint32_t unicode_buf[50];
+    uint16_t char_num =  get_unicode_from_string(str, unicode_buf, 50); //字符串转换为unicode编码
+    ESP_LOGE("framebuf", "unicode: %ld, char_num:%d", unicode_buf[0], char_num);
+
+    lv_font_glyph_dsc_t glyph_dsc = {0};
+    lv_font_t *font = (lv_font_t *)&lv_font_siyuan_heiti_medium_24;
+
+    // 1. 获取字形描述
+    if (!lv_font_get_glyph_dsc(font, &glyph_dsc, unicode_buf[0], 0)) {
+        // 字符不支持，跳过
+        return mp_const_none;
+    }
+
+        // 2. 创建绘制缓冲区
+    lv_draw_buf_t *draw_buf = lv_draw_buf_create(glyph_dsc.box_w, glyph_dsc.box_h, LV_COLOR_FORMAT_A8, 0);
+    lv_draw_buf_t *draw_buf = (lv_draw_buf_t *)heap_caps_malloc(sizeof(lv_draw_buf_t), MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    draw_buf->width = glyph_dsc.box_w;
+    draw_buf->height = glyph_dsc.box_h;
+    draw_buf->color_format = LV_COLOR_FORMAT_A8;
+    draw_buf->data_size = glyph_dsc.box_w * glyph_dsc.box_h;
+    draw_buf->data = (uint8_t *)heap_caps_malloc(draw_buf->data_size, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    memset(draw_buf->data, 0, draw_buf->data_size);
+
+    draw_buf->header.w = glyph_dsc.box_w;
+    draw_buf->header.h = glyph_dsc.box_h;
+    draw_buf->header.cf = LV_COLOR_FORMAT_A8;
+    draw_buf->header.flags = LV_IMAGE_FLAGS_MODIFIABLE | LV_IMAGE_FLAGS_ALLOCATED;
+    draw_buf->header.stride = 0;
+    draw_buf->header.magic = LV_IMAGE_HEADER_MAGIC;
+    draw_buf->data = lv_draw_buf_align(buf, cf);
+    draw_buf->unaligned_data = buf;
+    draw_buf->data_size = size;
+    draw_buf->handlers = handlers;
+
+    if (!draw_buf) {
+        return mp_const_none;
+    }
+
+    // const void *bitmap = lv_font_get_glyph_bitmap(&glyph_dsc, &draw_buf);
+    // if (bitmap) {
+    //     // Draw glyph to buffer at position (x, y)
+    //     // x += glyph_dsc.adv_w;
+    // }
+
+    // 3. 获取字形位图
+    if (!lv_font_get_glyph_bitmap(&glyph_dsc, draw_buf)) {
+        lv_draw_buf_destroy(draw_buf);
+        return mp_const_none;
+    }
+
+    // // 4. 计算绘制位置
+    // uint16_t draw_x = x + glyph_dsc.ofs_x;
+    // uint16_t draw_y = y + g_dsc.ofs_y;
+
+    // // 5. 将A8格式位图转换为RGB565并绘制到framebuffer
+    // const uint8_t *bitmap_data = draw_buf->data;
+    // ESP_LOGE("framebuf", "bitmap_data:%d", bitmap_data[0]);
+    // uint32_t stride = lv_draw_buf_get_stride(draw_buf);
+    
+    lv_draw_buf_destroy(draw_buf);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(framebuf_disp_char_obj, 1, framebuf_disp_char);
+
+static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args_in) {
     // extract arguments
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
     const char *str = mp_obj_str_get_str(args_in[1]);
@@ -1273,7 +1308,27 @@ static mp_obj_t framebuf_text1(size_t n_args, const mp_obj_t *args_in) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_text1_obj, 4, 5, framebuf_text1);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_text_obj, 4, 5, framebuf_text);
+
+static mp_obj_t framebuf_bitmap(size_t n_args, const mp_obj_t *args) {
+    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args[0]);
+    mp_obj_t _args[5];
+    _args[0] = args[3];
+    _args[1] = args[4];
+    _args[2] = args[5];
+    _args[3] = mp_obj_new_int(FRAMEBUF_MHLSB);  
+    mp_obj_t o = framebuf_make_new(self->base.type, 4, 0, _args);
+
+    _args[0] = self;
+    _args[1] = o;
+    _args[2] = args[1];
+    _args[3] = args[2];
+    //_args[4] = args[6];
+    framebuf_blit(4, _args);
+
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_bitmap_obj, 7, 7, framebuf_bitmap);
 
 #if !MICROPY_ENABLE_DYNRUNTIME
 static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
@@ -1297,13 +1352,10 @@ static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_poly), MP_ROM_PTR(&framebuf_poly_obj) },
     #endif
     { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&framebuf_blit_obj) },
-    { MP_ROM_QSTR(MP_QSTR_blit1), MP_ROM_PTR(&framebuf_blit1_obj) },
     { MP_ROM_QSTR(MP_QSTR_bitmap), MP_ROM_PTR(&framebuf_bitmap_obj) },
-    { MP_ROM_QSTR(MP_QSTR_Bitmap), MP_ROM_PTR(&framebuf_bitmap_obj) },
     { MP_ROM_QSTR(MP_QSTR_scroll), MP_ROM_PTR(&framebuf_scroll_obj) },
-    { MP_ROM_QSTR(MP_QSTR_scroll1), MP_ROM_PTR(&framebuf_scroll1_obj) },
     { MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&framebuf_text_obj) },
-    { MP_ROM_QSTR(MP_QSTR_text1), MP_ROM_PTR(&framebuf_text1_obj) },
+    { MP_ROM_QSTR(MP_QSTR_dispChar), MP_ROM_PTR(&framebuf_disp_char_obj) },
 };
 static MP_DEFINE_CONST_DICT(framebuf_locals_dict, framebuf_locals_dict_table);
 
