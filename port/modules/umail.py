@@ -69,7 +69,13 @@ class SMTP:
             code = sock.read(3)
             next = sock.read(1) == b'-'
             resp.append(sock.readline().strip().decode())
-        return int(code), resp
+        try:
+            return int(code), resp
+        except:
+            # print(code)
+            # print(resp)
+            # print("smtp=======")
+            return code, resp
 
     def __init__(self, host, port, ssl=False, username=None, password=None):
         import ssl as ussl 
