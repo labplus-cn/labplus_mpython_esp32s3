@@ -47,7 +47,7 @@ CLASSIFY_MODEL_MODE = 32 # 分类模型
 DETECT_MODEL_MODE = 33  # 检测模型
 HAND_KEYPOINT = 34 # 手部关键点
 FACE_REG_PLUS_MODE = 35 # 人脸拍照+注册 
-
+APS_MODE = 36  # 道路自动驾驶系统
 
 LINEAR_REGRESSION_MODE = 40 #快速线性回归
 LINEAR_REGRESSION_V3_MODE = 41 #快速线性回归 v3
@@ -98,6 +98,7 @@ AI ={
     'CLASSIFY_MODEL_MODE':[CLASSIFY_MODEL_MODE,0x01],
     'DETECT_MODEL_MODE':[DETECT_MODEL_MODE,0x01],
     'FACE_REG_PLUS_MODE':[FACE_REG_PLUS_MODE,0x01],
+    'APS_MODE':[APS_MODE,0x01],
     'LINEAR_REGRESSION_MODE':[LINEAR_REGRESSION_MODE,0x01],
     'LINEAR_REGRESSION_V3_MODE':[LINEAR_REGRESSION_V3_MODE,0x01],
     'factory':[99,0x01,0x02,0x03,0x04,0x05]
@@ -305,3 +306,61 @@ class TASK:
 
     # def kill(self):
     #     pass
+
+
+
+
+class PIDController:
+    def __init__(self, kp, ki, kd, min_out=-25, max_out=25):
+        """
+        :param kp: 比例系数 (响应速度)
+        :param ki: 积分系数 (消除静态误差)
+        :param kd: 微分系数 (减少震荡)
+        :param min_out: 输出下限
+        :param max_out: 输出上限
+        """
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.min_out = min_out
+        self.max_out = max_out
+        
+        self.prev_error = 0
+        self.integral = 0
+        self.last_time = time.time()
+
+    def compute(self, target, current):
+        """
+        计算PID输出
+        :param target: 目标角度 (通常是 0)
+        :param current: 当前角度
+        :return: 修正量 (turn_speed)
+        """
+        now = time.time()
+        dt = now - self.last_time
+        
+        # 防止除以0（如果是第一次运行或运行过快）
+        if dt <= 0: dt = 0.001 
+
+        error = target - current
+        
+        # P项
+        p_out = self.kp * error
+        
+        # I项
+        self.integral += error * dt
+        i_out = self.ki * self.integral
+        
+        # D项 (变化率)
+        derivative = (error - self.prev_error) / dt
+        d_out = self.kd * derivative
+
+        # 总输出
+        output = p_out + i_out + d_out
+        
+        # 保存状态
+        self.prev_error = error
+        self.last_time = now
+        
+        # 限幅 (防止输出超出电机允许范围)
+        return max(self.min_out, min(output, self.max_out))

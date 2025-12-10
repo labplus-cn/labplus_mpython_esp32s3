@@ -418,4 +418,31 @@ class LINEAR_V3_REGRESSION():
         time.sleep_ms(self.sleep_time_ms)
         if(not self.lock):
             AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
-     
+
+
+class AMR(object):
+    """ 自动驾驶 Autonomous Mobile Robot """
+    def __init__(self, uart):
+        self.uart = uart
+        self.pid = PIDController(kp=1.3, ki=0.0, kd=0.2, min_out=-25, max_out=25) 
+        self.res = {
+                        "F": "none",
+                        "AGL": 0,
+                        "SW": [],
+                        "GL": [],
+                        "RL": [],
+                        "UT": []
+                    }
+        self.CommandList = AI['APS_MODE']
+        self.lock = False
+        AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
+        time.sleep(0.5)
+
+    def pid_controller(self, kp=1.3, ki=0, kd=0.2, min_out=-25, max_out=25):
+        self.pid = PIDController(kp=kp, ki=ki, kd=kd, min_out=min_out, max_out=max_out) 
+
+    def recognize(self):
+        time.sleep_ms(10)
+        if(not self.lock):
+            AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
+
