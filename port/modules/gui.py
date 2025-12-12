@@ -1,6 +1,6 @@
 # gui for mpython
 # MIT license; Copyright (c) 2019 Zhang Kaihua(apple_eat@126.com)
-import time, math, struct, gc
+import time, math, struct, gc, lcd
 from framebuf import FrameBuffer
 import adafruit_miniqr,gc
 
@@ -79,11 +79,12 @@ class multiScreen():
 
 
 class Clock:
-    def __init__(self, oled, x, y, radius):  #定义时钟中心点和半径
+    def __init__(self, oled, x, y, radius, color = lcd.WHITE):  #定义时钟中心点和半径
         self.display = oled
         self.xc = x
         self.yc = y
         self.r = radius
+        self.color = color
 
     def settime(self):  #设定时间
         t = time.localtime()
@@ -95,8 +96,8 @@ class Clock:
         r_tic1 = self.r - 1
         r_tic2 = self.r - 2
 
-        self.display.circle(self.xc, self.yc, self.r, 1)
-        self.display.fill_circle(self.xc, self.yc, 2, 1)
+        self.display.circle(self.xc, self.yc, self.r, self.color)
+        self.display.fill_circle(self.xc, self.yc, 2, self.color)
 
         for h in range(12):
             at = math.pi * 2.0 * h / 12.0
@@ -104,7 +105,7 @@ class Clock:
             x2 = round(self.xc + r_tic2 * math.sin(at))
             y1 = round(self.yc - r_tic1 * math.cos(at))
             y2 = round(self.yc - r_tic2 * math.cos(at))
-            self.display.line(x1, y1, x2, y2, 1)
+            self.display.line(x1, y1, x2, y2, self.color)
 
     def drawHour(self):  #画时针
 
@@ -112,7 +113,7 @@ class Clock:
         ah = math.pi * 2.0 * ((self.hour % 12) + self.min / 60.0) / 12.0
         xh = int(self.xc + r_hour * math.sin(ah))
         yh = int(self.yc - r_hour * math.cos(ah))
-        self.display.line(self.xc, self.yc, xh, yh, 1)
+        self.display.line(self.xc, self.yc, xh, yh, self.color)
 
     def drawMin(self):  #画分针
 
@@ -121,7 +122,7 @@ class Clock:
 
         xm = round(self.xc + r_min * math.sin(am))
         ym = round(self.yc - r_min * math.cos(am))
-        self.display.line(self.xc, self.yc, xm, ym, 1)
+        self.display.line(self.xc, self.yc, xm, ym, self.color)
 
     def drawSec(self):  #画秒针
 
@@ -129,7 +130,7 @@ class Clock:
         asec = math.pi * 2.0 * self.sec / 60.0
         xs = round(self.xc + r_sec * math.sin(asec))
         ys = round(self.yc - r_sec * math.cos(asec))
-        self.display.line(self.xc, self.yc, xs, ys, 1)
+        self.display.line(self.xc, self.yc, xs, ys, self.color)
 
     def drawClock(self):  #画完整钟表
         self.drawDial()

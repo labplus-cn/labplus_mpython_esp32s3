@@ -43,6 +43,7 @@ set(MICROPY_SOURCE_BOARD
     # ${MPY_PORT_DIR}/drivers/startup/startup.c 
     # ${MPY_PORT_DIR}/drivers/rfid/mfrc522.c
     # ${MPY_PORT_DIR}/lib/utils/pyexec.c
+    ${MPY_PORT_DIR}/lib/decode_png/LP_lodepng.c
     ${MPY_PORT_DIR}/builtins/main.c
     ${MPY_PORT_DIR}/builtins/modmusictunes.c
     ${MPY_PORT_DIR}/builtins/modmusic.c
@@ -61,7 +62,7 @@ set(MICROPY_SOURCE_BOARD
 set(MICROPY_SOURCE_BOARD_DIR
     ${MPY_PORT_DIR}/drivers
     ${MPY_PORT_DIR}/drivers/audio/include
-    ${MPY_PORT_DIR}/lib
+    ${MPY_PORT_DIR}/lib/decode_png
     ${MPY_PORT_DIR}/builtins
     ${MPY_PORT_DIR}/boards
 )

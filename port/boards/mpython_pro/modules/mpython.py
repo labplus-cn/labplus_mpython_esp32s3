@@ -43,10 +43,8 @@ class TFT_displayer(framebuf.FrameBuffer):
         self.buffer = bytearray(110080) # 320*172*2
         super().__init__(self.buffer, 320, 172, framebuf.RGB565)
         
-    def DispChar(self, str, x, y, color, buff=None):
-        if buff is None:
-            buff = self.buffer
-        self.dispChar(str, x, y, color, buff)
+    def DispChar(self, str, x, y, color):
+        self.dispChar(str, x, y, color)
 
     def show(self):
         lcd.show(self.buffer)
@@ -991,6 +989,7 @@ touchpad_h = touchPad_H = Touch(Pin(12))
 touchpad_o = touchPad_O = Touch(Pin(13))
 touchpad_n = touchPad_N = Touch(Pin(14))
 
+from gui import *
 
 """
 uuid
