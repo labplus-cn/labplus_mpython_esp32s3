@@ -4,21 +4,21 @@
 # '''
 
 # button A
-from mpython import *
+# from mpython import *
 
-def on_button_a_pressed(_):
-    print('A')
+# def on_button_a_pressed(_):
+#     print('A')
 
-button_a.event_pressed = on_button_a_pressed
+# button_a.event_pressed = on_button_a_pressed
 
-# button B
-def on_button_b_pressed(_):
-    print('B')
+# # button B
+# def on_button_b_pressed(_):
+#     print('B')
 
-button_b.event_pressed = on_button_b_pressed
+# button_b.event_pressed = on_button_b_pressed
 
-while True:
-    print("hello")
+# while True:
+#     print("hello")
   
 # # ----------------------------------------------
 # # 3、数字光线
@@ -143,4 +143,40 @@ while True:
 #     p3.write_digital(1)
 #     time.sleep(1)
 
-    
+from mpython import *
+
+import framebuf
+
+import digiface_44
+
+def mono2rgb65(buf_in, len):
+    buf_list = [0] * len
+    for i in range(0, len):
+        # tmp = buf_in[i]
+        # for j in range(0, 8):
+        #     if tmp & 0x80:
+        #         buf_list[i] = (int)(0xff)
+        #     tmp = tmp << 1
+        buf_list[i] = (int)(0xffff)
+        print(buf_list[i])
+    return buf_list
+        
+
+def display_font(_font, _str, _x, _y, _wrap, _z=0):
+    _start = _x
+    for _c in _str:
+        _d = _font.get_ch(_c)
+        
+        if _wrap and _x > 128 - _d[2]:
+            _x = _start
+            _y += _d[1]
+            
+        if _c == '1' and _z > 0: 
+            oled.fill_rect(_x, _y, _d[2], _d[1], 0)
+            
+        buff = mono2rgb65(_d[0], _d[2] * _d[1])
+        fb = framebuf.FrameBuffer(bytearray(buff), _d[2], _d[1], framebuf.RGB565)    
+        # oled.blit(fb, (_x+int(_d[2]/_z)) if _c=='1' and _z>0 else _x, _y)
+        # _x += _d[2]
+        
+display_font(digiface_44, '12:34', 0, 0, False, 2)

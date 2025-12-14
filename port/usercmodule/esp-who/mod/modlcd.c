@@ -40,6 +40,7 @@ static mp_obj_t mp_lcd__show(mp_obj_t buf_obj)
     mp_get_buffer_raise(buf_obj, &bufinfo, MP_BUFFER_WRITE);
     
     lcd_t *lcd = get_lcd_handle();
+    lv_draw_sw_rgb565_swap(bufinfo.buf, bufinfo.len / 2);
     esp_lcd_panel_draw_bitmap(lcd->panel, 0, 0, 320, 172, (uint16_t *)bufinfo.buf);
 
     return mp_obj_new_int_from_uint(0);

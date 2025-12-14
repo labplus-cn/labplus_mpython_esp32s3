@@ -43,13 +43,16 @@ class TFT_displayer(framebuf.FrameBuffer):
         self.buffer = bytearray(110080) # 320*172*2
         super().__init__(self.buffer, 320, 172, framebuf.RGB565)
         
-    def DispChar(self, str, x, y, color):
+    def DispChar(self, str, x, y, color=lcd.WHITE):
         self.dispChar(str, x, y, color)
+
+    def set_bg_color(self, color = lcd.BLACK):
+        lcd.fill(color)
 
     def show(self):
         lcd.show(self.buffer)
         
-oled = TFT_displayer()
+oled = TFT_displayer() # 为兼容命名为oled
 
 # my_wifi = wifi()
 #多次尝试连接wifi

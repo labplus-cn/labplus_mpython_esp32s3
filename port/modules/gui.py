@@ -1,8 +1,9 @@
 # gui for mpython
 # MIT license; Copyright (c) 2019 Zhang Kaihua(apple_eat@126.com)
 import time, math, struct, gc, lcd
-from framebuf import FrameBuffer
+import framebuf
 import adafruit_miniqr,gc
+from mpython import oled
 
 class UI():
     def __init__(self, oled):
@@ -144,21 +145,38 @@ class Clock:
 
 class Image():
     def __init__(self):
-        self.image_type = None
+        self.file_type = None
 
     def load(self, path, invert=0):
         self.invert = invert
         with open(path, 'rb') as file:
-            self.image_type = file.read(2).decode()
+            header = file.read(8)
+            
+            if len(header) < 2:  # 至少需要2字节判断BMP
+                self.file_type = 'UNKNOWN FORMAT'
+                raise TypeError("Unsupported image format {}".format(self.file_type))
+            
+            if header[:2] == b'P4':
+                self.file_type = 'PBM'
+            if header[:2] == b'BM':
+                self.file_type = 'BMP'
+            if header[:8] == b'\x89PNG\r\n\x1a\n':
+                self.file_type = 'PNG'
+            if len(header) >= 3 and header[0] == 0xFF and header[1] == 0xD8 and header[2] == 0xFF:
+                self.file_type = 'JPEG'
+            
             file.seek(0)
             img_arrays = bytearray(file.read())
-            if self.image_type == 'P4':
+            if self.file_type == 'PBM':
                 fb = self._pbm_decode(img_arrays)
 
-            elif self.image_type == 'BM':
+            elif self.file_type == 'BMP':
                 fb = self._bmp_decode(img_arrays)
+            elif self.file_type == 'PNG':
+                w, h, buff = oled.decode_png(img_arrays)
+                fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)            
             else:
-                raise TypeError("Unsupported image format {}".format(self.image_type))
+                raise TypeError("Unsupported image format {}".format(self.header))
             gc.collect()
             return fb
 
@@ -185,7 +203,7 @@ class Image():
         if self.invert == 1:
             for i in range(len(pixel_arrays)):
                 pixel_arrays[i] = (~pixel_arrays[i]) & 0xff
-        return FrameBuffer(pixel_arrays, pnm_header[0], pnm_header[1], 3)
+        return framebuf.FrameBuffer(pixel_arrays, pnm_header[0], pnm_header[1], 3)
 
     def _bmp_decode(self, img_arrays):
 
@@ -221,5 +239,5 @@ class Image():
                     pixel_byte = img_arrays[_offset]
                 pixel_arrays[index] = pixel_byte
 
-        return FrameBuffer(pixel_arrays, width, height, 3)
+        return framebuf.FrameBuffer(pixel_arrays, width, height, 3)
 

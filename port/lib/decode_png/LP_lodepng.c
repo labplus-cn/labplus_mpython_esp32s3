@@ -29,6 +29,7 @@ Rename this file to lodepng.cpp to use it for C++, or to lodepng.c to use it for
 */
 
 #include "LP_lodepng.h"
+#include "py/runtime.h"
 
 #ifdef LODEPNG_COMPILE_DISK
 #include <limits.h> /* LONG_MAX */
@@ -75,7 +76,7 @@ static void* LP_lodepng_malloc(size_t size) {
 #ifdef LODEPNG_MAX_ALLOC
   if(size > LODEPNG_MAX_ALLOC) return 0;
 #endif
-  return malloc(size);
+  return m_malloc(size);
 }
 
 /* NOTE: when realloc returns NULL, it leaves the original memory untouched */
@@ -83,11 +84,11 @@ static void* LP_lodepng_realloc(void* ptr, size_t new_size) {
 #ifdef LODEPNG_MAX_ALLOC
   if(new_size > LODEPNG_MAX_ALLOC) return 0;
 #endif
-  return realloc(ptr, new_size);
+  return m_realloc(ptr, new_size);
 }
 
 static void LP_lodepng_free(void* ptr) {
-  free(ptr);
+  m_free(ptr);
 }
 #else /*LODEPNG_COMPILE_ALLOCATORS*/
 /* TODO: support giving additional void* payload to the custom allocators */
@@ -2912,12 +2913,12 @@ unsigned LP_lodepng_chunk_create(unsigned char** out, size_t* outsize,
 Return value is a LP_LodePNG error code.*/
 static unsigned checkColorValidity(LP_LodePNGColorType colortype, unsigned bd) {
   switch(colortype) {
-    case LCT_GREY:       if(!(bd == 1 || bd == 2 || bd == 4 || bd == 8 || bd == 16)) return 37; break;
-    case LCT_RGB:        if(!(                                 bd == 8 || bd == 16)) return 37; break;
-    case LCT_PALETTE:    if(!(bd == 1 || bd == 2 || bd == 4 || bd == 8            )) return 37; break;
-    case LCT_GREY_ALPHA: if(!(                                 bd == 8 || bd == 16)) return 37; break;
-    case LCT_RGBA:       if(!(                                 bd == 8 || bd == 16)) return 37; break;
-    case LCT_MAX_OCTET_VALUE: return 31; /* invalid color type */
+    case LP_LCT_GREY:       if(!(bd == 1 || bd == 2 || bd == 4 || bd == 8 || bd == 16)) return 37; break;
+    case LP_LCT_RGB:        if(!(                                 bd == 8 || bd == 16)) return 37; break;
+    case LP_LCT_PALETTE:    if(!(bd == 1 || bd == 2 || bd == 4 || bd == 8            )) return 37; break;
+    case LP_LCT_GREY_ALPHA: if(!(                                 bd == 8 || bd == 16)) return 37; break;
+    case LP_LCT_RGBA:       if(!(                                 bd == 8 || bd == 16)) return 37; break;
+    case LP_LCT_MAX_OCTET_VALUE: return 31; /* invalid color type */
     default: return 31; /* invalid color type */
   }
   return 0; /*allowed color type / bits combination*/
@@ -2925,12 +2926,12 @@ static unsigned checkColorValidity(LP_LodePNGColorType colortype, unsigned bd) {
 
 static unsigned getNumColorChannels(LP_LodePNGColorType colortype) {
   switch(colortype) {
-    case LCT_GREY: return 1;
-    case LCT_RGB: return 3;
-    case LCT_PALETTE: return 1;
-    case LCT_GREY_ALPHA: return 2;
-    case LCT_RGBA: return 4;
-    case LCT_MAX_OCTET_VALUE: return 0; /* invalid color type */
+    case LP_LCT_GREY: return 1;
+    case LP_LCT_RGB: return 3;
+    case LP_LCT_PALETTE: return 1;
+    case LP_LCT_GREY_ALPHA: return 2;
+    case LP_LCT_RGBA: return 4;
+    case LP_LCT_MAX_OCTET_VALUE: return 0; /* invalid color type */
     default: return 0; /*invalid color type*/
   }
 }
@@ -2945,7 +2946,7 @@ static unsigned LP_lodepng_get_bpp_lct(LP_LodePNGColorType colortype, unsigned b
 void LP_lodepng_color_mode_init(LP_LodePNGColorMode* info) {
   info->key_defined = 0;
   info->key_r = info->key_g = info->key_b = 0;
-  info->colortype = LCT_RGBA;
+  info->colortype = LP_LCT_RGBA;
   info->bitdepth = 8;
   info->palette = 0;
   info->palettesize = 0;
@@ -3042,7 +3043,7 @@ unsigned LP_lodepng_get_channels(const LP_LodePNGColorMode* info) {
 }
 
 unsigned LP_lodepng_is_greyscale_type(const LP_LodePNGColorMode* info) {
-  return info->colortype == LCT_GREY || info->colortype == LCT_GREY_ALPHA;
+  return info->colortype == LP_LCT_GREY || info->colortype == LP_LCT_GREY_ALPHA;
 }
 
 unsigned LP_lodepng_is_alpha_type(const LP_LodePNGColorMode* info) {
@@ -3050,7 +3051,7 @@ unsigned LP_lodepng_is_alpha_type(const LP_LodePNGColorMode* info) {
 }
 
 unsigned LP_lodepng_is_palette_type(const LP_LodePNGColorMode* info) {
-  return info->colortype == LCT_PALETTE;
+  return info->colortype == LP_LCT_PALETTE;
 }
 
 unsigned LP_lodepng_has_palette_alpha(const LP_LodePNGColorMode* info) {
@@ -3496,7 +3497,7 @@ static unsigned color_tree_add(ColorTree* tree,
 static unsigned rgba8ToPixel(unsigned char* out, size_t i,
                              const LP_LodePNGColorMode* mode, ColorTree* tree /*for palette*/,
                              unsigned char r, unsigned char g, unsigned char b, unsigned char a) {
-  if(mode->colortype == LCT_GREY) {
+  if(mode->colortype == LP_LCT_GREY) {
     unsigned char gray = r; /*((unsigned short)r + g + b) / 3u;*/
     if(mode->bitdepth == 8) out[i] = gray;
     else if(mode->bitdepth == 16) out[i * 2 + 0] = out[i * 2 + 1] = gray;
@@ -3505,7 +3506,7 @@ static unsigned rgba8ToPixel(unsigned char* out, size_t i,
       gray = ((unsigned)gray >> (8u - mode->bitdepth)) & ((1u << mode->bitdepth) - 1u);
       addColorBits(out, i, mode->bitdepth, gray);
     }
-  } else if(mode->colortype == LCT_RGB) {
+  } else if(mode->colortype == LP_LCT_RGB) {
     if(mode->bitdepth == 8) {
       out[i * 3 + 0] = r;
       out[i * 3 + 1] = g;
@@ -3515,12 +3516,12 @@ static unsigned rgba8ToPixel(unsigned char* out, size_t i,
       out[i * 6 + 2] = out[i * 6 + 3] = g;
       out[i * 6 + 4] = out[i * 6 + 5] = b;
     }
-  } else if(mode->colortype == LCT_PALETTE) {
+  } else if(mode->colortype == LP_LCT_PALETTE) {
     int index = color_tree_get(tree, r, g, b, a);
     if(index < 0) return 82; /*color not in palette*/
     if(mode->bitdepth == 8) out[i] = index;
     else addColorBits(out, i, mode->bitdepth, (unsigned)index);
-  } else if(mode->colortype == LCT_GREY_ALPHA) {
+  } else if(mode->colortype == LP_LCT_GREY_ALPHA) {
     unsigned char gray = r; /*((unsigned short)r + g + b) / 3u;*/
     if(mode->bitdepth == 8) {
       out[i * 2 + 0] = gray;
@@ -3529,7 +3530,7 @@ static unsigned rgba8ToPixel(unsigned char* out, size_t i,
       out[i * 4 + 0] = out[i * 4 + 1] = gray;
       out[i * 4 + 2] = out[i * 4 + 3] = a;
     }
-  } else if(mode->colortype == LCT_RGBA) {
+  } else if(mode->colortype == LP_LCT_RGBA) {
     if(mode->bitdepth == 8) {
       out[i * 4 + 0] = r;
       out[i * 4 + 1] = g;
@@ -3550,24 +3551,24 @@ static unsigned rgba8ToPixel(unsigned char* out, size_t i,
 static void rgba16ToPixel(unsigned char* out, size_t i,
                          const LP_LodePNGColorMode* mode,
                          unsigned short r, unsigned short g, unsigned short b, unsigned short a) {
-  if(mode->colortype == LCT_GREY) {
+  if(mode->colortype == LP_LCT_GREY) {
     unsigned short gray = r; /*((unsigned)r + g + b) / 3u;*/
     out[i * 2 + 0] = (gray >> 8) & 255;
     out[i * 2 + 1] = gray & 255;
-  } else if(mode->colortype == LCT_RGB) {
+  } else if(mode->colortype == LP_LCT_RGB) {
     out[i * 6 + 0] = (r >> 8) & 255;
     out[i * 6 + 1] = r & 255;
     out[i * 6 + 2] = (g >> 8) & 255;
     out[i * 6 + 3] = g & 255;
     out[i * 6 + 4] = (b >> 8) & 255;
     out[i * 6 + 5] = b & 255;
-  } else if(mode->colortype == LCT_GREY_ALPHA) {
+  } else if(mode->colortype == LP_LCT_GREY_ALPHA) {
     unsigned short gray = r; /*((unsigned)r + g + b) / 3u;*/
     out[i * 4 + 0] = (gray >> 8) & 255;
     out[i * 4 + 1] = gray & 255;
     out[i * 4 + 2] = (a >> 8) & 255;
     out[i * 4 + 3] = a & 255;
-  } else if(mode->colortype == LCT_RGBA) {
+  } else if(mode->colortype == LP_LCT_RGBA) {
     out[i * 8 + 0] = (r >> 8) & 255;
     out[i * 8 + 1] = r & 255;
     out[i * 8 + 2] = (g >> 8) & 255;
@@ -3584,7 +3585,7 @@ static void getPixelColorRGBA8(unsigned char* r, unsigned char* g,
                                unsigned char* b, unsigned char* a,
                                const unsigned char* in, size_t i,
                                const LP_LodePNGColorMode* mode) {
-  if(mode->colortype == LCT_GREY) {
+  if(mode->colortype == LP_LCT_GREY) {
     if(mode->bitdepth == 8) {
       *r = *g = *b = in[i];
       if(mode->key_defined && *r == mode->key_r) *a = 0;
@@ -3601,7 +3602,7 @@ static void getPixelColorRGBA8(unsigned char* r, unsigned char* g,
       if(mode->key_defined && value == mode->key_r) *a = 0;
       else *a = 255;
     }
-  } else if(mode->colortype == LCT_RGB) {
+  } else if(mode->colortype == LP_LCT_RGB) {
     if(mode->bitdepth == 8) {
       *r = in[i * 3 + 0]; *g = in[i * 3 + 1]; *b = in[i * 3 + 2];
       if(mode->key_defined && *r == mode->key_r && *g == mode->key_g && *b == mode->key_b) *a = 0;
@@ -3615,7 +3616,7 @@ static void getPixelColorRGBA8(unsigned char* r, unsigned char* g,
          && 256U * in[i * 6 + 4] + in[i * 6 + 5] == mode->key_b) *a = 0;
       else *a = 255;
     }
-  } else if(mode->colortype == LCT_PALETTE) {
+  } else if(mode->colortype == LP_LCT_PALETTE) {
     unsigned index;
     if(mode->bitdepth == 8) index = in[i];
     else {
@@ -3627,7 +3628,7 @@ static void getPixelColorRGBA8(unsigned char* r, unsigned char* g,
     *g = mode->palette[index * 4 + 1];
     *b = mode->palette[index * 4 + 2];
     *a = mode->palette[index * 4 + 3];
-  } else if(mode->colortype == LCT_GREY_ALPHA) {
+  } else if(mode->colortype == LP_LCT_GREY_ALPHA) {
     if(mode->bitdepth == 8) {
       *r = *g = *b = in[i * 2 + 0];
       *a = in[i * 2 + 1];
@@ -3635,7 +3636,7 @@ static void getPixelColorRGBA8(unsigned char* r, unsigned char* g,
       *r = *g = *b = in[i * 4 + 0];
       *a = in[i * 4 + 2];
     }
-  } else if(mode->colortype == LCT_RGBA) {
+  } else if(mode->colortype == LP_LCT_RGBA) {
     if(mode->bitdepth == 8) {
       *r = in[i * 4 + 0];
       *g = in[i * 4 + 1];
@@ -3659,7 +3660,7 @@ static void getPixelColorsRGBA8(unsigned char* LODEPNG_RESTRICT buffer, size_t n
                                 const LP_LodePNGColorMode* mode) {
   unsigned num_channels = 4;
   size_t i;
-  if(mode->colortype == LCT_GREY) {
+  if(mode->colortype == LP_LCT_GREY) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         buffer[0] = buffer[1] = buffer[2] = in[i];
@@ -3685,7 +3686,7 @@ static void getPixelColorsRGBA8(unsigned char* LODEPNG_RESTRICT buffer, size_t n
         buffer[3] = mode->key_defined && value == mode->key_r ? 0 : 255;
       }
     }
-  } else if(mode->colortype == LCT_RGB) {
+  } else if(mode->colortype == LP_LCT_RGB) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         LP_lodepng_memcpy(buffer, &in[i * 3], 3);
@@ -3708,7 +3709,7 @@ static void getPixelColorsRGBA8(unsigned char* LODEPNG_RESTRICT buffer, size_t n
            && 256U * in[i * 6 + 4] + in[i * 6 + 5] == mode->key_b ? 0 : 255;
       }
     }
-  } else if(mode->colortype == LCT_PALETTE) {
+  } else if(mode->colortype == LP_LCT_PALETTE) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         unsigned index = in[i];
@@ -3723,7 +3724,7 @@ static void getPixelColorsRGBA8(unsigned char* LODEPNG_RESTRICT buffer, size_t n
         LP_lodepng_memcpy(buffer, &mode->palette[index * 4], 4);
       }
     }
-  } else if(mode->colortype == LCT_GREY_ALPHA) {
+  } else if(mode->colortype == LP_LCT_GREY_ALPHA) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         buffer[0] = buffer[1] = buffer[2] = in[i * 2 + 0];
@@ -3735,7 +3736,7 @@ static void getPixelColorsRGBA8(unsigned char* LODEPNG_RESTRICT buffer, size_t n
         buffer[3] = in[i * 4 + 2];
       }
     }
-  } else if(mode->colortype == LCT_RGBA) {
+  } else if(mode->colortype == LP_LCT_RGBA) {
     if(mode->bitdepth == 8) {
       LP_lodepng_memcpy(buffer, in, numpixels * 4);
     } else {
@@ -3755,7 +3756,7 @@ static void getPixelColorsRGB8(unsigned char* LODEPNG_RESTRICT buffer, size_t nu
                                const LP_LodePNGColorMode* mode) {
   const unsigned num_channels = 3;
   size_t i;
-  if(mode->colortype == LCT_GREY) {
+  if(mode->colortype == LP_LCT_GREY) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         buffer[0] = buffer[1] = buffer[2] = in[i];
@@ -3772,7 +3773,7 @@ static void getPixelColorsRGB8(unsigned char* LODEPNG_RESTRICT buffer, size_t nu
         buffer[0] = buffer[1] = buffer[2] = (value * 255) / highest;
       }
     }
-  } else if(mode->colortype == LCT_RGB) {
+  } else if(mode->colortype == LP_LCT_RGB) {
     if(mode->bitdepth == 8) {
       LP_lodepng_memcpy(buffer, in, numpixels * 3);
     } else {
@@ -3782,7 +3783,7 @@ static void getPixelColorsRGB8(unsigned char* LODEPNG_RESTRICT buffer, size_t nu
         buffer[2] = in[i * 6 + 4];
       }
     }
-  } else if(mode->colortype == LCT_PALETTE) {
+  } else if(mode->colortype == LP_LCT_PALETTE) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         unsigned index = in[i];
@@ -3797,7 +3798,7 @@ static void getPixelColorsRGB8(unsigned char* LODEPNG_RESTRICT buffer, size_t nu
         LP_lodepng_memcpy(buffer, &mode->palette[index * 4], 3);
       }
     }
-  } else if(mode->colortype == LCT_GREY_ALPHA) {
+  } else if(mode->colortype == LP_LCT_GREY_ALPHA) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         buffer[0] = buffer[1] = buffer[2] = in[i * 2 + 0];
@@ -3807,7 +3808,7 @@ static void getPixelColorsRGB8(unsigned char* LODEPNG_RESTRICT buffer, size_t nu
         buffer[0] = buffer[1] = buffer[2] = in[i * 4 + 0];
       }
     }
-  } else if(mode->colortype == LCT_RGBA) {
+  } else if(mode->colortype == LP_LCT_RGBA) {
     if(mode->bitdepth == 8) {
       for(i = 0; i != numpixels; ++i, buffer += num_channels) {
         LP_lodepng_memcpy(buffer, &in[i * 4], 3);
@@ -3826,11 +3827,11 @@ static void getPixelColorsRGB8(unsigned char* LODEPNG_RESTRICT buffer, size_t nu
 given color type, but the given color type must be 16-bit itself.*/
 static void getPixelColorRGBA16(unsigned short* r, unsigned short* g, unsigned short* b, unsigned short* a,
                                 const unsigned char* in, size_t i, const LP_LodePNGColorMode* mode) {
-  if(mode->colortype == LCT_GREY) {
+  if(mode->colortype == LP_LCT_GREY) {
     *r = *g = *b = 256 * in[i * 2 + 0] + in[i * 2 + 1];
     if(mode->key_defined && 256U * in[i * 2 + 0] + in[i * 2 + 1] == mode->key_r) *a = 0;
     else *a = 65535;
-  } else if(mode->colortype == LCT_RGB) {
+  } else if(mode->colortype == LP_LCT_RGB) {
     *r = 256u * in[i * 6 + 0] + in[i * 6 + 1];
     *g = 256u * in[i * 6 + 2] + in[i * 6 + 3];
     *b = 256u * in[i * 6 + 4] + in[i * 6 + 5];
@@ -3839,10 +3840,10 @@ static void getPixelColorRGBA16(unsigned short* r, unsigned short* g, unsigned s
        && 256u * in[i * 6 + 2] + in[i * 6 + 3] == mode->key_g
        && 256u * in[i * 6 + 4] + in[i * 6 + 5] == mode->key_b) *a = 0;
     else *a = 65535;
-  } else if(mode->colortype == LCT_GREY_ALPHA) {
+  } else if(mode->colortype == LP_LCT_GREY_ALPHA) {
     *r = *g = *b = 256u * in[i * 4 + 0] + in[i * 4 + 1];
     *a = 256u * in[i * 4 + 2] + in[i * 4 + 3];
-  } else if(mode->colortype == LCT_RGBA) {
+  } else if(mode->colortype == LP_LCT_RGBA) {
     *r = 256u * in[i * 8 + 0] + in[i * 8 + 1];
     *g = 256u * in[i * 8 + 2] + in[i * 8 + 3];
     *b = 256u * in[i * 8 + 4] + in[i * 8 + 5];
@@ -3858,7 +3859,7 @@ unsigned LP_lodepng_convert(unsigned char* out, const unsigned char* in,
   size_t numpixels = (size_t)w * (size_t)h;
   unsigned error = 0;
 
-  if(mode_in->colortype == LCT_PALETTE && !mode_in->palette) {
+  if(mode_in->colortype == LP_LCT_PALETTE && !mode_in->palette) {
     return 107; /* error: must provide palette if input mode is palette */
   }
 
@@ -3868,7 +3869,7 @@ unsigned LP_lodepng_convert(unsigned char* out, const unsigned char* in,
     return 0;
   }
 
-  if(mode_out->colortype == LCT_PALETTE) {
+  if(mode_out->colortype == LP_LCT_PALETTE) {
     size_t palettesize = mode_out->palettesize;
     const unsigned char* palette = mode_out->palette;
     size_t palsize = (size_t)1u << mode_out->bitdepth;
@@ -3881,7 +3882,7 @@ unsigned LP_lodepng_convert(unsigned char* out, const unsigned char* in,
       /*if the input was also palette with same bitdepth, then the color types are also
       equal, so copy literally. This to preserve the exact indices that were in the PNG
       even in case there are duplicate colors in the palette.*/
-      if(mode_in->colortype == LCT_PALETTE && mode_in->bitdepth == mode_out->bitdepth) {
+      if(mode_in->colortype == LP_LCT_PALETTE && mode_in->bitdepth == mode_out->bitdepth) {
         size_t numbytes = LP_lodepng_get_raw_size(w, h, mode_in);
         LP_lodepng_memcpy(out, in, numbytes);
         return 0;
@@ -3903,9 +3904,9 @@ unsigned LP_lodepng_convert(unsigned char* out, const unsigned char* in,
         getPixelColorRGBA16(&r, &g, &b, &a, in, i, mode_in);
         rgba16ToPixel(out, i, mode_out, r, g, b, a);
       }
-    } else if(mode_out->bitdepth == 8 && mode_out->colortype == LCT_RGBA) {
+    } else if(mode_out->bitdepth == 8 && mode_out->colortype == LP_LCT_RGBA) {
       getPixelColorsRGBA8(out, numpixels, in, mode_in);
-    } else if(mode_out->bitdepth == 8 && mode_out->colortype == LCT_RGB) {
+    } else if(mode_out->bitdepth == 8 && mode_out->colortype == LP_LCT_RGB) {
       getPixelColorsRGB8(out, numpixels, in, mode_in);
     } else {
       unsigned char r = 0, g = 0, b = 0, a = 0;
@@ -3917,7 +3918,7 @@ unsigned LP_lodepng_convert(unsigned char* out, const unsigned char* in,
     }
   }
 
-  if(mode_out->colortype == LCT_PALETTE) {
+  if(mode_out->colortype == LP_LCT_PALETTE) {
     color_tree_cleanup(&tree);
   }
 
@@ -3939,13 +3940,13 @@ unsigned LP_lodepng_convert_rgb(
   unsigned mul = 65535 / ((1u << mode_in->bitdepth) - 1u); /*65535, 21845, 4369, 257, 1*/
   unsigned shift = 16 - mode_out->bitdepth;
 
-  if(mode_in->colortype == LCT_GREY || mode_in->colortype == LCT_GREY_ALPHA) {
+  if(mode_in->colortype == LP_LCT_GREY || mode_in->colortype == LP_LCT_GREY_ALPHA) {
     r = g = b = r_in * mul;
-  } else if(mode_in->colortype == LCT_RGB || mode_in->colortype == LCT_RGBA) {
+  } else if(mode_in->colortype == LP_LCT_RGB || mode_in->colortype == LP_LCT_RGBA) {
     r = r_in * mul;
     g = g_in * mul;
     b = b_in * mul;
-  } else if(mode_in->colortype == LCT_PALETTE) {
+  } else if(mode_in->colortype == LP_LCT_PALETTE) {
     if(r_in >= mode_in->palettesize) return 82;
     r = mode_in->palette[r_in * 4 + 0] * 257u;
     g = mode_in->palette[r_in * 4 + 1] * 257u;
@@ -3955,13 +3956,13 @@ unsigned LP_lodepng_convert_rgb(
   }
 
   /* now convert to output format */
-  if(mode_out->colortype == LCT_GREY || mode_out->colortype == LCT_GREY_ALPHA) {
+  if(mode_out->colortype == LP_LCT_GREY || mode_out->colortype == LP_LCT_GREY_ALPHA) {
     *r_out = r >> shift ;
-  } else if(mode_out->colortype == LCT_RGB || mode_out->colortype == LCT_RGBA) {
+  } else if(mode_out->colortype == LP_LCT_RGB || mode_out->colortype == LP_LCT_RGBA) {
     *r_out = r >> shift ;
     *g_out = g >> shift ;
     *b_out = b >> shift ;
-  } else if(mode_out->colortype == LCT_PALETTE) {
+  } else if(mode_out->colortype == LP_LCT_PALETTE) {
     unsigned i;
     /* a 16-bit color cannot be in the palette */
     if((r >> 8) != (r & 255) || (g >> 8) != (g & 255) || (b >> 8) != (b & 255)) return 82;
@@ -4223,7 +4224,7 @@ static unsigned LP_lodepng_color_stats_add(LP_LodePNGColorStats* stats,
   image[0] = r >> 8; image[1] = r; image[2] = g >> 8; image[3] = g;
   image[4] = b >> 8; image[5] = b; image[6] = a >> 8; image[7] = a;
   mode.bitdepth = 16;
-  mode.colortype = LCT_RGBA;
+  mode.colortype = LP_LCT_RGBA;
   error = LP_lodepng_compute_color_stats(stats, image, 1, 1, &mode);
   LP_lodepng_color_mode_cleanup(&mode);
   return error;
@@ -4277,10 +4278,10 @@ static unsigned auto_choose_color(LP_LodePNGColorMode* mode_out,
       if(error) break;
     }
 
-    mode_out->colortype = LCT_PALETTE;
+    mode_out->colortype = LP_LCT_PALETTE;
     mode_out->bitdepth = palettebits;
 
-    if(mode_in->colortype == LCT_PALETTE && mode_in->palettesize >= mode_out->palettesize
+    if(mode_in->colortype == LP_LCT_PALETTE && mode_in->palettesize >= mode_out->palettesize
         && mode_in->bitdepth == mode_out->bitdepth) {
       /*If input should have same palette colors, keep original to preserve its order and prevent conversion*/
       LP_lodepng_color_mode_cleanup(mode_out); /*clears palette, keeps the above set colortype and bitdepth fields as-is*/
@@ -4288,8 +4289,8 @@ static unsigned auto_choose_color(LP_LodePNGColorMode* mode_out,
     }
   } else /*8-bit or 16-bit per channel*/ {
     mode_out->bitdepth = bits;
-    mode_out->colortype = alpha ? (gray_ok ? LCT_GREY_ALPHA : LCT_RGBA)
-                                : (gray_ok ? LCT_GREY : LCT_RGB);
+    mode_out->colortype = alpha ? (gray_ok ? LP_LCT_GREY_ALPHA : LP_LCT_RGBA)
+                                : (gray_ok ? LP_LCT_GREY : LP_LCT_RGB);
     if(key) {
       unsigned mask = (1u << mode_out->bitdepth) - 1u; /*stats always uses 16-bit, mask converts it*/
       mode_out->key_r = stats->key_r & mask;
@@ -4799,18 +4800,18 @@ static unsigned readChunk_PLTE(LP_LodePNGColorMode* color, const unsigned char* 
 
 static unsigned readChunk_tRNS(LP_LodePNGColorMode* color, const unsigned char* data, size_t chunkLength) {
   unsigned i;
-  if(color->colortype == LCT_PALETTE) {
+  if(color->colortype == LP_LCT_PALETTE) {
     /*error: more alpha values given than there are palette entries*/
     if(chunkLength > color->palettesize) return 39;
 
     for(i = 0; i != chunkLength; ++i) color->palette[4 * i + 3] = data[i];
-  } else if(color->colortype == LCT_GREY) {
+  } else if(color->colortype == LP_LCT_GREY) {
     /*error: this chunk must be 2 bytes for grayscale image*/
     if(chunkLength != 2) return 30;
 
     color->key_defined = 1;
     color->key_r = color->key_g = color->key_b = 256u * data[0] + data[1];
-  } else if(color->colortype == LCT_RGB) {
+  } else if(color->colortype == LP_LCT_RGB) {
     /*error: this chunk must be 6 bytes for RGB image*/
     if(chunkLength != 6) return 41;
 
@@ -4828,7 +4829,7 @@ static unsigned readChunk_tRNS(LP_LodePNGColorMode* color, const unsigned char* 
 #ifdef LODEPNG_COMPILE_ANCILLARY_CHUNKS
 /*background color chunk (bKGD)*/
 static unsigned readChunk_bKGD(LP_LodePNGInfo* info, const unsigned char* data, size_t chunkLength) {
-  if(info->color.colortype == LCT_PALETTE) {
+  if(info->color.colortype == LP_LCT_PALETTE) {
     /*error: this chunk must be 1 byte for indexed color image*/
     if(chunkLength != 1) return 43;
 
@@ -4837,14 +4838,14 @@ static unsigned readChunk_bKGD(LP_LodePNGInfo* info, const unsigned char* data, 
 
     info->background_defined = 1;
     info->background_r = info->background_g = info->background_b = data[0];
-  } else if(info->color.colortype == LCT_GREY || info->color.colortype == LCT_GREY_ALPHA) {
+  } else if(info->color.colortype == LP_LCT_GREY || info->color.colortype == LP_LCT_GREY_ALPHA) {
     /*error: this chunk must be 2 bytes for grayscale image*/
     if(chunkLength != 2) return 44;
 
     /*the values are truncated to bitdepth in the PNG file*/
     info->background_defined = 1;
     info->background_r = info->background_g = info->background_b = 256u * data[0] + data[1];
-  } else if(info->color.colortype == LCT_RGB || info->color.colortype == LCT_RGBA) {
+  } else if(info->color.colortype == LP_LCT_RGB || info->color.colortype == LP_LCT_RGBA) {
     /*error: this chunk must be 6 bytes for grayscale image*/
     if(chunkLength != 6) return 45;
 
@@ -5179,14 +5180,14 @@ static unsigned readChunk_eXIf(LP_LodePNGInfo* info, const unsigned char* data, 
 
 /*significant bits chunk (sBIT)*/
 static unsigned readChunk_sBIT(LP_LodePNGInfo* info, const unsigned char* data, size_t chunkLength) {
-  unsigned bitdepth = (info->color.colortype == LCT_PALETTE) ? 8 : info->color.bitdepth;
-  if(info->color.colortype == LCT_GREY) {
+  unsigned bitdepth = (info->color.colortype == LP_LCT_PALETTE) ? 8 : info->color.bitdepth;
+  if(info->color.colortype == LP_LCT_GREY) {
     /*error: this chunk must be 1 bytes for grayscale image*/
     if(chunkLength != 1) return 114;
     if(data[0] == 0 || data[0] > bitdepth) return 115;
     info->sbit_defined = 1;
     info->sbit_r = info->sbit_g = info->sbit_b = data[0]; /*setting g and b is not required, but sensible*/
-  } else if(info->color.colortype == LCT_RGB || info->color.colortype == LCT_PALETTE) {
+  } else if(info->color.colortype == LP_LCT_RGB || info->color.colortype == LP_LCT_PALETTE) {
     /*error: this chunk must be 3 bytes for RGB and palette image*/
     if(chunkLength != 3) return 114;
     if(data[0] == 0 || data[1] == 0 || data[2] == 0) return 115;
@@ -5195,7 +5196,7 @@ static unsigned readChunk_sBIT(LP_LodePNGInfo* info, const unsigned char* data, 
     info->sbit_r = data[0];
     info->sbit_g = data[1];
     info->sbit_b = data[2];
-  } else if(info->color.colortype == LCT_GREY_ALPHA) {
+  } else if(info->color.colortype == LP_LCT_GREY_ALPHA) {
     /*error: this chunk must be 2 byte for grayscale with alpha image*/
     if(chunkLength != 2) return 114;
     if(data[0] == 0 || data[1] == 0) return 115;
@@ -5203,7 +5204,7 @@ static unsigned readChunk_sBIT(LP_LodePNGInfo* info, const unsigned char* data, 
     info->sbit_defined = 1;
     info->sbit_r = info->sbit_g = info->sbit_b = data[0]; /*setting g and b is not required, but sensible*/
     info->sbit_a = data[1];
-  } else if(info->color.colortype == LCT_RGBA) {
+  } else if(info->color.colortype == LP_LCT_RGBA) {
     /*error: this chunk must be 4 bytes for grayscale image*/
     if(chunkLength != 4) return 114;
     if(data[0] == 0 || data[1] == 0 || data[2] == 0 || data[3] == 0) return 115;
@@ -5459,7 +5460,7 @@ static void decodeGeneric(unsigned char** out, unsigned* w, unsigned* h,
     if(!IEND) chunk = LP_lodepng_chunk_next_const(chunk, in + insize);
   }
 
-  if(!state->error && state->info_png.color.colortype == LCT_PALETTE && !state->info_png.color.palette) {
+  if(!state->error && state->info_png.color.colortype == LP_LCT_PALETTE && !state->info_png.color.palette) {
     state->error = 106; /* error: PNG file must have PLTE chunk if color type is palette */
   }
 
@@ -5519,7 +5520,7 @@ unsigned LP_lodepng_decode(unsigned char** out, unsigned* w, unsigned* h,
 
     /*TODO: check if this works according to the statement in the documentation: "The converter can convert
     from grayscale input color type, to 8-bit grayscale or grayscale with alpha"*/
-    if(!(state->info_raw.colortype == LCT_RGB || state->info_raw.colortype == LCT_RGBA)
+    if(!(state->info_raw.colortype == LP_LCT_RGB || state->info_raw.colortype == LP_LCT_RGBA)
        && !(state->info_raw.bitdepth == 8)) {
       return 56; /*unsupported color mode conversion*/
     }
@@ -5554,11 +5555,11 @@ unsigned LP_lodepng_decode_memory(unsigned char** out, unsigned* w, unsigned* h,
 }
 
 unsigned LP_lodepng_decode32(unsigned char** out, unsigned* w, unsigned* h, const unsigned char* in, size_t insize) {
-  return LP_lodepng_decode_memory(out, w, h, in, insize, LCT_RGBA, 8);
+  return LP_lodepng_decode_memory(out, w, h, in, insize, LP_LCT_RGBA, 8);
 }
 
 unsigned LP_lodepng_decode24(unsigned char** out, unsigned* w, unsigned* h, const unsigned char* in, size_t insize) {
-  return LP_lodepng_decode_memory(out, w, h, in, insize, LCT_RGB, 8);
+  return LP_lodepng_decode_memory(out, w, h, in, insize, LP_LCT_RGB, 8);
 }
 
 #ifdef LODEPNG_COMPILE_DISK
@@ -5577,11 +5578,11 @@ unsigned LP_lodepng_decode_file(unsigned char** out, unsigned* w, unsigned* h, c
 }
 
 unsigned LP_lodepng_decode32_file(unsigned char** out, unsigned* w, unsigned* h, const char* filename) {
-  return LP_lodepng_decode_file(out, w, h, filename, LCT_RGBA, 8);
+  return LP_lodepng_decode_file(out, w, h, filename, LP_LCT_RGBA, 8);
 }
 
 unsigned LP_lodepng_decode24_file(unsigned char** out, unsigned* w, unsigned* h, const char* filename) {
-  return LP_lodepng_decode_file(out, w, h, filename, LCT_RGB, 8);
+  return LP_lodepng_decode_file(out, w, h, filename, LP_LCT_RGB, 8);
 }
 #endif /*LODEPNG_COMPILE_DISK*/
 
@@ -5690,7 +5691,7 @@ static unsigned addChunk_PLTE(ucvector* out, const LP_LodePNGColorMode* info) {
 static unsigned addChunk_tRNS(ucvector* out, const LP_LodePNGColorMode* info) {
   unsigned char* chunk = 0;
 
-  if(info->colortype == LCT_PALETTE) {
+  if(info->colortype == LP_LCT_PALETTE) {
     size_t i, amount = info->palettesize;
     /*the tail of palette values that all have 255 as alpha, does not have to be encoded*/
     for(i = info->palettesize; i != 0; --i) {
@@ -5702,13 +5703,13 @@ static unsigned addChunk_tRNS(ucvector* out, const LP_LodePNGColorMode* info) {
       /*add the alpha channel values from the palette*/
       for(i = 0; i != amount; ++i) chunk[8 + i] = info->palette[4 * i + 3];
     }
-  } else if(info->colortype == LCT_GREY) {
+  } else if(info->colortype == LP_LCT_GREY) {
     if(info->key_defined) {
       CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 2, "tRNS"));
       chunk[8] = (unsigned char)(info->key_r >> 8);
       chunk[9] = (unsigned char)(info->key_r & 255);
     }
-  } else if(info->colortype == LCT_RGB) {
+  } else if(info->colortype == LP_LCT_RGB) {
     if(info->key_defined) {
       CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 6, "tRNS"));
       chunk[8] = (unsigned char)(info->key_r >> 8);
@@ -5840,11 +5841,11 @@ static unsigned addChunk_iTXt(ucvector* out, unsigned compress, const char* keyw
 
 static unsigned addChunk_bKGD(ucvector* out, const LP_LodePNGInfo* info) {
   unsigned char* chunk = 0;
-  if(info->color.colortype == LCT_GREY || info->color.colortype == LCT_GREY_ALPHA) {
+  if(info->color.colortype == LP_LCT_GREY || info->color.colortype == LP_LCT_GREY_ALPHA) {
     CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 2, "bKGD"));
     chunk[8] = (unsigned char)(info->background_r >> 8);
     chunk[9] = (unsigned char)(info->background_r & 255);
-  } else if(info->color.colortype == LCT_RGB || info->color.colortype == LCT_RGBA) {
+  } else if(info->color.colortype == LP_LCT_RGB || info->color.colortype == LP_LCT_RGBA) {
     CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 6, "bKGD"));
     chunk[8] = (unsigned char)(info->background_r >> 8);
     chunk[9] = (unsigned char)(info->background_r & 255);
@@ -5852,7 +5853,7 @@ static unsigned addChunk_bKGD(ucvector* out, const LP_LodePNGInfo* info) {
     chunk[11] = (unsigned char)(info->background_g & 255);
     chunk[12] = (unsigned char)(info->background_b >> 8);
     chunk[13] = (unsigned char)(info->background_b & 255);
-  } else if(info->color.colortype == LCT_PALETTE) {
+  } else if(info->color.colortype == LP_LCT_PALETTE) {
     CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 1, "bKGD"));
     chunk[8] = (unsigned char)(info->background_r & 255); /*palette index*/
   }
@@ -6004,26 +6005,26 @@ static unsigned addChunk_eXIf(ucvector* out, const LP_LodePNGInfo* info) {
 }
 
 static unsigned addChunk_sBIT(ucvector* out, const LP_LodePNGInfo* info) {
-  unsigned bitdepth = (info->color.colortype == LCT_PALETTE) ? 8 : info->color.bitdepth;
+  unsigned bitdepth = (info->color.colortype == LP_LCT_PALETTE) ? 8 : info->color.bitdepth;
   unsigned char* chunk = 0;
-  if(info->color.colortype == LCT_GREY) {
+  if(info->color.colortype == LP_LCT_GREY) {
     if(info->sbit_r == 0 || info->sbit_r > bitdepth) return 115;
     CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 1, "sBIT"));
     chunk[8] = info->sbit_r;
-  } else if(info->color.colortype == LCT_RGB || info->color.colortype == LCT_PALETTE) {
+  } else if(info->color.colortype == LP_LCT_RGB || info->color.colortype == LP_LCT_PALETTE) {
     if(info->sbit_r == 0 || info->sbit_g == 0 || info->sbit_b == 0) return 115;
     if(info->sbit_r > bitdepth || info->sbit_g > bitdepth || info->sbit_b > bitdepth) return 115;
     CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 3, "sBIT"));
     chunk[8] = info->sbit_r;
     chunk[9] = info->sbit_g;
     chunk[10] = info->sbit_b;
-  } else if(info->color.colortype == LCT_GREY_ALPHA) {
+  } else if(info->color.colortype == LP_LCT_GREY_ALPHA) {
     if(info->sbit_r == 0 || info->sbit_a == 0) return 115;
     if(info->sbit_r > bitdepth || info->sbit_a > bitdepth) return 115;
     CERROR_TRY_RETURN(LP_lodepng_chunk_init(&chunk, out, 2, "sBIT"));
     chunk[8] = info->sbit_r;
     chunk[9] = info->sbit_a;
-  } else if(info->color.colortype == LCT_RGBA) {
+  } else if(info->color.colortype == LP_LCT_RGBA) {
     if(info->sbit_r == 0 || info->sbit_g == 0 || info->sbit_b == 0 || info->sbit_a == 0 ||
        info->sbit_r > bitdepth || info->sbit_g > bitdepth ||
        info->sbit_b > bitdepth || info->sbit_a > bitdepth) {
@@ -6096,7 +6097,7 @@ static size_t ilog2(size_t i) {
   return result;
 }
 
-/* integer approximation for i * log2(i), helper function for LFS_ENTROPY */
+/* integer approximation for i * log2(i), helper function for LP_LFS_ENTROPY */
 static size_t ilog2i(size_t i) {
   size_t l;
   if(i == 0) return 0;
@@ -6125,15 +6126,15 @@ static unsigned filter(unsigned char* out, const unsigned char* in, unsigned w, 
   unsigned error = 0;
   LP_LodePNGFilterStrategy strategy = settings->filter_strategy;
 
-  if(settings->filter_palette_zero && (color->colortype == LCT_PALETTE || color->bitdepth < 8)) {
+  if(settings->filter_palette_zero && (color->colortype == LP_LCT_PALETTE || color->bitdepth < 8)) {
     /*if the filter_palette_zero setting is enabled, override the filter strategy with
     zero for all scanlines for palette and less-than-8-bitdepth images*/
-    strategy = LFS_ZERO;
+    strategy = LP_LFS_ZERO;
   }
 
   if(bpp == 0) return 31; /*error: invalid color type*/
 
-  if(strategy >= LFS_ZERO && strategy <= LFS_FOUR) {
+  if(strategy >= LP_LFS_ZERO && strategy <= LP_LFS_FOUR) {
     unsigned char type = (unsigned char)strategy;
     for(y = 0; y != h; ++y) {
       size_t outindex = (1 + linebytes) * y; /*the extra filterbyte added to each row*/
@@ -6142,7 +6143,7 @@ static unsigned filter(unsigned char* out, const unsigned char* in, unsigned w, 
       filterScanline(&out[outindex + 1], &in[inindex], prevline, linebytes, bytewidth, type);
       prevline = &in[inindex];
     }
-  } else if(strategy == LFS_MINSUM) {
+  } else if(strategy == LP_LFS_MINSUM) {
     /*adaptive filtering: independently for each row, try all five filter types and select the one that produces the
     smallest sum of absolute values per row.*/
     unsigned char* attempt[5]; /*five filtering attempts, one for each filter type*/
@@ -6190,7 +6191,7 @@ static unsigned filter(unsigned char* out, const unsigned char* in, unsigned w, 
     }
 
     for(type = 0; type != 5; ++type) LP_lodepng_free(attempt[type]);
-  } else if(strategy == LFS_ENTROPY) {
+  } else if(strategy == LP_LFS_ENTROPY) {
     unsigned char* attempt[5]; /*five filtering attempts, one for each filter type*/
     size_t bestSum = 0;
     unsigned type, bestType = 0;
@@ -6229,7 +6230,7 @@ static unsigned filter(unsigned char* out, const unsigned char* in, unsigned w, 
     }
 
     for(type = 0; type != 5; ++type) LP_lodepng_free(attempt[type]);
-  } else if(strategy == LFS_PREDEFINED) {
+  } else if(strategy == LP_LFS_PREDEFINED) {
     for(y = 0; y != h; ++y) {
       size_t outindex = (1 + linebytes) * y; /*the extra filterbyte added to each row*/
       size_t inindex = linebytes * y;
@@ -6238,7 +6239,7 @@ static unsigned filter(unsigned char* out, const unsigned char* in, unsigned w, 
       filterScanline(&out[outindex + 1], &in[inindex], prevline, linebytes, bytewidth, type);
       prevline = &in[inindex];
     }
-  } else if(strategy == LFS_BRUTE_FORCE) {
+  } else if(strategy == LP_LFS_BRUTE_FORCE) {
     /*brute force filter chooser.
     deflate the scanline after every filter attempt to see which one deflates best.
     This is very slow and gives only slightly smaller, sometimes even larger, result*/
@@ -6486,7 +6487,7 @@ unsigned LP_lodepng_encode(unsigned char** out, size_t* outsize,
   state->error = 0;
 
   /*check input values validity*/
-  if((info_png->color.colortype == LCT_PALETTE || state->encoder.force_palette)
+  if((info_png->color.colortype == LP_LCT_PALETTE || state->encoder.force_palette)
       && (info_png->color.palettesize == 0 || info_png->color.palettesize > 256)) {
     /*this error is returned even if auto_convert is enabled and thus encoder could
     generate the palette by itself: while allowing this could be possible in theory,
@@ -6533,7 +6534,7 @@ unsigned LP_lodepng_encode(unsigned char** out, size_t* outsize,
     if(info_png->background_defined) {
       /*the background chunk's color must be taken into account as well*/
       unsigned r = 0, g = 0, b = 0;
-      LP_LodePNGColorMode mode16 = LP_lodepng_color_mode_make(LCT_RGB, 16);
+      LP_LodePNGColorMode mode16 = LP_lodepng_color_mode_make(LP_LCT_RGB, 16);
       LP_lodepng_convert_rgb(&r, &g, &b,
           info_png->background_r, info_png->background_g, info_png->background_b, &mode16, &info_png->color);
       state->error = LP_lodepng_color_stats_add(&stats, r, g, b, 65535);
@@ -6555,25 +6556,25 @@ unsigned LP_lodepng_encode(unsigned char** out, size_t* outsize,
                     && (!info_png->sbit_b || info_png->sbit_b == info_png->sbit_r)
                     && (!info_png->sbit_a || info_png->sbit_a == info_png->sbit_r);
       allow_convert = 0;
-      if(info.color.colortype == LCT_PALETTE &&
-         auto_color.colortype == LCT_PALETTE) {
+      if(info.color.colortype == LP_LCT_PALETTE &&
+         auto_color.colortype == LP_LCT_PALETTE) {
         /* input and output are palette, and in this case it may happen that palette data is
         expected to be copied from info_raw into the info_png */
         allow_convert = 1;
       }
       /*going from 8-bit RGB to palette (or 16-bit as long as sbit_max <= 8) is possible
       since both are 8-bit RGB for sBIT's purposes*/
-      if(info.color.colortype == LCT_RGB &&
-         auto_color.colortype == LCT_PALETTE && sbit_max <= 8) {
+      if(info.color.colortype == LP_LCT_RGB &&
+         auto_color.colortype == LP_LCT_PALETTE && sbit_max <= 8) {
         allow_convert = 1;
       }
       /*going from 8-bit RGBA to palette is also ok but only if sbit_a is exactly 8*/
-      if(info.color.colortype == LCT_RGBA && auto_color.colortype == LCT_PALETTE &&
+      if(info.color.colortype == LP_LCT_RGBA && auto_color.colortype == LP_LCT_PALETTE &&
          info_png->sbit_a == 8 && sbit_max <= 8) {
         allow_convert = 1;
       }
       /*going from 16-bit RGB(A) to 8-bit RGB(A) is ok if all sbit values are <= 8*/
-      if((info.color.colortype == LCT_RGB || info.color.colortype == LCT_RGBA) && info.color.bitdepth == 16 &&
+      if((info.color.colortype == LP_LCT_RGB || info.color.colortype == LP_LCT_RGBA) && info.color.bitdepth == 16 &&
          auto_color.colortype == info.color.colortype && auto_color.bitdepth == 8 &&
          sbit_max <= 8) {
         allow_convert = 1;
@@ -6586,15 +6587,15 @@ unsigned LP_lodepng_encode(unsigned char** out, size_t* outsize,
         an sbit value heavily implies that alpha's bit depth is equal to the PNG bit depth (rather
         than the bit depths set in the r, g and b sbit values, by how the PNG specification describes
         handling tRNS chunk case with sBIT), so be conservative here about ignoring user input.*/
-      if(info.color.colortype != LCT_PALETTE && auto_color.colortype != LCT_PALETTE &&
+      if(info.color.colortype != LP_LCT_PALETTE && auto_color.colortype != LP_LCT_PALETTE &&
          equal && info_png->sbit_r == auto_color.bitdepth) {
         allow_convert = 1;
       }
     }
 #endif
     if(state->encoder.force_palette) {
-      if(info.color.colortype != LCT_GREY && info.color.colortype != LCT_GREY_ALPHA &&
-         (auto_color.colortype == LCT_GREY || auto_color.colortype == LCT_GREY_ALPHA)) {
+      if(info.color.colortype != LP_LCT_GREY && info.color.colortype != LP_LCT_GREY_ALPHA &&
+         (auto_color.colortype == LP_LCT_GREY || auto_color.colortype == LP_LCT_GREY_ALPHA)) {
         /*user speficially forced a PLTE palette, so cannot convert to grayscale types because
         the PNG specification only allows writing a suggested palette in PLTE for truecolor types*/
         allow_convert = 0;
@@ -6618,7 +6619,7 @@ unsigned LP_lodepng_encode(unsigned char** out, size_t* outsize,
   if(info_png->iccp_defined) {
     unsigned gray_icc = isGrayICCProfile(info_png->iccp_profile, info_png->iccp_profile_size);
     unsigned rgb_icc = isRGBICCProfile(info_png->iccp_profile, info_png->iccp_profile_size);
-    unsigned gray_png = info.color.colortype == LCT_GREY || info.color.colortype == LCT_GREY_ALPHA;
+    unsigned gray_png = info.color.colortype == LP_LCT_GREY || info.color.colortype == LP_LCT_GREY_ALPHA;
     if(!gray_icc && !rgb_icc) {
       state->error = 100; /* Disallowed profile color type for PNG */
       goto cleanup;
@@ -6705,11 +6706,11 @@ unsigned LP_lodepng_encode(unsigned char** out, size_t* outsize,
     }
 #endif /*LODEPNG_COMPILE_ANCILLARY_CHUNKS*/
     /*PLTE*/
-    if(info.color.colortype == LCT_PALETTE) {
+    if(info.color.colortype == LP_LCT_PALETTE) {
       state->error = addChunk_PLTE(&outv, &info.color);
       if(state->error) goto cleanup;
     }
-    if(state->encoder.force_palette && (info.color.colortype == LCT_RGB || info.color.colortype == LCT_RGBA)) {
+    if(state->encoder.force_palette && (info.color.colortype == LP_LCT_RGB || info.color.colortype == LP_LCT_RGBA)) {
       /*force_palette means: write suggested palette for truecolor in PLTE chunk*/
       state->error = addChunk_PLTE(&outv, &info.color);
       if(state->error) goto cleanup;
@@ -6834,11 +6835,11 @@ unsigned LP_lodepng_encode_memory(unsigned char** out, size_t* outsize, const un
 }
 
 unsigned LP_lodepng_encode32(unsigned char** out, size_t* outsize, const unsigned char* image, unsigned w, unsigned h) {
-  return LP_lodepng_encode_memory(out, outsize, image, w, h, LCT_RGBA, 8);
+  return LP_lodepng_encode_memory(out, outsize, image, w, h, LP_LCT_RGBA, 8);
 }
 
 unsigned LP_lodepng_encode24(unsigned char** out, size_t* outsize, const unsigned char* image, unsigned w, unsigned h) {
-  return LP_lodepng_encode_memory(out, outsize, image, w, h, LCT_RGB, 8);
+  return LP_lodepng_encode_memory(out, outsize, image, w, h, LP_LCT_RGB, 8);
 }
 
 #ifdef LODEPNG_COMPILE_DISK
@@ -6853,18 +6854,18 @@ unsigned LP_lodepng_encode_file(const char* filename, const unsigned char* image
 }
 
 unsigned LP_lodepng_encode32_file(const char* filename, const unsigned char* image, unsigned w, unsigned h) {
-  return LP_lodepng_encode_file(filename, image, w, h, LCT_RGBA, 8);
+  return LP_lodepng_encode_file(filename, image, w, h, LP_LCT_RGBA, 8);
 }
 
 unsigned LP_lodepng_encode24_file(const char* filename, const unsigned char* image, unsigned w, unsigned h) {
-  return LP_lodepng_encode_file(filename, image, w, h, LCT_RGB, 8);
+  return LP_lodepng_encode_file(filename, image, w, h, LP_LCT_RGB, 8);
 }
 #endif /*LODEPNG_COMPILE_DISK*/
 
 void LP_lodepng_encoder_settings_init(LP_LodePNGEncoderSettings* settings) {
   LP_lodepng_compress_settings_init(&settings->zlibsettings);
   settings->filter_palette_zero = 1;
-  settings->filter_strategy = LFS_MINSUM;
+  settings->filter_strategy = LP_LFS_MINSUM;
   settings->auto_convert = 1;
   settings->force_palette = 0;
   settings->predefined_filters = 0;
