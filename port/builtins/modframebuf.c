@@ -35,6 +35,7 @@
 #include "lvgl.h"
 #include "esp_log.h"
 #include "LP_lodepng.h"
+#include "icon/icon.c"
 
 // #if MICROPY_PY_FRAMEBUF
 
@@ -856,7 +857,7 @@ static mp_obj_t framebuf_round_rect(size_t n_args, const mp_obj_t *args) {
     mp_int_t w = mp_obj_get_int(args[3]);
     mp_int_t h = mp_obj_get_int(args[4]);
     mp_int_t r = mp_obj_get_int(args[5]);
-    mp_int_t c = mp_obj_get_int(args[4]);
+    mp_int_t c = mp_obj_get_int(args[6]);
 
     fill_rect(self, x + r, y, w - 2 * r , 1, c);
     fill_rect(self, x + r, y + h - 1,  w - 2 * r, 1, c);
@@ -1206,12 +1207,13 @@ static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ys
 static MP_DEFINE_CONST_FUN_OBJ_3(framebuf_scroll_obj, framebuf_scroll);
 
 static mp_obj_t framebuf_disp_char(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum { ARG_str, ARG_x, ARG_y, ARG_color};
+    enum { ARG_str, ARG_x, ARG_y, ARG_color, ARG_auto_wrap };
     mp_arg_t allowed_args[] = {
         { MP_QSTR_str, MP_ARG_REQUIRED | MP_ARG_OBJ},
         { MP_QSTR_x, MP_ARG_REQUIRED | MP_ARG_INT},
         { MP_QSTR_y, MP_ARG_REQUIRED | MP_ARG_INT },
         { MP_QSTR_color, MP_ARG_REQUIRED | MP_ARG_INT },
+        { MP_QSTR_auto_wrap,  MP_ARG_BOOL, { .u_bool = false } },
     };
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
@@ -1223,8 +1225,13 @@ static mp_obj_t framebuf_disp_char(size_t n_args, const mp_obj_t *pos_args, mp_m
     mp_int_t y0 = args[ARG_y].u_int;
     mp_int_t color = args[ARG_color].u_int;
 
-    uint32_t unicode_buf[50];
-    uint16_t char_num =  get_unicode_from_string(str, unicode_buf, 50); //字符串转换为unicode编码
+    mp_int_t str_len = strlen(str);
+    if (str_len == 0) {
+        return mp_const_none;
+    }
+
+    uint32_t unicode_buf[str_len];
+    uint16_t char_num =  get_unicode_from_string(str, unicode_buf, str_len); //字符串转换为unicode编码
     // ESP_LOGE("framebuf", "unicode: %ld, char_num:%d", unicode_buf[0], char_num);
     lv_font_glyph_dsc_t glyph_dsc = {0};
     lv_font_t *font = (lv_font_t *)&lv_font_siyuan_heiti_medium_24;
@@ -1245,7 +1252,7 @@ static mp_obj_t framebuf_disp_char(size_t n_args, const mp_obj_t *pos_args, mp_m
         //字形参数表：{.bitmap_index = 0, .adv_w = 384, .box_w = 20, .box_h = 21, .ofs_x = 2, .ofs_y = -2}
         const lv_font_fmt_txt_glyph_dsc_t * gdsc = &fdsc->glyph_dsc[gid]; 
         //获取字体位图数据在字体位图数组中的起始位置
-        uint8_t * bitmap = &(fdsc->glyph_bitmap[gdsc->bitmap_index]); 
+        uint8_t * bitmap = (uint8_t *)&(fdsc->glyph_bitmap[gdsc->bitmap_index]); 
         // ESP_LOGE("framebuf", "bitmap data:%d", bitmap[0]);
 
         //4. 字形绘入framebuf
@@ -1254,6 +1261,10 @@ static mp_obj_t framebuf_disp_char(size_t n_args, const mp_obj_t *pos_args, mp_m
                 uint32_t byte_index = (row * gdsc->box_w + col_bit) / 8;
                 uint8_t bit_index = 7 - (row * gdsc->box_w + col_bit) % 8;
                 if(bitmap[byte_index] & (1 << bit_index)) {
+                    if((x0 + gdsc->ofs_x + gdsc->box_w) > self->width && args[ARG_auto_wrap].u_bool) { //自动换行
+                        x0 = 0;
+                        y0 += line_hight;
+                    }
                     int draw_x = x0 + gdsc->ofs_x + col_bit;
                     int draw_y = y0 + font->line_height - gdsc->ofs_y - glyph_dsc.box_h + row;
                     if (0 <= draw_x && draw_x < self->width && 0 <= draw_y && draw_y < self->height) {
@@ -1316,7 +1327,7 @@ static mp_obj_t framebuf_bitmap(size_t n_args, const mp_obj_t *args) {
     _args[0] = args[3];
     _args[1] = args[4];
     _args[2] = args[5];
-    _args[3] = mp_obj_new_int(FRAMEBUF_MHLSB);  
+    _args[3] = mp_obj_new_int(FRAMEBUF_RGB565);  
     mp_obj_t o = framebuf_make_new(self->base.type, 4, 0, _args);
 
     _args[0] = self;
@@ -1328,7 +1339,7 @@ static mp_obj_t framebuf_bitmap(size_t n_args, const mp_obj_t *args) {
 
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_bitmap_obj, 7, 7, framebuf_bitmap);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_bitmap_obj, 6, 7, framebuf_bitmap);
 
 mp_obj_t mp_decode_png(mp_obj_t self_in, mp_obj_t buf_obj) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
@@ -1387,6 +1398,41 @@ mp_obj_t mp_decode_png(mp_obj_t self_in, mp_obj_t buf_obj) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(mp_decode_png_opj, mp_decode_png);
 
+static mp_obj_t mp_backgrount_color(size_t n_args, const mp_obj_t *args_in) {
+    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
+
+    if (n_args == 1) {
+        return MP_OBJ_NEW_SMALL_INT(self->bgcolor.color); // get
+    } else {
+        self->bgcolor.color = mp_obj_get_int(args_in[1]); // set
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_backgrount_color_obj, 1, 2, mp_backgrount_color);
+
+static mp_obj_t decode_png_internal(mp_obj_t self_in, mp_obj_t buf_id) {
+    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
+    int icon_id_int = mp_obj_get_int(buf_id);
+    // Find the icon in the array
+    const icon_t *icon = NULL;
+    int icon_num = sizeof(icons) / sizeof(icons[0]);
+    for (int i = 0; i < icon_num; i++) {
+        if (icons[i].icon_id == icon_id_int) {
+            icon = &icons[i];
+            break;
+        }
+    }
+
+    if (icon == NULL) {
+        return mp_const_none;
+    }
+
+    mp_obj_t icon_data = mp_obj_new_bytearray_by_ref(icon->width * icon->height * 2, (void *)icon->data);
+
+    return mp_decode_png(self_in, icon_data);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(decode_png_internal_opj, decode_png_internal);
+
 #if !MICROPY_ENABLE_DYNRUNTIME
 static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_fill), MP_ROM_PTR(&framebuf_fill_obj) },
@@ -1414,6 +1460,8 @@ static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&framebuf_text_obj) },
     { MP_ROM_QSTR(MP_QSTR_dispChar), MP_ROM_PTR(&framebuf_disp_char_obj) },
     { MP_ROM_QSTR(MP_QSTR_decode_png), MP_ROM_PTR(&mp_decode_png_opj) },
+    { MP_ROM_QSTR(MP_QSTR_decode_png_internal), MP_ROM_PTR(&decode_png_internal_opj) },
+    { MP_ROM_QSTR(MP_QSTR_background_color), MP_ROM_PTR(&mp_backgrount_color_obj) },
 };
 static MP_DEFINE_CONST_DICT(framebuf_locals_dict, framebuf_locals_dict_table);
 
