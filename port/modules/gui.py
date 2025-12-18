@@ -12,13 +12,14 @@ class MicroChart:
     MicroPython 轻量级图表类，支持折线图、柱状图
     适配 SSD1306 (OLED)、ST7735 (TFT) 等显示屏
     """
-    def __init__(self, display = tft_lcd, x0=0, y0=0, width=200, height=80, 
-                 bg_color=lcd.BLACK, axis_color=lcd.WHITE, data_colors=[lcd.WHITE, lcd.RED, lcd.BLUE], padding=10):
+    def __init__(self, display = tft_lcd, x0=0, y0=0, width=200, height=100, val_min = 0, val_max = 100,
+                 bg_color=lcd.BLACK, axis_color=lcd.WHITE, data_colors=[lcd.RED, lcd.GREEN, lcd.BLUE], padding=10):
         """
         初始化图表
         :param display: 显示屏对象（如SSD1306_I2C/ST7735）
         :param x0/y0: 图表左上角坐标
         :param width/height: 图表尺寸
+        :param val_min val_max: 待显示数据范围
         :param bg_color: 背景色（单色屏：0=黑/1=白；彩色屏：RGB565值）
         :param axis_color: 坐标轴颜色
         :param data_colors: 数据系列颜色列表（循环使用）
@@ -29,6 +30,8 @@ class MicroChart:
         self.y0 = y0
         self.width = width
         self.height = height
+        self.min_val = val_min
+        self.max_val = val_max
         self.bg_color = bg_color
         self.axis_color = axis_color
         self.data_colors = data_colors
@@ -38,7 +41,7 @@ class MicroChart:
         self.plot_x0 = self.x0 + self.padding  # 绘图区左上角X
         self.plot_y0 = self.y0 + 2             # 绘图区左上角Y
         self.plot_width = self.width - self.padding  # 绘图区宽度
-        self.plot_height = self.height - self.padding  # 绘图区高度
+        self.plot_height = self.height - self.padding  # 绘图区高度（Y轴缩放基准）
         self.x_axis_y = self.plot_y0 + self.plot_height  # X轴Y坐标
 
     def _scale_data(self, data):
@@ -52,14 +55,17 @@ class MicroChart:
         if not flat_data:
             return [], 0, 0, 0  # 空数据
         
-        min_val = min(flat_data)
-        max_val = max(flat_data)
-        # 避免极值相同导致除零
-        if max_val == min_val:
-            max_val += 1
-            min_val -= 1
 
-        # 缩放数据：Y值映射到绘图区（屏幕Y轴向下，需反转）
+        # 避免极值相同导致除零，重置缩放基准
+        value_range = self.max_val - self.min_val
+        if value_range == 0:
+            value_range = 1
+            self.max_val += 1
+            self.min_val -= 1
+
+        # 核心：按Y轴绘图区高度计算缩放比例
+        scale_ratio = self.plot_height / value_range  # 每单位数据对应的像素高度
+
         scaled_data = []
         for series in data:
             scaled_series = []
@@ -67,59 +73,102 @@ class MicroChart:
                 if val is None:
                     scaled_series.append(None)
                     continue
-                # 映射公式：val → 绘图区Y坐标
-                scaled_y = self.x_axis_y - ((val - min_val) / (max_val - min_val)) * self.plot_height
-                scaled_series.append(round(scaled_y))
+                
+                # 步骤1：计算数据相对最小值的偏移量
+                relative_val = val - self.min_val
+                # 步骤2：按高度缩放
+                scaled_val = relative_val * scale_ratio
+                # 步骤3：强制限定范围（0 ≤ scaled_val ≤ 绘图区高度）
+                scaled_val = max(0, min(self.plot_height, scaled_val))
+                # 步骤4：转换为屏幕坐标（屏幕Y轴向下，需反转）
+                screen_y = self.x_axis_y - scaled_val
+                scaled_series.append(round(screen_y))  # 确保坐标为整数
             scaled_data.append(scaled_series)
 
         # 计算X轴每个数据点的像素步长
         num_points = max(len(series) for series in data)
         x_step = self.plot_width / (num_points - 1) if num_points > 1 else 1
 
-        return scaled_data, x_step, min_val, max_val
+        return scaled_data, x_step, self.min_val, self.max_val
 
     def draw_background(self):
         """绘制图表背景（填充矩形）"""
-        self.display.fill_rect(self.x0, self.y0, self.width, self.height, self.bg_color)
+        self.display.fill_rect(self.x0, self.y0, self.width + 1, self.height + 1, self.bg_color)
 
     def draw_axis(self, show_ticks=True):
-        """绘制坐标轴（可选刻度）"""
-        # 绘制Y轴（垂直）
-        y_axis_x = self.plot_x0 - 5
-        self.display.line(y_axis_x, self.y0, y_axis_x, self.x_axis_y, self.axis_color)
-        # 绘制X轴（水平）
-        self.display.line(self.x0, self.x_axis_y, self.x0 + self.width, self.x_axis_y, self.axis_color)
+        """绘制坐标轴（可选刻度）- 修复浮点数坐标问题"""
+        # 绘制Y轴（垂直）- 确保坐标为整数
+        y_axis_x = round(self.plot_x0 - 5)
+        self.display.line(
+            y_axis_x, 
+            round(self.y0), 
+            y_axis_x, 
+            round(self.x_axis_y), 
+            self.axis_color
+        )
+        # 绘制X轴（水平）- 确保坐标为整数
+        self.display.line(
+            round(self.x0), 
+            round(self.x_axis_y), 
+            round(self.x0 + self.width), 
+            round(self.x_axis_y), 
+            self.axis_color
+        )
 
         # 绘制刻度（可选）
         if show_ticks:
-            # Y轴刻度（5个）
+            # Y轴刻度（5个）- 修复浮点数坐标
             tick_count = 5
             tick_step = self.plot_height / (tick_count - 1)
             for i in range(tick_count):
-                tick_y = self.x_axis_y - i * tick_step
-                self.display.line(y_axis_x - 3, tick_y, y_axis_x, tick_y, self.axis_color)
-            # X轴刻度（5个）
+                tick_y = round(self.x_axis_y - i * tick_step)  # 转为整数
+                self.display.line(
+                    round(y_axis_x - 3), 
+                    tick_y, 
+                    y_axis_x, 
+                    tick_y, 
+                    self.axis_color
+                )
+            # X轴刻度（5个）- 修复浮点数坐标
             tick_step_x = self.plot_width / (tick_count - 1)
             for i in range(tick_count):
-                tick_x = self.plot_x0 + i * tick_step_x
-                self.display.line(tick_x, self.x_axis_y, tick_x, self.x_axis_y + 3, self.axis_color)
+                tick_x = round(self.plot_x0 + i * tick_step_x)  # 转为整数
+                self.display.line(
+                    tick_x, 
+                    round(self.x_axis_y), 
+                    tick_x, 
+                    round(self.x_axis_y + 3), 
+                    self.axis_color
+                )
 
     def draw_grid(self, grid_color=None):
-        """绘制网格线（可选）"""
+        """绘制网格线（可选）- 修复浮点数坐标问题"""
         if grid_color is None:
             # 单色屏用浅色调，彩色屏用灰度
             grid_color = self.axis_color // 2 if self.axis_color > 1 else 1
-        # 水平网格线
+        # 水平网格线 - 修复浮点数坐标
         tick_count = 5
         tick_step = self.plot_height / (tick_count - 1)
         for i in range(tick_count):
-            y = self.x_axis_y - i * tick_step
-            self.display.line(self.plot_x0, y, self.plot_x0 + self.plot_width, y, grid_color)
-        # 垂直网格线
+            y = round(self.x_axis_y - i * tick_step)  # 转为整数
+            self.display.line(
+                round(self.plot_x0), 
+                y, 
+                round(self.plot_x0 + self.plot_width), 
+                y, 
+                grid_color
+            )
+        # 垂直网格线 - 修复浮点数坐标
         tick_step_x = self.plot_width / (tick_count - 1)
         for i in range(tick_count):
-            x = self.plot_x0 + i * tick_step_x
-            self.display.line(x, self.plot_y0, x, self.x_axis_y, grid_color)
+            x = round(self.plot_x0 + i * tick_step_x)  # 转为整数
+            self.display.line(
+                x, 
+                round(self.plot_y0), 
+                x, 
+                round(self.x_axis_y), 
+                grid_color
+            )
 
     def draw_line_chart(self, data, show_grid=False):
         """
@@ -147,9 +196,8 @@ class MicroChart:
                 if y is None:
                     prev_x, prev_y = None, None
                     continue
-                # 计算当前点X坐标
-                x = self.plot_x0 + point_idx * x_step
-                x = round(x)
+                # 计算当前点X坐标并转为整数
+                x = round(self.plot_x0 + point_idx * x_step)
                 # 绘制点
                 self.display.pixel(x, y, color)
                 # 绘制线段（与前一个点连接）
@@ -179,9 +227,9 @@ class MicroChart:
         scaled_data, x_step, _, _ = self._scale_data(data)
         num_series = len(data)
         num_points = max(len(series) for series in data)
-        # 计算柱子宽度（多系列错开显示）
+        # 计算柱子宽度（多系列错开显示）- 确保宽度为整数
         bar_width = (x_step / (num_series + 1)) * 0.8
-        bar_width = max(1, bar_width)  # 最小宽度1像素
+        bar_width = max(1, round(bar_width))  # 转为整数，最小宽度1像素
 
         # 绘制每个数据系列
         for series_idx, series in enumerate(scaled_data):
@@ -189,18 +237,17 @@ class MicroChart:
             for point_idx, y in enumerate(series):
                 if y is None:
                     continue
-                # 计算柱子X坐标（多系列居中错开）
+                # 计算柱子X坐标并转为整数（多系列居中错开）
                 base_x = self.plot_x0 + point_idx * x_step
-                bar_x = base_x + (series_idx - (num_series - 1)/2) * bar_width
-                bar_x = round(bar_x)
-                # 柱子高度（从X轴到数据点）
+                bar_x = round(base_x + (series_idx - (num_series - 1)/2) * bar_width)
+                # 柱子高度（从X轴到数据点）- 确保高度为整数
                 bar_height = round(self.x_axis_y - y)
                 if bar_height > 0:
-                    self.display.fill_rect(bar_x, y, round(bar_width), bar_height, color)
+                    self.display.fill_rect(bar_x, y, bar_width, bar_height, color)
 
         # 刷新显示屏
         self.display.show()
-        
+    
 class UI():
     def __init__(self):
         self.display = tft_lcd
