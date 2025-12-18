@@ -40,19 +40,93 @@ def numberMap(inputNum, bMin, bMax, cMin, cMax):
 
 class TFT_displayer(framebuf.FrameBuffer):
     def __init__(self):
-        self.buffer = bytearray(110080) # 320*172*2
-        super().__init__(self.buffer, 320, 172, framebuf.RGB565)
+        self.lcd_width = 320
+        self.lcd_height = 172
+        self.buffer = bytearray(110080) # self.lcd_width*self.lcd_height*2
+        super().__init__(self.buffer, self.lcd_width, self.lcd_height, framebuf.RGB565)
         
-    def DispChar(self, str, x, y, color=lcd.WHITE):
-        self.dispChar(str, x, y, color)
+    def _mono2rgb65(self, ch_bitmap:bytes, ch_w:int, ch_h:int, char_col=0xffff)->list[int]:
+        """
+        黑白像素字符缓存点转化为RGB565缓存
+        param bitmap: 黑白像素点字符缓存
+        param ch_w ch_w: 缓存宽高
+        param char_col: 目标字体颜色
+        return: RGB565字符缓存
+        """
+        char_buf = bytearray(ch_w * ch_h * 2)
+        char_fb = framebuf.FrameBuffer(char_buf, ch_w, ch_h, framebuf.RGB565)
 
-    def set_bg_color(self, color = lcd.BLACK):
-        lcd.fill(color)
+        # 填充字符FB：将1bit位图映射为RGB565像素
+        for row in range(ch_h):
+            for col in range(ch_w):
+                # 计算当前像素在1bit位图中的字节/位位置
+                byte_idx = row * ((ch_w + 7) // 8) + (col // 8)
+                bit_idx = 7 - (col % 8)  # 适配font-to-py的位序（bit7对应第一个像素）
+                
+                # 读取1bit值（0=背景/透明，1=前景）
+                bit_val = (ch_bitmap[byte_idx] >> bit_idx) & 0x01 if byte_idx < len(ch_bitmap) else 0
+                
+                # 映射为RGB565颜色并填充到字符FB
+                bg_color = super().background_color()
+                color = char_col if bit_val else bg_color
+                char_fb.pixel(col, row, color)
 
+        return char_fb
+        
+    def DispChar(self, str, x, y, color=lcd.WHITE, auto_wrap = False):
+        """
+        显示内置思源24位黑体字符
+        :param str: 待显示字符
+        :param x y: 位置
+        :param color:字体颜色
+        :param auto_wrap:是否换行
+        """
+        self.dispChar(str, x, y, color, auto_wrap)
+
+    def DispChar_font(self, font, str, x, y, color=lcd.WHITE, auto_wrap = False):
+        """
+        显示用户自定义字体，参考： https://github.com/peterhinch/micropython-font-to-py
+        参数
+        :param font:  使用 font_to_py.py 从`ttf` or `otf`转换出的字体py文件，内置的相关字体位于font文件夹下.
+        :param str: 待显示字体，内置了数码管字体和相关ASCII字符字体，当然用户可以自已制作中文字体。
+        :param x y: 显示位置坐标
+        :param color: 字体颜色
+        :param auto_wrap: 是否自动换行，每行高度：char_height + 5，擦除一行时会用到此参数
+        """
+        is_x_change = False
+        for char in str:
+            char_buf, char_height, char_width = font.get_ch(char)
+           
+            # 在数码管字体中，调整‘1’字符位置，在时钟显示中更美观 
+            if font.fon_type() == 'DIGIFACE':
+                if char == '1':
+                    x = x + char_width // 2   
+                    is_x_change = True
+                elif is_x_change:
+                    x = x - char_width // 2  
+                    is_x_change = False
+                
+            if x > self.lcd_width - char_width:
+                if auto_wrap:
+                    x = 0
+                    y += char_height + 5
+                else: # x超出屏幕宽度则不显示
+                    return
+            if y > 240 - char_height: # y超出屏幕高度则不显示
+                return
+                
+            fb = self._mono2rgb65(char_buf, char_width, char_height, color) 
+            super().blit(fb, x, y)
+            x += char_width #+ 5
+
+    def clear(self, color = lcd.BLACK):
+        super().background_color(color)
+        super().fill(color)
+        
     def show(self):
         lcd.show(self.buffer)
         
-oled = TFT_displayer() # 为兼容命名为oled
+tft_lcd = TFT_displayer() 
 
 # my_wifi = wifi()
 #多次尝试连接wifi
