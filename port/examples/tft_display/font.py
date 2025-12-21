@@ -11,3 +11,12 @@ tft_lcd.DispChar("中华人民共和国!中华人民共和国!中华人民共和
 tft_lcd.DispChar_font(dvsm_21, "hello,world", 50, 105, lcd.RED)
 tft_lcd.DispChar_font(digiface_44, "12:34", 50, 130, lcd.BLUE)
 tft_lcd.show()
+
+# 刷屏测试
+while True:
+    t1 = time.ticks_ms()
+    tft_lcd.clear()
+    tft_lcd.DispChar("中华人民共和国!中华人民共和国!中华人民共和国!中华人民共和国!中华人民共和国!", 0, 0, lcd.WHITE, True)
+    # tft_lcd.DispChar_font(dvsm_21, "hello,world", 50, 105, lcd.RED)
+    tft_lcd.show()
+    print(time.ticks_diff(time.ticks_ms(), t1))
