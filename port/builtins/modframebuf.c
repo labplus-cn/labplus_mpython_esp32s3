@@ -47,16 +47,7 @@ typedef struct _mp_obj_framebuf_t {
     void *buf;
     uint16_t width, height, stride;
     uint8_t format;
-    
-    union {
-        uint16_t color;
-        struct {
-            uint16_t b : 5;
-            uint16_t g : 6;
-            uint16_t r : 5;
-        } channels;
-    } bgcolor;
-
+    uint16_t bgcolor;
     uint16_t color;
 } mp_obj_framebuf_t;
 
@@ -434,7 +425,7 @@ static mp_obj_t framebuf_make_new(const mp_obj_type_t *type, size_t n_args, size
     o->height = height;
     o->format = format;
     o->stride = stride;
-    o->bgcolor.color = 0;
+    o->bgcolor = 0;
     o->color = 0xffff;
 
     return MP_OBJ_FROM_PTR(o);
@@ -1368,17 +1359,16 @@ mp_obj_t mp_decode_png(mp_obj_t self_in, mp_obj_t buf_obj) {
 
             // 转换为RGB565
             uint16_t r5, g6, b5;
+            uint16_t rgb565 = 0;
             if(a8 == 0) {
-                r5 = self->bgcolor.channels.r;
-                g6 = self->bgcolor.channels.g;
-                b5 = self->bgcolor.channels.b;
+                rgb565 = self->bgcolor;
             }else{ //做下brg->bgr转换
                 r5 = ((uint16_t)(r8 & 0xF8)) << 8;  
                 g6 = ((uint16_t)(g8 & 0xF8)) << 3;  
-                b5 = ((uint16_t)(b8 & 0xFc)) >> 3;  
+                b5 = ((uint16_t)(b8 & 0xFc)) >> 3; 
+                rgb565 = r5 | g6 | b5; 
             }
-
-            uint16_t rgb565 = r5 | g6 | b5;
+            
             // setpixel(self, i, j, rgb565);
             data_buf[j * width + i] = rgb565;
             ptr += 4;
@@ -1402,9 +1392,9 @@ static mp_obj_t mp_backgrount_color(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
 
     if (n_args == 1) {
-        return MP_OBJ_NEW_SMALL_INT(self->bgcolor.color); // get
+        return MP_OBJ_NEW_SMALL_INT(self->bgcolor); // get
     } else {
-        self->bgcolor.color = mp_obj_get_int(args_in[1]); // set
+        self->bgcolor = mp_obj_get_int(args_in[1]); // set
     }
     return mp_const_none;
 }

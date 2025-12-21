@@ -1,69 +1,15 @@
+#include "common/tusb_types.h"
+#include "esp_heap_caps.h"
+#include "py/nlr.h"
 #include "py/runtime.h"
 #include "who_lcd.h"
 #include "esp_camera.h"
 #include "esp_lcd_panel_ops.h"
 #include "lvgl.h"
 #include "esp_log.h"
+#include <stdint.h>
+#include <string.h>
 
-static void rgb565_swap(void * buf, uint32_t buf_size_px, void * dst_buf)
-{
-    uint32_t u32_cnt = buf_size_px / 2;
-    uint16_t * buf16 = buf;
-    uint16_t * d_buf16 = dst_buf;
-    uint32_t * buf32 = buf;
-    uint32_t * d_buf32 = dst_buf;
-
-    while(u32_cnt >= 32) {
-        d_buf32[0] = ((buf32[0] & 0xff00ff00) >> 8) | ((buf32[0] & 0x00ff00ff) << 8);
-        d_buf32[1] = ((buf32[1] & 0xff00ff00) >> 8) | ((buf32[1] & 0x00ff00ff) << 8);
-        d_buf32[2] = ((buf32[2] & 0xff00ff00) >> 8) | ((buf32[2] & 0x00ff00ff) << 8);
-        d_buf32[3] = ((buf32[3] & 0xff00ff00) >> 8) | ((buf32[3] & 0x00ff00ff) << 8);
-        d_buf32[4] = ((buf32[4] & 0xff00ff00) >> 8) | ((buf32[4] & 0x00ff00ff) << 8);
-        d_buf32[5] = ((buf32[5] & 0xff00ff00) >> 8) | ((buf32[5] & 0x00ff00ff) << 8);
-        d_buf32[6] = ((buf32[6] & 0xff00ff00) >> 8) | ((buf32[6] & 0x00ff00ff) << 8);
-        d_buf32[7] = ((buf32[7] & 0xff00ff00) >> 8) | ((buf32[7] & 0x00ff00ff) << 8);
-        d_buf32[8] = ((buf32[8] & 0xff00ff00) >> 8) | ((buf32[8] & 0x00ff00ff) << 8);
-        d_buf32[9] = ((buf32[9] & 0xff00ff00) >> 8) | ((buf32[9] & 0x00ff00ff) << 8);
-        d_buf32[10] = ((buf32[10] & 0xff00ff00) >> 8) | ((buf32[10] & 0x00ff00ff) << 8);
-        d_buf32[11] = ((buf32[11] & 0xff00ff00) >> 8) | ((buf32[11] & 0x00ff00ff) << 8);
-        d_buf32[12] = ((buf32[12] & 0xff00ff00) >> 8) | ((buf32[12] & 0x00ff00ff) << 8);
-        d_buf32[13] = ((buf32[13] & 0xff00ff00) >> 8) | ((buf32[13] & 0x00ff00ff) << 8);
-        d_buf32[14] = ((buf32[14] & 0xff00ff00) >> 8) | ((buf32[14] & 0x00ff00ff) << 8);
-        d_buf32[15] = ((buf32[15] & 0xff00ff00) >> 8) | ((buf32[15] & 0x00ff00ff) << 8);
-        d_buf32[16] = ((buf32[16] & 0xff00ff00) >> 8) | ((buf32[16] & 0x00ff00ff) << 8);
-        d_buf32[17] = ((buf32[17] & 0xff00ff00) >> 8) | ((buf32[17] & 0x00ff00ff) << 8);
-        d_buf32[18] = ((buf32[18] & 0xff00ff00) >> 8) | ((buf32[18] & 0x00ff00ff) << 8);
-        d_buf32[19] = ((buf32[19] & 0xff00ff00) >> 8) | ((buf32[19] & 0x00ff00ff) << 8);
-        d_buf32[20] = ((buf32[20] & 0xff00ff00) >> 8) | ((buf32[20] & 0x00ff00ff) << 8);
-        d_buf32[21] = ((buf32[21] & 0xff00ff00) >> 8) | ((buf32[21] & 0x00ff00ff) << 8);
-        d_buf32[22] = ((buf32[22] & 0xff00ff00) >> 8) | ((buf32[22] & 0x00ff00ff) << 8);
-        d_buf32[23] = ((buf32[23] & 0xff00ff00) >> 8) | ((buf32[23] & 0x00ff00ff) << 8);
-        d_buf32[24] = ((buf32[24] & 0xff00ff00) >> 8) | ((buf32[24] & 0x00ff00ff) << 8);
-        d_buf32[25] = ((buf32[25] & 0xff00ff00) >> 8) | ((buf32[25] & 0x00ff00ff) << 8);
-        d_buf32[26] = ((buf32[26] & 0xff00ff00) >> 8) | ((buf32[26] & 0x00ff00ff) << 8);
-        d_buf32[27] = ((buf32[27] & 0xff00ff00) >> 8) | ((buf32[27] & 0x00ff00ff) << 8);
-        d_buf32[28] = ((buf32[28] & 0xff00ff00) >> 8) | ((buf32[28] & 0x00ff00ff) << 8);
-        d_buf32[29] = ((buf32[29] & 0xff00ff00) >> 8) | ((buf32[29] & 0x00ff00ff) << 8);
-        d_buf32[30] = ((buf32[30] & 0xff00ff00) >> 8) | ((buf32[30] & 0x00ff00ff) << 8);
-        d_buf32[31] = ((buf32[31] & 0xff00ff00) >> 8) | ((buf32[31] & 0x00ff00ff) << 8);
-        buf32 += 32;
-        d_buf32 += 32;
-        u32_cnt -= 32;
-    }
-
-    while(u32_cnt) {
-        *d_buf32 = ((*buf32 & 0xff00ff00) >> 8) | ((*buf32 & 0x00ff00ff) << 8);
-        buf32++;
-        d_buf32++;
-        u32_cnt--;
-    }
-
-    if(buf_size_px & 0x1) {
-        uint32_t e = buf_size_px - 1;
-        d_buf16[e] = ((buf16[e] & 0xff00) >> 8) | ((buf16[e] & 0x00ff) << 8);
-    }
-
-}
 
 static mp_obj_t mp_lcd_init(void)
 {
@@ -100,14 +46,9 @@ static mp_obj_t mp_lcd_show(mp_obj_t buf_obj)
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_obj, &bufinfo, MP_BUFFER_READ);
     
-    lcd_t *lcd = get_lcd_handle();
-    // lv_draw_sw_rgb565_swap(bufinfo.buf, bufinfo.len / 2);
-    uint16_t *buf_tmp = (uint16_t *)m_malloc(bufinfo.len);
-    rgb565_swap(bufinfo.buf, bufinfo.len / 2, (void *)buf_tmp);
-    esp_lcd_panel_draw_bitmap(lcd->panel, 0, 0, 320, 172, buf_tmp); //(uint16_t *)bufinfo.buf);
-
-    m_free(buf_tmp);
-    return mp_obj_new_int_from_uint(0);
+    lcd_flush(bufinfo.buf);
+    
+    return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mp_lcd_show_obj, mp_lcd_show);
 
