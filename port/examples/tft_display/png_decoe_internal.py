@@ -3,27 +3,27 @@ from mpython import *
 
 display.clear(lcd.WHITE)
 
-w, h, buff = display.decode_png_internal(71)
+w, h, buff = display.decode_png_internal(27)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 display.blit(fb, 0, 0)
 
-w, h, buff = display.decode_png_internal(64)
+w, h, buff = display.decode_png_internal(28)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 display.blit(fb, 100, 0)
 
-w, h, buff = display.decode_png_internal(65)
+w, h, buff = display.decode_png_internal(29)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 display.blit(fb, 200, 0)
 
-w, h, buff = display.decode_png_internal(66)
+w, h, buff = display.decode_png_internal(30)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 display.blit(fb, 0, 85)
 
-w, h, buff = display.decode_png_internal(61)
+w, h, buff = display.decode_png_internal(31)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 display.blit(fb, 100, 85)
 
-w, h, buff = display.decode_png_internal(62)
+w, h, buff = display.decode_png_internal(32)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 display.blit(fb, 200, 85)
 
