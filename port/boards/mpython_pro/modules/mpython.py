@@ -8,6 +8,7 @@
 # V1.1 add oled draw function,add buzz.freq().  by tangliufeng
 # V1.2 add servo/ui class,by tangliufeng
 # ledong_pro 202411
+# v2.0 modified by zhaohuijiang for mpython V3 20250301
 
 from machine import I2C, PWM, Pin, ADC, TouchPad
 import esp, math, time, network
@@ -126,7 +127,7 @@ class TFT_displayer(framebuf.FrameBuffer):
     def show(self):
         lcd.show(self.buffer)
         
-tft_lcd = TFT_displayer() 
+display = TFT_displayer() 
 
 # my_wifi = wifi()
 #多次尝试连接wifi
@@ -607,44 +608,13 @@ class Magnetic(object):
                 return (math.sqrt(math.pow(self.raw_x - self.peeling_x, 2) + pow(self.raw_y - self.peeling_y, 2) + pow(self.raw_z - self.peeling_z , 2)))*0.0625
             return (math.sqrt(math.pow(self.get_x(), 2) + pow(self.get_y(), 2) + pow(self.get_z(), 2)))
 
-    def calibrate(self): 
-        import lvgl as lv
-        import lcd
-        import lv_displayer
-        from lv_utils import event_loop
-
-        event_loop()
-        
-        data = None
-        data2 = None       
-        scr = lv.screen_active()
-        scr.set_scroll_dir(lv.DIR.NONE)
-        scr.set_style_bg_color(lv.color_hex(0xffffff), lv.PART.MAIN)
-
-        with open('/images/magnetic/1.png','rb') as f:
-            data = f.read()
-        img_src = lv.image_dsc_t({
-            'data_size': len(data),
-            'data': data
-        })
-
-        with open('/images/magnetic/2.png','rb') as f:
-            data2 = f.read()
-        img_src2 = lv.image_dsc_t({
-            'data_size': len(data2),
-            'data': data2
-        })
-        img = lv.image(scr)
-        img.set_src(img_src)
-        img.set_pos(162, 0)
-
-        label = lv.label(scr)
-        label.set_pos(20, 30)
-        label.set_size(320, 100)
-        label.set_text('步骤1:\n如图转几周')
-        label.set_style_text_color(lv.color_hex(0x000000), lv.PART.MAIN)
-        label.set_style_text_font(lv.font_siyuan_heiti_medium_24, lv.PART.MAIN)
-        time.sleep(5)
+    def calibrate(self):
+        display.clear(lcd.WHITE)
+        w, h, buff = display.decode_png_internal(72)
+        fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
+        display.blit(fb, 75, -17)
+        display.DispChar("步骤1:如图转几周", 50, 130, lcd.RED)
+        display.show()
         
         self._get_raw()
         min_x = max_x = self.raw_x
@@ -661,8 +631,14 @@ class Magnetic(object):
         self.cali_offset_x = (max_x + min_x) / 2
         self.cali_offset_y = (max_y + min_y) / 2
         print('cali_offset_x: ' + str(self.cali_offset_x) + '  cali_offset_y: ' + str(self.cali_offset_y))
-        img.set_src(img_src2)
-        label.set_text('步骤2:\n如图转几周')
+        
+        display.clear(lcd.WHITE)
+        w, h, buff = display.decode_png_internal(73)
+        fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
+        display.blit(fb, 75, -20)
+        display.DispChar("步骤2:如图转几周", 50, 130, lcd.RED)
+        display.show()
+        
         time.sleep(5)
         ticks_start = time.ticks_ms()
         while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
@@ -674,13 +650,9 @@ class Magnetic(object):
   
         print('cali_offset_z: ' + str(self.cali_offset_z))
 
-        
-        img.delete()
-        label.set_pos(110, 60)
-        label.set_text('校准完成')
-        lv.task_handler()
-        time.sleep(3)
-        label.delete()
+        display.clear(lcd.WHITE)
+        display.DispChar("校准完成！", 100, 60, lcd.RED)
+        display.show()
 
     def get_heading(self):
         if(self.chip==1):

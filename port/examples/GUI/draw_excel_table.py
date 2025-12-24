@@ -4,7 +4,7 @@ from mpython import *
 table = MicroExcelTable()
 # table = MicroExcelTable(y0=10, cols=2, rows=3, cell_width=100,)
 
-tft_lcd.clear()
+display.clear()
 # 2. 绘制表头（仅调用一次）
 col_headers = ["温度", "湿度", "光线值"]   # 列表头
 row_headers = ["位置1", "位置2", "位置3", "位置4"] # 列表头
@@ -26,7 +26,7 @@ table.update_data([
 #     ["24℃", "61%"],
 # ])
 
-tft_lcd.show()
+display.show()
 
 # 4. 模拟实时更新单个单元格（核心演示）
 count = 0
@@ -35,6 +35,6 @@ while True:
     table.update_cell(row=0, col=0, text=f"{(25+count) % 99}℃")
     # 仅更新第2行第3列的电量值
     table.update_cell(row=2, col=2, text=f"{count % 1024}")
-    tft_lcd.show()
+    display.show()
     count += 1
     time.sleep(1)

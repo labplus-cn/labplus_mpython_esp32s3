@@ -3,19 +3,19 @@
 from mpython import *
 import time
 
-tft_lcd.clear(lcd.BLACK)
-tft_lcd.show()
-w, h, buff = tft_lcd.decode_png_internal(0)
+display.clear(lcd.BLACK)
+display.show()
+w, h, buff = display.decode_png_internal(0)
 fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
 
 #刷屏测试
 while True:
     start = time.ticks_us()
-    tft_lcd.blit(fb, 0,0)
-    # tft_lcd.clear(lcd.RED)
-    tft_lcd.show()
+    display.blit(fb, 0,0)
+    # display.clear(lcd.RED)
+    display.show()
     # time.sleep_ms(500)
-    tft_lcd.clear(lcd.GREEN)
-    tft_lcd.show()
+    display.clear(lcd.GREEN)
+    display.show()
     # time.sleep_ms(500)
     print(time.ticks_diff(time.ticks_us(), start))
