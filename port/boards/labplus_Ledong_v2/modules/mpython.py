@@ -8,15 +8,19 @@
 # V1.1 add oled draw function,add buzz.freq().  by tangliufeng
 # V1.2 add servo/ui class,by tangliufeng
 # labplus_Ledong_v2 202411
+# v2.0 modified by zhaohuijiang for mpython V3 20250301
 
 from machine import I2C, PWM, Pin, ADC
 import esp, math, time, network
 import ustruct
 from neopixel import NeoPixel
+import time
 from micropython import schedule,const
 from esp32 import NVS
 from _ntptime import *
 from ltr308 import *
+import framebuf
+import lcd
 
 i2c = I2C(0, scl=Pin(43), sda=Pin(44), freq=200000)
 
@@ -34,6 +38,96 @@ def numberMap(inputNum, bMin, bMax, cMin, cMax):
     outputNum = ((cMax - cMin) / (bMax - bMin)) * (inputNum - bMin) + cMin
     return outputNum
 
+class TFT_displayer(framebuf.FrameBuffer):
+    def __init__(self):
+        self.lcd_width = 320
+        self.lcd_height = 172
+        self.buffer = bytearray(110080) # self.lcd_width*self.lcd_height*2
+        super().__init__(self.buffer, self.lcd_width, self.lcd_height, framebuf.RGB565)
+        
+    def _mono2rgb65(self, ch_bitmap:bytes, ch_w:int, ch_h:int, char_col=0xffff)->list[int]:
+        """
+        黑白像素字符缓存点转化为RGB565缓存
+        param bitmap: 黑白像素点字符缓存
+        param ch_w ch_w: 缓存宽高
+        param char_col: 目标字体颜色
+        return: RGB565字符缓存
+        """
+        char_buf = bytearray(ch_w * ch_h * 2)
+        char_fb = framebuf.FrameBuffer(char_buf, ch_w, ch_h, framebuf.RGB565)
+
+        # 填充字符FB：将1bit位图映射为RGB565像素
+        for row in range(ch_h):
+            for col in range(ch_w):
+                # 计算当前像素在1bit位图中的字节/位位置
+                byte_idx = row * ((ch_w + 7) // 8) + (col // 8)
+                bit_idx = 7 - (col % 8)  # 适配font-to-py的位序（bit7对应第一个像素）
+                
+                # 读取1bit值（0=背景/透明，1=前景）
+                bit_val = (ch_bitmap[byte_idx] >> bit_idx) & 0x01 if byte_idx < len(ch_bitmap) else 0
+                
+                # 映射为RGB565颜色并填充到字符FB
+                bg_color = super().background_color()
+                color = char_col if bit_val else bg_color
+                char_fb.pixel(col, row, color)
+
+        return char_fb
+        
+    def DispChar(self, str, x, y, color=lcd.WHITE, auto_wrap = False):
+        """
+        显示内置思源24位黑体字符
+        :param str: 待显示字符
+        :param x y: 位置
+        :param color:字体颜色
+        :param auto_wrap:是否换行
+        """
+        self.dispChar(str, x, y, color, auto_wrap)
+
+    def DispChar_font(self, font, str, x, y, color=lcd.WHITE, auto_wrap = False):
+        """
+        显示用户自定义字体，参考： https://github.com/peterhinch/micropython-font-to-py
+        参数
+        :param font:  使用 font_to_py.py 从`ttf` or `otf`转换出的字体py文件，内置的相关字体位于font文件夹下.
+        :param str: 待显示字体，内置了数码管字体和相关ASCII字符字体，当然用户可以自已制作中文字体。
+        :param x y: 显示位置坐标
+        :param color: 字体颜色
+        :param auto_wrap: 是否自动换行，每行高度：char_height + 5，擦除一行时会用到此参数
+        """
+        is_x_change = False
+        for char in str:
+            char_buf, char_height, char_width = font.get_ch(char)
+           
+            # 在数码管字体中，调整‘1’字符位置，在时钟显示中更美观 
+            if font.fon_type() == 'DIGIFACE':
+                if char == '1':
+                    x = x + char_width // 2   
+                    is_x_change = True
+                elif is_x_change:
+                    x = x - char_width // 2  
+                    is_x_change = False
+                
+            if x > self.lcd_width - char_width:
+                if auto_wrap:
+                    x = 0
+                    y += char_height + 5
+                else: # x超出屏幕宽度则不显示
+                    return
+            if y > 240 - char_height: # y超出屏幕高度则不显示
+                return
+                
+            fb = self._mono2rgb65(char_buf, char_width, char_height, color) 
+            super().blit(fb, x, y)
+            x += char_width #+ 5
+
+    def clear(self, color = lcd.BLACK):
+        super().background_color(color)
+        super().fill(color)
+        
+    def show(self):
+        lcd.show(self.buffer)
+        
+display = TFT_displayer() 
+
 # my_wifi = wifi()
 #多次尝试连接wifi
 def try_connect_wifi(_wifi, _ssid, _pass, _times):
@@ -48,7 +142,6 @@ def try_connect_wifi(_wifi, _ssid, _pass, _times):
     except:
         time.sleep(5)
         return try_connect_wifi(_wifi, _ssid, _pass, _times-1)
-
 
 class wifi:
     def __init__(self):
@@ -100,7 +193,6 @@ class wifi:
     def disable_APWiFi(self):
         self.ap.active(False)
         print('disable AP WiFi...')
-
 
 class MOTION(object):
     def __init__(self):
@@ -566,44 +658,13 @@ class Magnetic(object):
                 return (math.sqrt(math.pow(self.raw_x - self.peeling_x, 2) + pow(self.raw_y - self.peeling_y, 2) + pow(self.raw_z - self.peeling_z , 2)))*0.0625
             return (math.sqrt(math.pow(self.get_x(), 2) + pow(self.get_y(), 2) + pow(self.get_z(), 2)))
 
-    def calibrate(self): 
-        import lvgl as lv
-        import lcd
-        import lv_displayer
-        from lv_utils import event_loop
-
-        event_loop()
-        
-        data = None
-        data2 = None       
-        scr = lv.screen_active()
-        scr.set_scroll_dir(lv.DIR.NONE)
-        scr.set_style_bg_color(lv.color_hex(0xffffff), lv.PART.MAIN)
-
-        with open('/images/magnetic/1.png','rb') as f:
-            data = f.read()
-        img_src = lv.image_dsc_t({
-            'data_size': len(data),
-            'data': data
-        })
-
-        with open('/images/magnetic/2.png','rb') as f:
-            data2 = f.read()
-        img_src2 = lv.image_dsc_t({
-            'data_size': len(data2),
-            'data': data2
-        })
-        img = lv.image(scr)
-        img.set_src(img_src)
-        img.set_pos(162, 0)
-
-        label = lv.label(scr)
-        label.set_pos(20, 30)
-        label.set_size(320, 100)
-        label.set_text('步骤1:\n如图转几周')
-        label.set_style_text_color(lv.color_hex(0x000000), lv.PART.MAIN)
-        label.set_style_text_font(lv.font_siyuan_heiti_medium_24, lv.PART.MAIN)
-        time.sleep(5)
+    def calibrate(self):
+        display.clear(lcd.WHITE)
+        w, h, buff = display.decode_png_internal(72)
+        fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
+        display.blit(fb, 75, -17)
+        display.DispChar("步骤1:如图转几周", 50, 130, lcd.RED)
+        display.show()
         
         self._get_raw()
         min_x = max_x = self.raw_x
@@ -620,8 +681,14 @@ class Magnetic(object):
         self.cali_offset_x = (max_x + min_x) / 2
         self.cali_offset_y = (max_y + min_y) / 2
         print('cali_offset_x: ' + str(self.cali_offset_x) + '  cali_offset_y: ' + str(self.cali_offset_y))
-        img.set_src(img_src2)
-        label.set_text('步骤2:\n如图转几周')
+
+        display.clear(lcd.WHITE)
+        w, h, buff = display.decode_png_internal(73)
+        fb = framebuf.FrameBuffer(buff, w, h, framebuf.RGB565)
+        display.blit(fb, 75, -20)
+        display.DispChar("步骤2:如图转几周", 50, 130, lcd.RED)
+        display.show()
+        
         time.sleep(5)
         ticks_start = time.ticks_ms()
         while (time.ticks_diff(time.ticks_ms(), ticks_start) < 15000) :
@@ -633,13 +700,9 @@ class Magnetic(object):
   
         print('cali_offset_z: ' + str(self.cali_offset_z))
 
-        
-        img.delete()
-        label.set_pos(110, 60)
-        label.set_text('校准完成')
-        lv.task_handler()
-        time.sleep(3)
-        label.delete()
+        display.clear(lcd.WHITE)
+        display.DispChar("校准完成！", 100, 60, lcd.RED)
+        display.show()
 
     def get_heading(self):
         if(self.chip==1):
@@ -755,7 +818,7 @@ class MPythonPin():
         if mode not in [PinMode.IN, PinMode.OUT, PinMode.PWM, PinMode.ANALOG, PinMode.OUT_DRAIN]:
             raise TypeError("mode must be 'IN, OUT, PWM, ANALOG,OUT_DRAIN'")
         if pin == 10:
-            raise TypeError("P10 is used for internalsound sensor")
+            raise TypeError("P10 is used for internal sound sensor")
         if pin == 5 or pin == 11:
             raise TypeError("P5 or P11 is used for internal A B key.")
         if pin == 7:
@@ -827,7 +890,6 @@ class MPythonPin():
 # 3 rgb leds
 rgb = NeoPixel(Pin(16, Pin.OUT), 3, 3, 1, brightness=0.3)
 rgb.write()
-
 
 # light sensor LTR-308ALS 
 if 83 in i2c.scan():    
@@ -942,6 +1004,7 @@ class Ledong_shield(object):
 
 ledong_shield = Ledong_shield()
 
+from gui import *
 
 """
 uuid

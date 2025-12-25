@@ -27,8 +27,6 @@ for count in range(3):
 mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
 print(mac)
 
-# import lcd
-# lcd.draw_logo()
 
 # 上电后立即关闭rgb,防止随机灯亮问题
 _rgb = NeoPixel(Pin(8, Pin.OUT), 4, 3, 1,0.1)
