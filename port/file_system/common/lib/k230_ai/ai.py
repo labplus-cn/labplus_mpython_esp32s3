@@ -424,7 +424,7 @@ class AMR(object):
     """ 自动驾驶 Autonomous Mobile Robot """
     def __init__(self, uart):
         self.uart = uart
-        self.pid = PIDController(kp=1.3, ki=0.0, kd=0.2, min_out=-25, max_out=25) 
+        self.pid = PIDController(kp=1.55, ki=0.0, kd=0.2, min_out=-25, max_out=25) 
         self.res = {
                         "F": "none",
                         "AGL": 0,
@@ -438,7 +438,7 @@ class AMR(object):
         AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
         time.sleep(0.5)
 
-    def pid_controller(self, kp=1.3, ki=0, kd=0.2, min_out=-25, max_out=25):
+    def pid_controller(self, kp=1.55, ki=0, kd=0.2, min_out=-25, max_out=25):
         self.pid = PIDController(kp=kp, ki=ki, kd=kd, min_out=min_out, max_out=max_out) 
 
     def recognize(self):
