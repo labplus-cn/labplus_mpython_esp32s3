@@ -1,6 +1,6 @@
 from mpython import *
 
-gui = UI(display)
+gui = UI()
 
 display.clear(lcd.BLACK)
 gui.ProgressBar(140, 10, 180, 20, 20, lcd.BLUE)
