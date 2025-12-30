@@ -251,23 +251,23 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
 4. 固件编译
 
    ```bash
-   idf.py -D MICROPY_BOARD=mpython_pro build
+   idf.py -D MICROPY_BOARD=mpython_v3 build
    idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build
 
-   idf.py -D MICROPY_BOARD=mpython_pro -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake build
+   idf.py -D MICROPY_BOARD=mpython_v3 -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake build
    ```   
 
    合并固件
    ```
 
-   idf.py -D MICROPY_BOARD=mpython_pro merge_bin
+   idf.py -D MICROPY_BOARD=mpython_v3 merge_bin
    idf.py -D MICROPY_BOARD=labplus_Ledong_v2 merge_bin
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary merge_bin
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle merge_bin
 
-   idf.py -D MICROPY_BOARD=mpython_pro build merge_bin
+   idf.py -D MICROPY_BOARD=mpython_v3 build merge_bin
    idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build merge_bin
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build merge_bin
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build merge_bin
@@ -303,7 +303,7 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
 
    ```bash
    esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 4000000 --before default_reset --after hard_reset write_flash \
-          --flash_size detect 0x0 build/labplus_Ledong_v2-5fb5161-dirty-5fb5161_2025-09-19.bin
+          --flash_size detect 0x0 build/labplus_Ledong_v2-v1.0-38.g5a4cd1d.dirty-5a4cd1d_2025-12-30.bin
    ```
 
    3. windows使用flash_download_tool烧录

@@ -37,8 +37,8 @@
     #include "labplus_Ledong_pro/bsp_audio_board.h"
 #elif CONFIG_LABPLUS_FOR_XUEJING_BOARD
     #include "labplus_for_xuejing/bsp_audio_board.h"
-#elif CONFIG_MPYTHON_PRO_BOARD
-    #include "mpython_pro/bsp_audio_board.h"
+#elif CONFIG_MPYTHON_V3_BOARD
+    #include "mpython_v3/bsp_audio_board.h"
 #elif CONFIG_LABPLUS_LEDONG_V2_BOARD
     #include "labplus_Ledong_v2/bsp_audio_board.h"
 #elif CONFIG_LABPLUS_XUNFEI_JS_PRIMARY_BOARD

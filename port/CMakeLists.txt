@@ -6,9 +6,9 @@ cmake_minimum_required(VERSION 3.12)
 include($ENV{IDF_PATH}/tools/cmake/version.cmake)
 set(IDF_VERSION "${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}.${IDF_VERSION_PATCH}")
 
-# Set the board if it's not already set.   mpython_pro labplus_Ledong_v2 labplus_xunfei_js_middle labplus_xunfei_js_primary
+# Set the board if it's not already set.   mpython_v3 labplus_Ledong_v2 labplus_xunfei_js_middle labplus_xunfei_js_primary
 if(NOT MICROPY_BOARD)
-    set(MICROPY_BOARD mpython_pro)
+    set(MICROPY_BOARD mpython_v3)
 endif()
 
 # Set the board directory and check that it exists.
@@ -87,7 +87,7 @@ add_custom_target(
     COMMAND_EXPAND_LISTS
     )
 
-# if(MPYTHON_PRO_BOARD OR LABPLUS_LEDONG_V2_BOARD)
+# if(MPYTHON_V3_BOARD OR LABPLUS_LEDONG_V2_BOARD)
     set(USER_C_MODULES ${CMAKE_CURRENT_LIST_DIR}/usercmodule/micropython.cmake)
 # endif()
 

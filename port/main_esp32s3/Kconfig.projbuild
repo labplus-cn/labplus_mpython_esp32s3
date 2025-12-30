@@ -13,7 +13,7 @@ config LABPLUS_LEDONG_PRO_BOARD
 config LABPLUS_FOR_XUEJING_BOARD
     bool "labplus for xuejing board"
     depends on IDF_TARGET_ESP32S3
-config MPYTHON_PRO_BOARD
+config MPYTHON_V3_BOARD
     bool "mpython pro board"
     depends on IDF_TARGET_ESP32S3
 config LABPLUS_LEDONG_V2_BOARD

@@ -1,21 +1,21 @@
-新建板：mpython_pro(掌控板pro)
+新建板：mpython_v3(掌控板pro)
 修改本文档，记录添加板相关修改。
 
-1. port/boards下：复制labplus_fro_xuejing到mpython_pro，一些通用修改参阅labplus_fro_xuejing下board.md。
+1. port/boards下：复制labplus_fro_xuejing到mpython_v3，一些通用修改参阅labplus_fro_xuejing下board.md。
 
 2. 修改bsp_audio_board.h/c文件：
     - 修改IIC IIS引脚定义
-3. 在mpython_pro目录下搜labplus_for_xuejing,替换成mpython_pro。
-4. 搜索CONFIG_LABPLUS_FOR_XUEJING_BOARD,替换为CONFIG_MPYTHON_PRO_BOARD,用于板相关编译配置
+3. 在mpython_v3目录下搜labplus_for_xuejing,替换成mpython_v3。
+4. 搜索CONFIG_LABPLUS_FOR_XUEJING_BOARD,替换为CONFIG_MPYTHON_V3_BOARD,用于板相关编译配置
    - sdkconfig.board
    - port/drivers/audio/include/bsp_audio.h加入：
-    #elif CONFIG_MPYTHON_PRO_BOARD
-    #include "mpython_pro/bsp_audio_board.h"
+    #elif CONFIG_MPYTHON_V3_BOARD
+    #include "mpython_v3/bsp_audio_board.h"
 5. 修改mpconfigboard.h
    mpconfigport.h做了些公用配置，其包含了mpconfigboard.h，用于做板级配置，修改此文件：
    - 加入音乐模块
    - 修改板名信息
-6. 修改boards/mpython_pro/mpconfigboard.cmake
+6. 修改boards/mpython_v3/mpconfigboard.cmake
    - 设置目标芯片为s3
       set(IDF_TARGET esp32s3)
    - 修改SDKCONFIG_DEFAULTS变量，添加相关配置
