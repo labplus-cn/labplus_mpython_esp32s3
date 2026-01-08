@@ -1,3 +1,11 @@
+'''
+display继承framebuf,framebuf实现以下功能
+1、创建图形缓存区
+2、图形绘制：点、线、圆...
+3、png图片解码
+4、清屏（背景填充）
+5、内置文本显示
+'''
 from mpython import *
 
 display.clear()

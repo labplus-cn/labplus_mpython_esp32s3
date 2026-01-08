@@ -1,3 +1,5 @@
+# 猜拳没游戏，需要用到AI摄像头。
+
 from mpython import *
 import smartcamera_k230 as smartcamera
 import time

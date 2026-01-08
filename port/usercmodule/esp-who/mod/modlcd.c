@@ -101,7 +101,7 @@ static const mp_rom_map_elem_t lcd_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_GOLD), MP_ROM_INT(GUI_Gold) },
     { MP_ROM_QSTR(MP_QSTR_DARK_ORANGE), MP_ROM_INT(GUI_DarkOrange) },
     { MP_ROM_QSTR(MP_QSTR_BROWN), MP_ROM_INT(GUI_Brown) },
-    { MP_ROM_QSTR(MP_QSTR_LIGHT_GRAY), MP_ROM_INT(GUI_LightGray) },
+    { MP_ROM_QSTR(MP_QSTR_HOT_PINK), MP_ROM_INT(GUI_HotPink) },
 };
 
 static MP_DEFINE_CONST_DICT(lcd_module_globals, lcd_module_globals_table);
