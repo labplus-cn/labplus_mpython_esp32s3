@@ -6,7 +6,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "audio.h"
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 
 audio_handle_t *audio_handle = NULL;
 

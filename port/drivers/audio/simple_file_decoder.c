@@ -19,7 +19,7 @@
 #include "vfs_lfs2.h"
 #include "wav_codec.h"
 #include "player.h"
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 
 #define TAG "SIMP_DEC_TEST"
 
@@ -191,10 +191,10 @@ void simple_file_decoder_task(void *arg)
                         // Update audio information
                         esp_audio_simple_dec_info_t dec_info = {};
                         esp_audio_simple_dec_get_info(decoder, &dec_info);
-                        bsp_codec_dev_open(dec_info.sample_rate, dec_info.channel, dec_info.bits_per_sample);
+                        bsp_codec_dev_open(dec_info.sample_rate, dec_info.channel, dec_info.bits_per_sample, CODEC_OUTPUT);
                     }
                     total_decoded += out_frame.decoded_size;
-                    bsp_audio_play((int8_t *)out_frame.buffer, out_frame.decoded_size, portMAX_DELAY);
+                    bsp_codec_dev_write((int8_t *)out_frame.buffer, out_frame.decoded_size, portMAX_DELAY);
                 }
                 // In case that input data contain multiple frames
                 raw.len -= raw.consumed;
@@ -206,7 +206,7 @@ void simple_file_decoder_task(void *arg)
             }
         }
 
-        bsp_codec_dev_close();
+        bsp_codec_dev_close(CODEC_OUTPUT);
     } while (0);
 
     vfs_lfs2_file_close(wav_codec->lfs2_file);

@@ -14,7 +14,7 @@
 
 #include "esp_partition.h"
 #include "esp_idf_version.h"
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 #include "sc.h"
 
 static esp_tts_handle_t *g_tts_handle = NULL;
@@ -76,17 +76,17 @@ static void text_to_speech_task(void *arg)
 
         bsp_codec_dev_delete();
         bsp_codec_dev_create();
-//        bsp_audio_set_play_vol(50);
-        bsp_codec_dev_open(10000, 2, 16);
+//        bsp_codec_dev_set_out_vol(50);
+        bsp_codec_dev_open(10000, 2, 16, CODEC_OUTPUT);
 
         do {
 //            short *pcm = (short *)heap_caps_malloc(4*1024 * sizeof(short), MALLOC_CAP_SPIRAM);
             short *pcm = esp_tts_stream_play(g_tts_handle, len, 0);
-            bsp_audio_play2(pcm, len[0] * 2, portMAX_DELAY);
+            bsp_codec_dev_write((int8_t *)pcm, len[0] * 2, portMAX_DELAY);
         } while (len[0] > 0);
 
-        bsp_codec_dev_close();
-        bsp_codec_dev_open(16000, 1, 16);
+        bsp_codec_dev_close(CODEC_OUTPUT);
+        bsp_codec_dev_open(16000, 1, 16, CODEC_OUTPUT);
         tts_flag = 0;
     }
 

@@ -7,7 +7,7 @@
 #include "freertos/task.h"
 #include "wav_codec.h"
 #include <sys/stat.h>
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 #include "simple_file_decoder.h"
 #include "simple_http_decoder.h"
 
@@ -114,13 +114,13 @@ int player_get_state(void)
 
 void player_set_vol(int vol)
 {
-    bsp_audio_set_play_vol(vol);   
+    bsp_codec_dev_set_out_vol(vol);   
 }
 
 void player_increase_vol(void)
 {
     int vol = 0;
-    bsp_audio_get_play_vol(&vol);
+    bsp_codec_dev_get_out_vol(&vol);
     if (vol < 50) {
         vol += 3;
     } else if (vol < 70) {
@@ -130,13 +130,13 @@ void player_increase_vol(void)
     } else {
         vol = 95;
     }
-    bsp_audio_set_play_vol(vol);
+    bsp_codec_dev_set_out_vol(vol);
 }
 
 void player_decrease_vol(void)
 {
     int vol = 65;
-    bsp_audio_get_play_vol(&vol);
+    bsp_codec_dev_get_out_vol(&vol);
     if (vol >= 95) {
         vol -= 1;
     } else if (vol >= 70) {
@@ -147,5 +147,5 @@ void player_decrease_vol(void)
         vol = 50;
     }
 
-    bsp_audio_set_play_vol(vol);
+    bsp_codec_dev_set_out_vol(vol);
 }

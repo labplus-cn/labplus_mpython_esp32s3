@@ -8,9 +8,7 @@
 3. 在mpython_v3目录下搜labplus_for_xuejing,替换成mpython_v3。
 4. 搜索CONFIG_LABPLUS_FOR_XUEJING_BOARD,替换为CONFIG_MPYTHON_V3_BOARD,用于板相关编译配置
    - sdkconfig.board
-   - port/drivers/audio/include/bsp_audio.h加入：
-    #elif CONFIG_MPYTHON_V3_BOARD
-    #include "mpython_v3/bsp_audio_board.h"
+
 5. 修改mpconfigboard.h
    mpconfigport.h做了些公用配置，其包含了mpconfigboard.h，用于做板级配置，修改此文件：
    - 加入音乐模块

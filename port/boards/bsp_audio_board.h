@@ -27,6 +27,12 @@
 #include "esp_codec_dev.h"
 #include "esp_codec_dev_defaults.h"
 #include "esp_codec_dev_os.h"
+#include "driver/i2s_std.h"
+#include "driver/i2s_tdm.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief labplus_classroom_kit I2C GPIO defineation
@@ -48,6 +54,10 @@
 #define GPIO_I2S_SCLK       (GPIO_NUM_41)
 #define GPIO_I2S_SDIN       (GPIO_NUM_40)
 #define GPIO_I2S_DOUT       (GPIO_NUM_38)
+
+#define DEFAULT_SAMPLE_RATE 16000
+#define DEFAULT_CHANNEL_FORMT 2
+#define DEFAULT_BITS_PER_SAMPLE 16
 
 #define RECORD_VOLUME   (35.0)
 /**
@@ -98,4 +108,38 @@
     .bits_per_sample          = I2S_BITS_PER_CHAN_32BIT, \
 }
 
+#endif
+
+typedef enum{
+    CODEC_NONE,
+    CODEC_INPUT,
+    CODEC_OUTPUT,
+}codec_type_t;
+
+typedef struct{
+    i2s_chan_handle_t tx_handle;        // I2S tx channel handler
+    i2s_chan_handle_t rx_handle;        // I2S rx channel handler
+    const audio_codec_data_if_t *codec_data_if;
+    const audio_codec_ctrl_if_t *codec_ctrl_if;
+    const audio_codec_if_t *codec_if;
+    esp_codec_dev_handle_t input_codec_dev;
+    esp_codec_dev_handle_t output_codec_dev;
+    bool is_codec_dev_input_open;
+    bool is_codec_dev_output_open;
+    SemaphoreHandle_t semaphore_codec_dev_input;
+    SemaphoreHandle_t semaphore_codec_dev_output;
+}bsp_codec_dev_t;
+
+esp_err_t bsp_codec_dev_create(void);
+esp_err_t bsp_codec_dev_delete(void);
+esp_err_t bsp_codec_dev_open(uint32_t sample_rate, int channel_format, int bits_per_sample, codec_type_t type);
+esp_err_t bsp_codec_dev_close(codec_type_t type);
+esp_err_t bsp_codec_dev_write(const int8_t *data, int length, TickType_t ticks_to_wait);
+esp_err_t bsp_codec_dev_read(bool is_get_raw_channel, int8_t *buffer, int buffer_len);
+esp_err_t bsp_codec_dev_set_out_vol(int volume);
+esp_err_t bsp_codec_dev_get_out_vol(int *volume);
+bsp_codec_dev_t* get_codec_dev(void);
+
+#ifdef __cplusplus
+}
 #endif

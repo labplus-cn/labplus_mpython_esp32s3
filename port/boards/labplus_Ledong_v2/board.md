@@ -8,9 +8,7 @@
 3. 在labplus_Ledong_v2目录下搜labplus_for_xuejing,替换成labplus_Ledong_v2。
 4. 搜索CONFIG_LABPLUS_FOR_XUEJING_BOARD,替换为CONFIG_LABPLUS_LEDONG_V2_BOARD,用于板相关编译配置
    - sdkconfig.board
-   - port/drivers/audio/include/bsp_audio.h加入：
-    #elif 替换为CONFIG_LABPLUS_LEDONG_V2_BOARD
-    #include "labplus_Ledong_v2/bsp_audio_board.h"
+
 5. 修改mpconfigboard.h
    mpconfigport.h做了些公用配置，其包含了mpconfigboard.h，用于做板级配置，修改此文件：
    - 加入音乐模块

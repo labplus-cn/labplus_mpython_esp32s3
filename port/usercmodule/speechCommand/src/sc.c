@@ -14,7 +14,7 @@
 #include "speech_commands_action.h"
 #include "model_path.h"
 #include "esp_afe_config.h"
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 #include "esp_mn_speech_commands.h"
 #include "sc_module.h"
 #include "tts.h"
@@ -108,25 +108,22 @@ void feed_Task(void *arg)
     int feed_channel = 1;
     assert(nch == feed_channel);
     int16_t *i2s_buff = heap_caps_malloc(audio_chunksize * sizeof(int16_t) * feed_channel,MALLOC_CAP_SPIRAM);
-    assert(i2s_buff);
+    assert(i2s_buff != NULL);
 
     while (task_flag) {
         if(sc_stop_flag){
             vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
-        if (!dev_open_flag){
-            bsp_codec_dev_open(16000, 1, 16);
-        }
 
-        bsp_get_feed_data2(true, i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
+        bsp_codec_dev_open(16000, 1, 16, CODEC_INPUT);
+        bsp_codec_dev_read(true, (int8_t *)i2s_buff, audio_chunksize * sizeof(int16_t) * feed_channel);
 
         afe_handle->feed(afe_data, i2s_buff);
     }
-    if (i2s_buff) {
-        heap_caps_free(i2s_buff);
-        i2s_buff = NULL;
-    }
+
+    heap_caps_free(i2s_buff);
+    bsp_codec_dev_close(CODEC_INPUT);
     vTaskDelete(NULL);
 }
 
@@ -237,7 +234,7 @@ void sc_init(const char *word, uint16_t t, bool f)
     timeout = t;
     enable_flag = f;
 
-    bsp_codec_dev_open(16000, 1, 16);
+    // bsp_codec_dev_open(16000, 1, 16, CODEC_INPUT);
     models = esp_srmodel_init("sr_module");
 
     afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);

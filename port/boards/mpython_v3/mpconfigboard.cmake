@@ -24,7 +24,7 @@ set(ADF_COMPS ${ADF_PATH}/components)
 
 set(MICROPY_SOURCE_BOARD
     # ${MICROPY_BOARD_DIR}/main.c
-    ${MICROPY_BOARD_DIR}/bsp_audio_board.c
+    ${MPY_PORT_DIR}/boards/bsp_audio_board.c
     ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
     ${MPY_PORT_DIR}/drivers/audio/wave_head.c
     ${MPY_PORT_DIR}/drivers/audio/vfs_fatfs.c

@@ -25,7 +25,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "vfs_lfs2.h"
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 #include "audio.h"
 #include "player.h"
 #include "recorder.h"
@@ -157,19 +157,19 @@ void stream_i2s_write_task(void *arg)
         return;
     }
 
-    bsp_codec_dev_open(player->wav_codec->wav_info.sampleRate, player->wav_codec->wav_info.channels, player->wav_codec->wav_info.bits_per_sample);
+    bsp_codec_dev_open(player->wav_codec->wav_info.sampleRate, player->wav_codec->wav_info.channels, player->wav_codec->wav_info.bits_per_sample, CODEC_OUTPUT);
     while (1) {
         len = read_ringbuf(wav_codec_ringbuff, STREAM_OUT_RINGBUF_SIZE, STREAM_OUT_FRAME_SIZE, stream_buff);
         // ESP_LOGE(TAG, "ring buffer read len: %d", len);
         if(len > 0){
             if(player->audio_type == AUDIO_WAV_FILE_PLAY){
-                bsp_audio_play(stream_buff, len, portMAX_DELAY);
+                bsp_codec_dev_write(stream_buff, len, portMAX_DELAY);
             }else if(player->audio_type == AUDIO_WAV_FILE_RECORD){
                 //write data to file
             }
         }else{
             memset(stream_buff, 0, STREAM_OUT_FRAME_SIZE);
-            bsp_audio_play(stream_buff, STREAM_OUT_FRAME_SIZE, portMAX_DELAY);
+            bsp_codec_dev_write(stream_buff, STREAM_OUT_FRAME_SIZE, portMAX_DELAY);
             vTaskDelay(200 / portTICK_PERIOD_MS);
             goto exit;
         }
@@ -189,7 +189,7 @@ exit:
 	if(wav_codec_ringbuff){
 		vRingbufferDelete(wav_codec_ringbuff);
 	}
-    bsp_codec_dev_close();
+    bsp_codec_dev_close(CODEC_OUTPUT);
     if(stream_buff){
         free(stream_buff);
     }
@@ -272,12 +272,12 @@ void stream_i2s_read_task(void *arg)
 		if(!stream_buff){ break; }
 
 		rb_reset(recorder->record_ringbuff);
-		bsp_codec_dev_open(recorder->wav_fmt.sampleRate, recorder->wav_fmt.channels, recorder->wav_fmt.bits_per_sample);
+		bsp_codec_dev_open(recorder->wav_fmt.sampleRate, recorder->wav_fmt.channels, recorder->wav_fmt.bits_per_sample, CODEC_INPUT);
 		xTaskCreatePinnedToCore(&wav_file_write_task, "wav_file_write_task", 4 * 1024, (void*)recorder, 8, NULL, CORE_NUM1);
 		while (1) {
 			while( rb_bytes_available(recorder->record_ringbuff) >= READ_RINGBUF_BLOCK_SIZE){
-				bsp_get_feed_data(true, stream_buff, READ_RINGBUF_BLOCK_SIZE);
-				// bsp_audio_play(stream_buff, READ_RINGBUF_BLOCK_SIZE, portMAX_DELAY);
+				bsp_codec_dev_read(true, stream_buff, READ_RINGBUF_BLOCK_SIZE);
+				// bsp_codec_dev_write(stream_buff, READ_RINGBUF_BLOCK_SIZE, portMAX_DELAY);
 				rb_write(recorder->record_ringbuff, (char *)stream_buff, READ_RINGBUF_BLOCK_SIZE, 100/portTICK_PERIOD_MS);
 				frame_cnt++;
 				if(frame_cnt > recorder->total_frames){
@@ -289,7 +289,7 @@ void stream_i2s_read_task(void *arg)
 		}
 	}while(0);
 exit:
-    bsp_codec_dev_close();
+    bsp_codec_dev_close(CODEC_INPUT);
     if(stream_buff){
         free(stream_buff);
     }

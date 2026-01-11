@@ -26,14 +26,14 @@
 #include "msg.h"
 
 #include "sc.h"
-#include "bsp_audio.h"
+#include "bsp_audio_board.h"
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 // #define TAG "recorder"
 
 recorder_handle_t *recorder = NULL;
-bool is_record_open = false;
 int8_t *stream_buff = NULL;
+static bool is_record_open = false;
 
 /*
 static void example_disp_buf(uint8_t* buf, int length)
@@ -74,14 +74,10 @@ void recorder_record(const char *filename, wav_fmt_t fmt, int time)
     // ESP_LOGE(TAG, "record total frame: %d, time: %d", recorder->total_frames, recorder->time);
     recorder->file_uri = filename;
 
-    sc_stop_flag = 1;
-    bsp_codec_dev_delete();
-    bsp_codec_dev_create();
-
     xBinarySemaphore = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(&stream_i2s_read_task, "stream_i2s_read_task", 4 * 1024, (void*)recorder, 8, NULL, CORE_NUM1);
     xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
-    sc_stop_flag = 0;
+
     vSemaphoreDelete(xBinarySemaphore);
 }
 
@@ -97,15 +93,13 @@ uint16_t record_loudness(void)
     if(!stream_buff){
         stream_buff = calloc(100, sizeof(int8_t));
     }
-
-    sc_stop_flag = 1;
-    if(!is_record_open){
-        bsp_codec_dev_open(8000, 1, 16);
-        bsp_audio_set_play_vol(0);
+    if(is_record_open == false){
+        bsp_codec_dev_open(8000, 1, 16, CODEC_INPUT);
+        bsp_codec_dev_set_out_vol(0);
         is_record_open = true;
     }
-    
-    bsp_get_feed_data(true, stream_buff, 100);
+
+    bsp_codec_dev_read(true, stream_buff, 100);
     for(int i = 0; i < 50; i++){
         // loudness += *((int16_t *)stream_buff + i) < 0 ? -*((int16_t *)stream_buff + i) : *((int16_t *)stream_buff + i);
         loudness += (double)(pow(*((int16_t *)stream_buff + i), 2));
@@ -115,12 +109,8 @@ uint16_t record_loudness(void)
 
 void record_loudness_stop(void)
 {
-    if(is_record_open){
-        bsp_codec_dev_close();
-        is_record_open = false;
-        sc_stop_flag = 0;
-    }
-
+    bsp_codec_dev_close(CODEC_INPUT);
+    is_record_open = false;
     if(stream_buff){
         free(stream_buff);
         stream_buff = NULL;
