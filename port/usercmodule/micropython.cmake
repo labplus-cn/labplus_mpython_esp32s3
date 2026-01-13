@@ -8,11 +8,11 @@ endif()
 # add lv displayer driver module
 include(${CMAKE_CURRENT_LIST_DIR}/lv_displayer/micropython.cmake)
 
-# add tts module
-include(${CMAKE_CURRENT_LIST_DIR}/tts/micropython.cmake)
+# # add tts module
+# include(${CMAKE_CURRENT_LIST_DIR}/tts/micropython.cmake)
 
-# add wake up and speech command module
-include(${CMAKE_CURRENT_LIST_DIR}/speechCommand/micropython.cmake)
+# # add wake up and speech command module
+# include(${CMAKE_CURRENT_LIST_DIR}/speechCommand/micropython.cmake)
 
 # add rfid module
 include(${CMAKE_CURRENT_LIST_DIR}/rfid/micropython.cmake)
@@ -20,3 +20,5 @@ include(${CMAKE_CURRENT_LIST_DIR}/rfid/micropython.cmake)
 if(LABPLUS_LEDONG_V2_BOARD)
 include(${CMAKE_CURRENT_LIST_DIR}/touchpad/micropython.cmake)
 endif()
+
+include(${CMAKE_CURRENT_LIST_DIR}/audio/micropython.cmake)
