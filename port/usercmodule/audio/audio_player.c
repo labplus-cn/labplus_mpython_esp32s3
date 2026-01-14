@@ -104,7 +104,7 @@ static esp_audio_handle_t audio_player_create(void)
 {
     // init player
     esp_audio_cfg_t cfg = DEFAULT_ESP_AUDIO_CONFIG();
-    cfg.vol_handle = audio_board_codec_init();
+    cfg.vol_handle = board_codec_init();
     cfg.vol_set = (audio_volume_set)audio_hal_set_volume;
     cfg.vol_get = (audio_volume_get)audio_hal_get_volume;
     cfg.resample_rate = 48000;

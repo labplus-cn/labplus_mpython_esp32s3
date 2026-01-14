@@ -52,6 +52,20 @@ audio_hal_handle_t audio_board_codec_init(void)
     return codec_hal;
 }
 
+audio_hal_handle_t board_codec_init(void)
+{
+    if (board_handle) {
+        ESP_LOGW(TAG, "The board has already been initialized!");
+        return board_handle->audio_hal;
+    }
+    board_handle = (audio_board_handle_t) audio_calloc(1, sizeof(struct audio_board_handle));
+    AUDIO_MEM_CHECK(TAG, board_handle, return NULL);
+    board_handle->audio_hal = audio_board_codec_init();
+    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+    
+    return board_handle->audio_hal;
+}
+
 audio_board_handle_t audio_board_get_handle(void)
 {
     return board_handle;

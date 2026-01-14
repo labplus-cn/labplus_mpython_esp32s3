@@ -313,4 +313,4 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
 可以使用pymakr调试，上传、下载用户代码。
 
 esp-idf打补丁：
-patch -p1 < ~/patches/spi_flash_fix.patch
+patch -p1 < ../port/idf_v5.2_freertos.patch

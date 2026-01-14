@@ -56,6 +56,8 @@ audio_board_handle_t audio_board_init(void);
  */
 audio_hal_handle_t audio_board_codec_init(void);
 
+audio_hal_handle_t board_codec_init(void);
+
 /**
  * @brief Query audio_board_handle
  *
