@@ -35,7 +35,7 @@
 #include "wav_decoder.h"
 
 #include "http_stream.h"
-#include "vfs_stream.h"
+#include "lfs2_stream.h"
 #include "i2s_stream.h"
 
 #include "board.h"
@@ -113,10 +113,10 @@ static esp_audio_handle_t audio_player_create(void)
 
     // add input stream
     // fatfs stream
-    // vfs_stream_cfg_t fs_reader = VFS_STREAM_CFG_DEFAULT();
-    // fs_reader.type = AUDIO_STREAM_READER;
-    // fs_reader.task_core = 1;
-    // esp_audio_input_stream_add(player, vfs_stream_init(&fs_reader));
+    lfs2_stream_cfg_t fs_reader = LFS2_STREAM_CFG_DEFAULT();
+    fs_reader.type = AUDIO_STREAM_READER;
+    fs_reader.task_core = 1;
+    esp_audio_input_stream_add(player, lfs2_stream_init(&fs_reader));
     // http stream
     http_stream_cfg_t http_cfg = HTTP_STREAM_CFG_DEFAULT();
     http_cfg.event_handle = _http_stream_event_handle;

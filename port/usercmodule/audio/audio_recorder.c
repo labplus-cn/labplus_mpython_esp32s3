@@ -34,7 +34,7 @@
 #include "filter_resample.h"
 
 #include "raw_stream.h"
-#include "vfs_stream.h"
+#include "lfs2_stream.h"
 #include "i2s_stream.h"
 
 #include "amrnb_encoder.h"
@@ -133,13 +133,11 @@ static audio_element_handle_t audio_recorder_create_encoder(int encoder_type)
 static audio_element_handle_t audio_recorder_create_outstream(const char *uri)
 {
     audio_element_handle_t out_stream = NULL;
-    if (strstr(uri, "/sdcard/") != NULL) {
-        vfs_stream_cfg_t vfs_cfg = VFS_STREAM_CFG_DEFAULT();
-        vfs_cfg.type = AUDIO_STREAM_WRITER;
-        vfs_cfg.task_core = 1;
-        out_stream = vfs_stream_init(&vfs_cfg);
-    } else if (strstr(uri, "/spiffs/") != NULL) {
-        // TODO: spiffs
+    if (strstr(uri, "/sd/") != NULL) {
+        lfs2_stream_cfg_t lfs2_cfg = LFS2_STREAM_CFG_DEFAULT();
+        lfs2_cfg.type = AUDIO_STREAM_WRITER;
+        lfs2_cfg.task_core = 1;
+        out_stream = lfs2_stream_init(&lfs2_cfg);
     } else {
         raw_stream_cfg_t raw_cfg = RAW_STREAM_CFG_DEFAULT();
         raw_cfg.type = AUDIO_STREAM_WRITER;
