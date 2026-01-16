@@ -41,7 +41,7 @@
 #include "wav_encoder.h"
 
 #include "board.h"
-
+#include "modaudio.h"
 #include "mpconfigboard.h"
 
 enum {
@@ -78,7 +78,7 @@ static mp_obj_t audio_recorder_make_new(const mp_obj_type_t *type, size_t n_args
 static audio_element_handle_t audio_recorder_create_filter(int encoder_type)
 {
     rsp_filter_cfg_t rsp_cfg = DEFAULT_RESAMPLE_FILTER_CONFIG();
-    rsp_cfg.src_rate = 48000;
+    rsp_cfg.src_rate = 16000;
     rsp_cfg.src_ch = 2;
     rsp_cfg.task_core = 1;
 
@@ -97,7 +97,8 @@ static audio_element_handle_t audio_recorder_create_filter(int encoder_type)
             break;
         }
         case WAV: {
-            rsp_cfg.dest_rate = 16000;
+            rsp_cfg.dest_ch = 1;
+            rsp_cfg.dest_rate = 8000;
             break;
         }
         default:
@@ -151,16 +152,13 @@ static audio_element_handle_t audio_recorder_create_outstream(const char *uri)
 static void audio_recorder_create(audio_recorder_obj_t *self, const char *uri, int format)
 {
     // init audio board
-    audio_board_codec_init();
+    // audio_board_codec_init();
 
     // pipeline
     audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
     self->pipeline = audio_pipeline_init(&pipeline_cfg);
     // I2S
-    i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT_WITH_PARA(CODEC_ADC_I2S_PORT, 48000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_READER);
-    i2s_cfg.task_core = 1;
-    i2s_cfg.uninstall_drv = false;
-    self->i2s_stream = i2s_stream_init(&i2s_cfg);
+    self->i2s_stream = i2s_reader_el;
     // filter
     self->filter = audio_recorder_create_filter(format);
     // encoder
@@ -179,8 +177,9 @@ static void audio_recorder_create(audio_recorder_obj_t *self, const char *uri, i
     if (format == WAV) {
         audio_element_info_t out_stream_info;
         audio_element_getinfo(self->out_stream, &out_stream_info);
-        out_stream_info.sample_rates = 16000;
-        out_stream_info.channels = 2;
+        out_stream_info.sample_rates = 8000;
+        out_stream_info.channels = 1; 
+        out_stream_info.bits = 16;
         audio_element_setinfo(self->out_stream, &out_stream_info);
     }
     // link

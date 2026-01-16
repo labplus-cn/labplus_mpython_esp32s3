@@ -126,13 +126,13 @@ static esp_err_t _lfs2_open(audio_element_handle_t self)
             if ((STREAM_TYPE_WAV == vfs->w_type)) {
                 wav_header_t info = {0};
                 lfs2_file_write(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, (uint8_t *)&info, sizeof(wav_header_t));
-                lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
+                // lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
             } else if ((STREAM_TYPE_AMR == vfs->w_type)) {
                 lfs2_file_write(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, "#!AMR\n", 6);
-                lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
+                // lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
             } else if ((STREAM_TYPE_AMRWB == vfs->w_type)) {
                 lfs2_file_write(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, "#!AMR-WB\n", 9);
-                lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
+                // lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
             }
         } else {
             ESP_LOGE(TAG, "failed to open %s", path);
@@ -172,6 +172,9 @@ static int _lfs2_write(audio_element_handle_t self, char *buffer, int len, TickT
     lfs2_stream_t *vfs = (lfs2_stream_t *)audio_element_getdata(self);
     audio_element_info_t info;
     audio_element_getinfo(self, &info);
+    for(int i = 0; i < len/2; i++){
+        *((uint16_t*)buffer + i) <<= 3;
+    }
     size_t wlen = 0;
     wlen = lfs2_file_write(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, (uint8_t *)buffer, len);
     // lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
@@ -207,11 +210,11 @@ static esp_err_t _lfs2_close(audio_element_handle_t self)
 
         lfs2_file_seek(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, 0, LFS2_SEEK_SET);
         audio_element_info_t info;
-        size_t bw = 0;
         audio_element_getinfo(self, &info);
         wav_head_init(wav_info, info.sample_rates, info.bits, info.channels);
+        ESP_LOGD(TAG, "file end pos: %ld", (uint32_t)info.byte_pos);
         wav_head_size(wav_info, (uint32_t)info.byte_pos);
-        bw = lfs2_file_write(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, (uint8_t *)wav_info, sizeof(wav_header_t));
+        lfs2_file_write(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file, (uint8_t *)wav_info, sizeof(wav_header_t));
         lfs2_file_sync(&vfs->lfs2_file->vfs->lfs, &vfs->lfs2_file->file);
         // vfs_lfs2_file_close(vfs->lfs2_file);
         audio_free(wav_info);

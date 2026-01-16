@@ -37,7 +37,7 @@
 #define FUNC_AUDIO_CODEC_EN       (1)
 #define CODEC_ADC_I2S_PORT        ((i2s_port_t)0)
 #define CODEC_ADC_BITS_PER_SAMPLE ((i2s_data_bit_width_t)16) /* 16bit */
-#define CODEC_ADC_SAMPLE_RATE     (48000)
+#define CODEC_ADC_SAMPLE_RATE     (16000)
 #define RECORD_HARDWARE_AEC       (false)
 #define BOARD_PA_GAIN             (10) /* Power amplifier gain defined by board (dB) */
 
@@ -54,7 +54,7 @@ extern audio_hal_func_t AUDIO_CODEC_ES8388_DEFAULT_HANDLE;
         .i2s_iface = {                                  \
             .mode = AUDIO_HAL_MODE_SLAVE,               \
             .fmt = AUDIO_HAL_I2S_NORMAL,                \
-            .samples = AUDIO_HAL_48K_SAMPLES,           \
+            .samples = AUDIO_HAL_16K_SAMPLES,           \
             .bits = AUDIO_HAL_BIT_LENGTH_16BITS,        \
         },                                              \
 };

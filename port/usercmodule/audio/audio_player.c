@@ -39,6 +39,7 @@
 #include "i2s_stream.h"
 
 #include "board.h"
+#include "modaudio.h"
 
 typedef struct _audio_player_obj_t {
     mp_obj_base_t base;
@@ -104,10 +105,10 @@ static esp_audio_handle_t audio_player_create(void)
 {
     // init player
     esp_audio_cfg_t cfg = DEFAULT_ESP_AUDIO_CONFIG();
-    cfg.vol_handle = board_codec_init();
+    cfg.vol_handle = audio_hal;
     cfg.vol_set = (audio_volume_set)audio_hal_set_volume;
     cfg.vol_get = (audio_volume_get)audio_hal_get_volume;
-    cfg.resample_rate = 48000;
+    cfg.resample_rate = 16000;
     cfg.prefer_type = ESP_AUDIO_PREFER_MEM;
     esp_audio_handle_t player = esp_audio_create(&cfg);
 
@@ -141,10 +142,7 @@ static esp_audio_handle_t audio_player_create(void)
     esp_audio_codec_lib_add(player, AUDIO_CODEC_TYPE_DECODER, wav_decoder_init(&wav_dec_cfg));
 
     // Create writers and add to esp_audio
-    i2s_stream_cfg_t i2s_writer = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 48000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_WRITER);
-    i2s_writer.task_core = 1;
-    i2s_writer.uninstall_drv = false;
-    esp_audio_output_stream_add(player, i2s_stream_init(&i2s_writer));
+    esp_audio_output_stream_add(player, i2s_writer_el);
 
     return player;
 }
