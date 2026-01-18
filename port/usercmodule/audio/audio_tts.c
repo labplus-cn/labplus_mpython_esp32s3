@@ -22,19 +22,32 @@
  *
  */
 
-#ifndef __MODAUDIO_H_
-#define __MODAUDIO_H_
+#include <string.h>
 
 #include "py/obj.h"
-#include "audio_element.h"
-#include "audio_hal.h"
+#include "py/objstr.h"
+#include "py/runtime.h"
+#include "tts.h"
 
-// extern audio_element_handle_t i2s_writer_el;
-// extern audio_element_handle_t i2s_reader_el;
-extern audio_hal_handle_t audio_hal;
+static mp_obj_t mp_tts_generate(mp_obj_t text_obj)
+{
+    const char* text = mp_obj_str_get_str(text_obj);
+    tts_generate(text); 
 
-extern const mp_obj_module_t machine_tts_module;
-extern const mp_obj_module_t machine_sr_module;
-extern const mp_obj_module_t machine_baidu_tts_module;
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_1(mp_tts_generate_obj, mp_tts_generate);
 
-#endif //__MODAUDIO_H_
+static const mp_rom_map_elem_t tts_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_tts) },
+    { MP_ROM_QSTR(MP_QSTR_generate), MP_ROM_PTR(&mp_tts_generate_obj) },
+};
+
+static MP_DEFINE_CONST_DICT(tts_module_globals, tts_module_globals_table);
+
+const mp_obj_module_t machine_tts_module = {
+    .base = { &mp_type_module },
+    .globals = (mp_obj_dict_t *)&tts_module_globals,
+};
+
+// MP_REGISTER_MODULE(MP_QSTR_tts, machine_tts_module);

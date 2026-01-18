@@ -34,8 +34,8 @@
 
 const char *verno = "0.5-beta2";
 
-audio_element_handle_t i2s_writer_el = NULL;
-audio_element_handle_t i2s_reader_el = NULL;
+// audio_element_handle_t i2s_writer_el = NULL;
+// audio_element_handle_t i2s_reader_el = NULL;
 audio_hal_handle_t audio_hal = NULL;
 static bool is_audio_init = false;
 
@@ -44,15 +44,15 @@ static mp_obj_t audio_init(void)
     if (!is_audio_init) {
         audio_hal = board_codec_init();
 
-        i2s_stream_cfg_t i2s_cfg_w = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_WRITER);
-        i2s_cfg_w.task_core = 1;
-        i2s_cfg_w.uninstall_drv = false;
-        i2s_writer_el = i2s_stream_init(&i2s_cfg_w);
+        // i2s_stream_cfg_t i2s_cfg_w = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_WRITER);
+        // i2s_cfg_w.task_core = 1;
+        // i2s_cfg_w.uninstall_drv = false;
+        // i2s_writer_el = i2s_stream_init(&i2s_cfg_w);
 
-        i2s_stream_cfg_t i2s_cfg_r = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_READER);
-        i2s_cfg_r.task_core = 1;
-        i2s_cfg_r.uninstall_drv = false;
-        i2s_reader_el = i2s_stream_init(&i2s_cfg_r);
+        // i2s_stream_cfg_t i2s_cfg_r = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_READER);
+        // i2s_cfg_r.task_core = 1;
+        // i2s_cfg_r.uninstall_drv = false;
+        // i2s_reader_el = i2s_stream_init(&i2s_cfg_r);
 
         is_audio_init = true;
     }
@@ -60,6 +60,19 @@ static mp_obj_t audio_init(void)
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(audio_init_obj, audio_init);
+
+static mp_obj_t audio_volume(mp_obj_t Volume)
+{
+    mp_int_t vol =  mp_obj_get_int(Volume);
+    if(vol > 100){ vol = 100;}
+    if(vol < 0){ vol = 0;}
+    if(audio_hal){
+        audio_hal_set_volume(audio_hal, vol);
+    }
+    
+    return mp_const_none;   
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(audio_volume_obj, audio_volume);
 
 static mp_obj_t audio_mem_info(void)
 {
@@ -91,6 +104,10 @@ static const mp_rom_map_elem_t audio_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&audio_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_mem_info), MP_ROM_PTR(&audio_mem_info_obj) },
     { MP_ROM_QSTR(MP_QSTR_verno), MP_ROM_PTR(&audio_mod_verno_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_volume), MP_ROM_PTR(&audio_volume_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tts), MP_ROM_PTR(&machine_tts_module) },
+    { MP_ROM_QSTR(MP_QSTR_sr), MP_ROM_PTR(&machine_sr_module) },
+    { MP_ROM_QSTR(MP_QSTR_baidu_tts), MP_ROM_PTR(&machine_baidu_tts_module) },
 
     { MP_ROM_QSTR(MP_QSTR_player), MP_ROM_PTR(&audio_player_type) },
     { MP_ROM_QSTR(MP_QSTR_recorder), MP_ROM_PTR(&audio_recorder_type) },

@@ -158,7 +158,10 @@ static void audio_recorder_create(audio_recorder_obj_t *self, const char *uri, i
     audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
     self->pipeline = audio_pipeline_init(&pipeline_cfg);
     // I2S
-    self->i2s_stream = i2s_reader_el;
+    i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT_WITH_PARA(CODEC_ADC_I2S_PORT, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_READER);
+    i2s_cfg.task_core = 1;
+    i2s_cfg.uninstall_drv = false;
+    self->i2s_stream = i2s_stream_init(&i2s_cfg);
     // filter
     self->filter = audio_recorder_create_filter(format);
     // encoder

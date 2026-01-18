@@ -1,0 +1,281 @@
+/* Play MP3 Stream from Baidu Text to Speech service
+
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
+#include "esp_heap_caps.h"
+#include "lib/littlefs/lfs2.h"
+#include "py/obj.h"
+#include "py/runtime.h"
+// #include <cstddef>
+#include <sys/time.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "esp_log.h"
+#include "audio_element.h"
+#include "audio_pipeline.h"
+#include "filter_resample.h"
+#include "audio_event_iface.h"
+#include "audio_common.h"
+#include "http_stream.h"
+#include "i2s_stream.h"
+#include "mp3_decoder.h"
+
+#include "esp_http_client.h"
+#include "baidu_access_token.h"
+#include "modaudio.h"
+#include "lfs2_stream.h"
+
+static const char *TAG = "BAIDU_SPEECH_EXAMPLE";
+
+#define BAIDU_TTS_ENDPOINT "http://tsn.baidu.com/text2audio"
+// #define TTS_TEXT "欢迎使用乐鑫音频平台，想了解更多方案信息请联系我们"
+
+static char *baidu_access_token = NULL;
+char *a_key = NULL;
+char *s_key = NULL;
+char *text = NULL;
+char *file = NULL;
+char *request_data = NULL;
+static bool need_write_file = false;
+
+int _http_stream_event_handle(http_stream_event_msg_t *msg)
+{
+    esp_http_client_handle_t http_client = (esp_http_client_handle_t)msg->http_client;
+
+    if (msg->event_id != HTTP_STREAM_PRE_REQUEST) {
+        return ESP_OK;
+    }
+
+    if (baidu_access_token == NULL) {
+        // Must freed `baidu_access_token` after used
+        // ESP_LOGE("TAG", "%s, %s, %s", a_key, s_key, text);
+        baidu_access_token = baidu_get_access_token(a_key, s_key);
+    }
+
+    if (baidu_access_token == NULL) {
+        ESP_LOGE(TAG, "Error issuing access token");
+        return ESP_FAIL;
+    }
+    request_data = (char *)heap_caps_calloc(1024, sizeof(char), MALLOC_CAP_SPIRAM);
+    int data_len = snprintf(request_data, 1024, "lan=zh&cuid=ESP32&ctp=1&tok=%s&tex=%s", baidu_access_token, text);
+    esp_http_client_set_post_field(http_client, request_data, data_len);
+    esp_http_client_set_method(http_client, HTTP_METHOD_POST);
+    return ESP_OK;
+}
+
+static esp_err_t audio_data_dup_callback(audio_element_handle_t el, char *buffer, int len, TickType_t ticks_to_wait, void *ctx)
+{
+    if (len <= 0) {
+        return ESP_OK; 
+    }
+    
+    int write_len = audio_element_input(el, buffer, len); //写入文件
+    if (write_len < 0) {
+        ESP_LOGE("AUDIO_DUP", "SD 卡写入失败，错误码：%d", write_len);
+    }
+    
+    return len;  
+}
+
+static void tts_play(void)
+{
+    // esp_log_level_set("*", ESP_LOG_INFO);
+    // esp_log_level_set(TAG, ESP_LOG_DEBUG);
+    // esp_log_level_set("HTTP_STREAM", ESP_LOG_DEBUG);
+
+    audio_pipeline_handle_t pipeline;
+    audio_element_handle_t http_stream_reader, i2s_stream_writer, mp3_decoder;
+    audio_element_handle_t lfs2_out_stream = NULL;
+
+    // ESP_LOGI(TAG, "[ 1 ] Start audio codec chip");
+    // audio_board_handle_t board_handle = audio_board_init();
+    // audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+
+    ESP_LOGI(TAG, "[2.0] Create audio pipeline for playback");
+    audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
+    pipeline = audio_pipeline_init(&pipeline_cfg);
+    mem_assert(pipeline);
+
+    ESP_LOGI(TAG, "[2.1] Create http stream to read data");
+    http_stream_cfg_t http_cfg = HTTP_STREAM_CFG_DEFAULT();
+    http_cfg.event_handle = _http_stream_event_handle;
+    http_cfg.type = AUDIO_STREAM_READER;
+    http_stream_reader = http_stream_init(&http_cfg);
+    rsp_filter_cfg_t rsp_cfg = DEFAULT_RESAMPLE_FILTER_CONFIG();
+    rsp_cfg.src_rate = 16000;
+    rsp_cfg.src_ch = 2;
+    rsp_cfg.task_core = 1;
+    rsp_cfg.dest_ch = 2;
+    rsp_cfg.dest_rate = 16000;
+    audio_element_handle_t rsp_filter = rsp_filter_init(&rsp_cfg);
+    ESP_LOGI(TAG, "[2.2] Create i2s stream to write data to codec chip");
+    i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_WRITER);
+    i2s_cfg.task_core = 1;
+    i2s_cfg.uninstall_drv = false;
+    i2s_stream_writer = i2s_stream_init(&i2s_cfg);
+
+    // if(need_write_file && file != NULL){
+    //     lfs2_stream_cfg_t lfs2_cfg = LFS2_STREAM_CFG_DEFAULT();
+    //     lfs2_cfg.type = AUDIO_STREAM_WRITER;
+    //     lfs2_cfg.task_core = 1;
+    //     lfs2_out_stream = lfs2_stream_init(&lfs2_cfg);
+    //     audio_element_set_uri(lfs2_out_stream, file);
+    // }
+
+    ESP_LOGI(TAG, "[2.3] Create mp3 decoder to decode mp3 file");
+    mp3_decoder_cfg_t mp3_cfg = DEFAULT_MP3_DECODER_CONFIG();
+    mp3_decoder = mp3_decoder_init(&mp3_cfg);
+
+    ESP_LOGI(TAG, "[2.4] Register all elements to audio pipeline");
+    audio_pipeline_register(pipeline, http_stream_reader, "http");
+    audio_pipeline_register(pipeline, mp3_decoder,        "mp3");
+    audio_pipeline_register(pipeline, rsp_filter,         "filter");
+    audio_pipeline_register(pipeline, i2s_stream_writer,  "i2s");
+
+    ESP_LOGI(TAG, "[2.5] Link it together http_stream-->mp3_decoder-->i2s_stream-->[codec_chip]");
+    const char *link_tag[4] = {"http", "mp3", "filter", "i2s"};
+    audio_pipeline_link(pipeline, &link_tag[0], 4);
+
+    ESP_LOGI(TAG, "[2.6] Set up  uri (http as http_stream, mp3 as mp3 decoder, and default output is i2s)");
+    audio_element_set_uri(http_stream_reader, BAIDU_TTS_ENDPOINT);
+
+    ESP_LOGI(TAG, "[ 4 ] Set up  event listener");
+    audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
+    audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
+
+    // if(need_write_file){
+    //     audio_element_set_read_cb(http_stream_reader, audio_data_dup_callback, NULL);
+    // }
+    ESP_LOGI(TAG, "[4.1] Listening event from all elements of pipeline");
+    audio_pipeline_set_listener(pipeline, evt);
+
+    ESP_LOGI(TAG, "[ 5 ] Start audio_pipeline");
+    audio_pipeline_run(pipeline);
+
+    // i2s_stream_set_clk(i2s_stream_writer, 16000, 16, 1);
+
+    while (1) {
+        audio_event_iface_msg_t msg;
+        esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
+            continue;
+        }
+
+        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT
+            && msg.source == (void *) mp3_decoder) {
+            if(msg.cmd == AEL_MSG_CMD_REPORT_STATUS && ((int)msg.data <= AEL_STATUS_ERROR_UNKNOWN)){
+                ESP_LOGE(TAG, "mp3 decoder error,err_code =%d", (int)msg.data);
+                break;
+            }else if(msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO){
+                audio_element_info_t music_info = {0};
+                audio_element_getinfo(mp3_decoder, &music_info);
+
+                ESP_LOGI(TAG, "[ * ] Receive music info from mp3 decoder, sample_rates=%d, bits=%d, ch=%d",
+                        music_info.sample_rates, music_info.bits, music_info.channels);
+                rsp_filter_change_src_info(rsp_filter, music_info.sample_rates, music_info.channels, music_info.bits);
+                // i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
+                continue;
+            }
+        }
+
+        /* Stop when the last pipeline element (i2s_stream_writer in this case) receives stop event */
+        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) i2s_stream_writer
+            && msg.cmd == AEL_MSG_CMD_REPORT_STATUS
+            && (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
+            ESP_LOGW(TAG, "[ * ] Stop event received");
+            break;
+        }
+    }
+
+    audio_pipeline_stop(pipeline);
+    audio_pipeline_wait_for_stop(pipeline);
+    audio_pipeline_terminate(pipeline);
+    audio_pipeline_unregister(pipeline, http_stream_reader);
+    audio_pipeline_unregister(pipeline, i2s_stream_writer);
+    audio_pipeline_unregister(pipeline, rsp_filter);
+    audio_pipeline_unregister(pipeline, mp3_decoder);
+    // if(need_write_file){
+    //     audio_pipeline_unregister(pipeline, lfs2_out_stream);
+    // }
+    /* Terminal the pipeline before removing the listener */
+    audio_pipeline_remove_listener(pipeline);
+    /* Make sure audio_pipeline_remove_listener & audio_event_iface_remove_listener are called before destroying event_iface */
+    audio_event_iface_destroy(evt);
+    /* Release all resources */
+    audio_pipeline_deinit(pipeline);
+    audio_element_deinit(http_stream_reader);
+    audio_element_deinit(i2s_stream_writer);
+    audio_element_deinit(rsp_filter);
+    audio_element_deinit(mp3_decoder);
+    if(need_write_file){
+        audio_element_deinit(lfs2_out_stream);
+    }
+    heap_caps_free(a_key);
+    heap_caps_free(s_key);
+    heap_caps_free(text);
+    if(need_write_file){
+        heap_caps_free(file);
+    }
+    need_write_file = false;
+    if(request_data){
+        heap_caps_free(request_data);
+    }
+}
+
+static mp_obj_t tts_run(void) {
+    tts_play();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_tts_run_obj, tts_run);
+
+static mp_obj_t audio_baidu_tts_cfg(size_t n_args, const mp_obj_t *args_in, mp_map_t *kw_args)
+{
+    enum {ARG_A_KEY, ARG_S_KEY, ARG_text, ARG_file};
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_A_KEY, MP_ARG_REQUIRED | MP_ARG_OBJ },
+        { MP_QSTR_S_KEY, MP_ARG_REQUIRED | MP_ARG_OBJ },
+        { MP_QSTR_text, MP_ARG_REQUIRED | MP_ARG_OBJ},
+        { MP_QSTR_file, MP_ARG_OBJ, { .u_obj = mp_const_none } },
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, args_in, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    
+    const char *_a_key = mp_obj_str_get_str(args[ARG_A_KEY].u_obj);
+    const char *_s_key = mp_obj_str_get_str(args[ARG_S_KEY].u_obj);
+    const char *_text = mp_obj_str_get_str(args[ARG_text].u_obj);
+
+    a_key = (char *)heap_caps_calloc(strlen(_a_key) + 1, sizeof(char), MALLOC_CAP_SPIRAM);
+    s_key = (char *)heap_caps_calloc(strlen(_s_key) + 1, sizeof(char), MALLOC_CAP_SPIRAM);
+    text = (char *)heap_caps_calloc(strlen(_text) + 1, sizeof(char), MALLOC_CAP_SPIRAM);
+    if(args[ARG_file].u_obj != mp_const_none){
+        const char *_file = mp_obj_str_get_str(args[ARG_file].u_obj);
+        file = (char *)heap_caps_calloc(strlen(_file) + 1, sizeof(char), MALLOC_CAP_SPIRAM);
+        strcpy((char *)file, _file);
+        need_write_file = true;
+    }
+    strcpy((char *)a_key, _a_key);
+    strcpy((char *)s_key, _s_key);
+    strcpy((char *)text, _text);
+    ESP_LOGI(TAG, "%s, %s, %s", a_key, s_key, text);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(audio_baidu_tts_cfg_obj, 0, audio_baidu_tts_cfg);
+
+static const mp_rom_map_elem_t baidu_tts_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sr) },
+    { MP_ROM_QSTR(MP_QSTR_run), MP_ROM_PTR(&mp_tts_run_obj) },
+    { MP_ROM_QSTR(MP_QSTR_config), MP_ROM_PTR(&audio_baidu_tts_cfg_obj) },
+};
+static MP_DEFINE_CONST_DICT(baidu_tts_module_globals, baidu_tts_module_globals_table);
+
+const mp_obj_module_t machine_baidu_tts_module = {
+    .base = { &mp_type_module },
+    .globals = (mp_obj_dict_t*)&baidu_tts_module_globals,
+};

@@ -142,7 +142,10 @@ static esp_audio_handle_t audio_player_create(void)
     esp_audio_codec_lib_add(player, AUDIO_CODEC_TYPE_DECODER, wav_decoder_init(&wav_dec_cfg));
 
     // Create writers and add to esp_audio
-    esp_audio_output_stream_add(player, i2s_writer_el);
+    i2s_stream_cfg_t i2s_writer = I2S_STREAM_CFG_DEFAULT_WITH_PARA(I2S_NUM_0, 16000, I2S_DATA_BIT_WIDTH_16BIT, AUDIO_STREAM_WRITER);
+    i2s_writer.task_core = 1;
+    i2s_writer.uninstall_drv = false;
+    esp_audio_output_stream_add(player, i2s_stream_init(&i2s_writer));
 
     return player;
 }

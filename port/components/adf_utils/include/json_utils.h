@@ -1,7 +1,7 @@
 /*
  * ESPRESSIF MIT License
  *
- * Copyright (c) 2019 <ESPRESSIF SYSTEMS (SHANGHAI) CO., LTD>
+ * Copyright (c) 2018 <ESPRESSIF SYSTEMS (SHANGHAI) PTE LTD>
  *
  * Permission is hereby granted for use on all ESPRESSIF SYSTEMS products, in which case,
  * it is free of charge, to any person obtaining a copy of this software and associated
@@ -22,19 +22,26 @@
  *
  */
 
-#ifndef __MODAUDIO_H_
-#define __MODAUDIO_H_
+#ifndef _JSON_UTILS_H_
+#define _JSON_UTILS_H_
 
-#include "py/obj.h"
-#include "audio_element.h"
-#include "audio_hal.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-// extern audio_element_handle_t i2s_writer_el;
-// extern audio_element_handle_t i2s_reader_el;
-extern audio_hal_handle_t audio_hal;
+/**
+ * @brief      This function returns the string value of the token in json_string.
+ *             The returning string is allocated and must be free as soon as it is used
+ *
+ * @param[in]  json_string  The json string
+ * @param[in]  token_name   The token name
+ *
+ * @return     The token value
+ */
+char *json_get_token_value(const char *json_string, const char *token_name);
 
-extern const mp_obj_module_t machine_tts_module;
-extern const mp_obj_module_t machine_sr_module;
-extern const mp_obj_module_t machine_baidu_tts_module;
+#ifdef __cplusplus
+}
+#endif
 
-#endif //__MODAUDIO_H_
+#endif

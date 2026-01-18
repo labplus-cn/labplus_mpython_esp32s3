@@ -5,14 +5,22 @@ target_sources(adf_module INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/audio_recorder.c
     ${CMAKE_CURRENT_LIST_DIR}/src/lfs2_stream.c
     ${CMAKE_CURRENT_LIST_DIR}/src/vfs_lfs2.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/tts.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/speech_recognition.c
     ${CMAKE_CURRENT_LIST_DIR}/modaudio.c
+    ${CMAKE_CURRENT_LIST_DIR}/audio_tts.c
+    ${CMAKE_CURRENT_LIST_DIR}/audio_sr.c
+    ${CMAKE_CURRENT_LIST_DIR}/audio_baidu_tts.c
 )
 
 target_include_directories(adf_module INTERFACE
+    ${MPY_PORT_DIR}/components/adf_utils/include
+    ${MPY_PORT_DIR}/components/adf_utils/cloud_services/include
     ${MPY_PORT_DIR}/components/audio_stream/include
     ${MPY_PORT_DIR}/components/audio_stream/lib/gzip/include
     ${MPY_PORT_DIR}/components/audio_stream/lib/hls/include
     ${MPY_PORT_DIR}/components/audio_pipeline/include
+    ${MPY_PORT_DIR}/components/audio_recorder/include
     ${MPY_PORT_DIR}/components/audio_sal/include
     ${MPY_PORT_DIR}/components/audio_hal/include
     ${MPY_PORT_DIR}/components/audio_board/include
