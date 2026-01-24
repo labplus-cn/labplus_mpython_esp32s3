@@ -232,8 +232,8 @@ static mp_obj_t rfid_make_new(const mp_obj_type_t *type, size_t n_args, size_t n
     if(!i2c_obj)
         i2c_obj = (mp_obj_base_t *)MP_OBJ_TO_PTR(args[ARG_i2c].u_obj);
 
-    if(!self)
-        mp_raise_ValueError("Invalid i2c address");
+    // if(!self)
+    //     mp_raise_ValueError("Invalid i2c address");
 
     RFID_init(self->i2c_addr);
 

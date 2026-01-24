@@ -22,11 +22,11 @@ if(CONFIG_IDF_TARGET_ARCH_RISCV)
     )
 endif()
 
-# if(NOT DEFINED MICROPY_PY_TINYUSB)
-#     if(CONFIG_IDF_TARGET_ESP32S2 OR CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
-#         set(MICROPY_PY_TINYUSB ON)
-#     endif()
-# endif()
+if(NOT DEFINED MICROPY_PY_TINYUSB)
+    if(CONFIG_IDF_TARGET_ESP32S2 OR CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
+        set(MICROPY_PY_TINYUSB ON)
+    endif()
+endif()
 
 # Enable error text compression by default.
 if(NOT MICROPY_ROM_TEXT_COMPRESSION)
@@ -84,33 +84,41 @@ list(APPEND MICROPY_SOURCE_DRIVERS
     ${MICROPY_DIR}/drivers/dht/dht.c
 )
 
-# if(MICROPY_PY_TINYUSB)
-#     string(TOUPPER OPT_MCU_${IDF_TARGET} tusb_mcu)
+if(MICROPY_PY_TINYUSB)
+    string(TOUPPER OPT_MCU_${IDF_TARGET} tusb_mcu)
 
-#     list(APPEND MICROPY_DEF_TINYUSB
-#         CFG_TUSB_MCU=${tusb_mcu}
-#     )
+    list(APPEND MICROPY_DEF_TINYUSB
+        CFG_TUSB_MCU=${tusb_mcu}
+    )
 
-#     list(APPEND MICROPY_SOURCE_TINYUSB
-#         ${MICROPY_DIR}/shared/tinyusb/mp_usbd.c
-#         ${MICROPY_DIR}/shared/tinyusb/mp_usbd_cdc.c
-#         ${MICROPY_DIR}/shared/tinyusb/mp_usbd_descriptor.c
-#         ${MICROPY_DIR}/shared/tinyusb/mp_usbd_runtime.c
-#     )
+    list(APPEND MICROPY_SOURCE_TINYUSB
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd.c
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd_cdc.c
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd_descriptor.c
+        ${MICROPY_DIR}/shared/tinyusb/mp_usbd_runtime.c
+    )
 
-#     list(APPEND MICROPY_INC_TINYUSB
-#         ${MICROPY_DIR}/shared/tinyusb
-#     )
+    list(APPEND MICROPY_INC_TINYUSB
+        ${MICROPY_DIR}/shared/tinyusb
+    )
 
-#     # Build the Espressif tinyusb component with MicroPython shared/tinyusb/tusb_config.h
-#     idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
-#     message(STATUS "获取到的tinyusb库目标：${tusb_lib}") # 关键调试行
-#     target_include_directories(${tusb_lib} PRIVATE
-#         ${MICROPY_DIR}/shared/tinyusb
-#         ${MICROPY_DIR}
-#         ${MICROPY_PORT_DIR}
-#         ${MICROPY_BOARD_DIR})
-# endif()
+    set(COMPONENT_EXTRA_INCLUDES
+        ${MICROPY_DIR}/shared/tinyusb
+        ${MICROPY_DIR}
+        ${MICROPY_PORT_DIR}
+        ${MICROPY_BOARD_DIR}
+    )
+    # Build the Espressif tinyusb component with MicroPython shared/tinyusb/tusb_config.h
+    # idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
+    # message(STATUS "获取到的tinyusb库目标：${tusb_lib}") # 关键调试行
+
+    # target_include_directories(${tusb_lib} PRIVATE
+    #     ${MICROPY_DIR}/shared/tinyusb
+    #     ${MICROPY_DIR}
+    #     ${MICROPY_PORT_DIR}
+    #     ${MICROPY_BOARD_DIR}
+    # )
+endif()
 
 list(APPEND MICROPY_SOURCE_PORT
     panichandler.c
