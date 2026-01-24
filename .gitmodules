@@ -13,3 +13,6 @@
 [submodule "port/usercmodule/lv_binding_micropython"]
 	path = port/usercmodule/lv_binding_micropython
 	url = https://github.com/labplus-cn/lv_binding_micropython.git
+[submodule "esp-gmf"]
+	path = esp-gmf
+	url = https://github.com/labplus-cn/esp-gmf.git
