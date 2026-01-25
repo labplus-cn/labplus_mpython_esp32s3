@@ -1,0 +1,2 @@
+dependencies:
+  compenents/esp_lcd_jd9853: '2.0.2'

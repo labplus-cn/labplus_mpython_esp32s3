@@ -9,16 +9,16 @@ set(SDKCONFIG_DEFAULTS
     boards/sdkconfig.240mhz
     boards/mpython_v3/sdkconfig.spiram 
     boards/mpython_v3/sdkconfig.board
-    # boards/mpython_v3/sdkconfig.usb
+    boards/mpython_v3/sdkconfig.usb
 )
 
 if(NOT MPY_PORT_DIR)
     get_filename_component(MPY_PORT_DIR ${CMAKE_CURRENT_LIST_DIR}/../.. ABSOLUTE)
 endif()
 
-if(NOT PROJECT_PATH)
-    get_filename_component(PROJECT_PATH ${CMAKE_CURRENT_LIST_DIR}/../../.. ABSOLUTE)
-endif()
+# if(NOT PROJECT_PATH)
+#     get_filename_component(PROJECT_PATH ${CMAKE_CURRENT_LIST_DIR}/../../.. ABSOLUTE)
+# endif()
 
 set(MICROPY_SOURCE_BOARD
     ${MPY_PORT_DIR}/lib/decode_png/LP_lodepng.c
@@ -40,19 +40,19 @@ set(MICROPY_SOURCE_BOARD_DIR
     ${MPY_PORT_DIR}/boards
 )
 
-list(APPEND EXTRA_COMPONENT_DIRS
-    ${PROJECT_PATH}/esp-gmf/packages/esp_audio_render 
-    ${PROJECT_PATH}/esp-gmf/packages/esp_audio_simple_player
-    ${PROJECT_PATH}/esp-gmf/packages/esp_board_manager 
-    ${PROJECT_PATH}/esp-gmf/packages/esp_capture
-    ${PROJECT_PATH}/esp-gmf/packages/gmf_app_utils
-    ${PROJECT_PATH}/esp-gmf/packages/gmf_loader
-    ${PROJECT_PATH}/esp-gmf/gmf_core
-    ${PROJECT_PATH}/esp-gmf/elements/gmf_ai_audio
-    ${PROJECT_PATH}/esp-gmf/elements/gmf_audio
-    ${PROJECT_PATH}/esp-gmf/elements/gmf_io
-    ${PROJECT_PATH}/esp-gmf/elements/gmf_misc
-)
+# list(APPEND EXTRA_COMPONENT_DIRS
+#     ${PROJECT_PATH}/esp-gmf/packages/esp_audio_render 
+#     ${PROJECT_PATH}/esp-gmf/packages/esp_audio_simple_player
+#     ${PROJECT_PATH}/esp-gmf/packages/esp_board_manager 
+#     ${PROJECT_PATH}/esp-gmf/packages/esp_capture
+#     ${PROJECT_PATH}/esp-gmf/packages/gmf_app_utils
+#     ${PROJECT_PATH}/esp-gmf/packages/gmf_loader
+#     ${PROJECT_PATH}/esp-gmf/gmf_core
+#     ${PROJECT_PATH}/esp-gmf/elements/gmf_ai_audio
+#     ${PROJECT_PATH}/esp-gmf/elements/gmf_audio
+#     ${PROJECT_PATH}/esp-gmf/elements/gmf_io
+#     ${PROJECT_PATH}/esp-gmf/elements/gmf_misc
+# )
 
 set(MPYTHON_V3_BOARD ON)
 

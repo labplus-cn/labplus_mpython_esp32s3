@@ -104,7 +104,7 @@ void mp_task(void *pvParameter) {
     #if MICROPY_PY_THREAD
     mp_thread_init(pxTaskGetStackStart(NULL), MICROPY_TASK_STACK_SIZE / sizeof(uintptr_t));
     #endif
-    esp_log_level_set("*", ESP_LOG_ERROR);
+    // esp_log_level_set("*", ESP_LOG_ERROR);
     #if MICROPY_HW_ESP_USB_SERIAL_JTAG
     usb_serial_jtag_init();
     #elif MICROPY_HW_ENABLE_USBDEV
@@ -147,9 +147,8 @@ soft_reset:
     esp_board_manager_init();
     dev_display_lcd_handles_t *disp_handle;
     esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);
-    // ESP_LOGE("TAG", "display haFndle");
-    esp_log_level_set("*", ESP_LOG_ERROR);
-    // // lcd_draw_logo(disp_handle);
+    lcd_draw_logo(disp_handle);
+    
     // run boot-up scripts
     pyexec_frozen_module("_boot.py", true);
     int ret = pyexec_file_if_exists("boot.py");
