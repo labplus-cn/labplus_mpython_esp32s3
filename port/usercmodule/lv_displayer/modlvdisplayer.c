@@ -1,15 +1,18 @@
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "misc/lv_types.h"
 #include "py/runtime.h"
-#include "who_lcd.h"
 #include "lvgl.h"
 #include "py/obj.h"
 #include "esp_lcd_panel_ops.h"
+#include "esp_board_manager.h"
+#include "dev_display_lcd.h"
+#include <stdint.h>
 
 typedef struct _lv_displayet_t
 {
     mp_obj_base_t base;
-    lcd_t *lcd;
+    dev_display_lcd_handles_t *lcd;
 
     size_t buf_size;
     uint16_t *buf1;
@@ -24,7 +27,7 @@ static void flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *data
     lv_displayet_t *disp = (lv_displayet_t *) lv_display_get_user_data(display);
 
     lv_draw_sw_rgb565_swap(data, disp->buf_size);
-    esp_lcd_panel_draw_bitmap(disp->lcd->panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, (uint16_t *)data);
+    esp_lcd_panel_draw_bitmap(disp->lcd->panel_handle, area->x1, area->y1, area->x2 + 1, area->y2 + 1, (uint16_t *)data);
 }
 
 static void transfer_done_cb(void *user_data)
@@ -43,18 +46,18 @@ static mp_obj_t lv_displayer_init(void)
     if(!lv_displayer){
         lv_displayer = calloc(1, sizeof(lv_displayet_t));
 
-        lv_displayer->lcd = get_lcd_handle();
-        if(!lv_displayer->lcd){
-            lcd_init();
-        }
+        esp_board_manager_get_device_handle("display_lcd", (void **)&lv_displayer->lcd);
+        assert(lv_displayer->lcd != NULL);
 
         if (!lv_is_initialized()){
             lv_init();
         }
     
-        lv_displayer->lv_display = lv_display_create(BOARD_LCD_H_RES, BOARD_LCD_V_RES);
+        dev_display_lcd_config_t *cfg = NULL;
+        esp_board_manager_get_device_config("display_lcd", (void **)&cfg);
+        lv_displayer->lv_display = lv_display_create(cfg->lcd_width, cfg->lcd_height);
     
-        lv_displayer->buf_size = BOARD_LCD_H_RES * BOARD_LCD_V_RES;
+        lv_displayer->buf_size = cfg->lcd_width * cfg->lcd_height * sizeof(uint16_t);
         lv_displayer->buf1 = heap_caps_malloc(lv_displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
         assert(lv_displayer->buf1);
         lv_displayer->buf2 = heap_caps_malloc(lv_displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
