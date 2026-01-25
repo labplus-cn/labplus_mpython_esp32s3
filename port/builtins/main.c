@@ -61,7 +61,9 @@
 #include "usb_serial_jtag.h"
 #include "modmachine.h"
 #include "modnetwork.h"
-#include "who_lcd.h"
+// #include "who_lcd.h"
+#include "esp_board_manager.h"
+#include "dev_display_lcd.h"
 
 #if MICROPY_BLUETOOTH_NIMBLE
 #include "extmod/modbluetooth.h"
@@ -102,6 +104,7 @@ void mp_task(void *pvParameter) {
     #if MICROPY_PY_THREAD
     mp_thread_init(pxTaskGetStackStart(NULL), MICROPY_TASK_STACK_SIZE / sizeof(uintptr_t));
     #endif
+    esp_log_level_set("*", ESP_LOG_ERROR);
     #if MICROPY_HW_ESP_USB_SERIAL_JTAG
     usb_serial_jtag_init();
     #elif MICROPY_HW_ENABLE_USBDEV
@@ -139,9 +142,14 @@ soft_reset:
     #if MICROPY_PY_MACHINE_I2S
     machine_i2s_init0();
     #endif
-    lcd_init();
-    lcd_draw_logo();
-
+    // lcd_init();
+    // lcd_draw_logo();
+    esp_board_manager_init();
+    dev_display_lcd_handles_t *disp_handle;
+    esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);
+    // ESP_LOGE("TAG", "display haFndle");
+    esp_log_level_set("*", ESP_LOG_ERROR);
+    // // lcd_draw_logo(disp_handle);
     // run boot-up scripts
     pyexec_frozen_module("_boot.py", true);
     int ret = pyexec_file_if_exists("boot.py");

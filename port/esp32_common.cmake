@@ -137,7 +137,7 @@ list(APPEND MICROPY_SOURCE_PORT
     # machine_pin.c
     # machine_touchpad.c
     machine_dac.c
-    machine_i2c.c
+    # machine_i2c.c
     network_common.c
     network_lan.c
     network_ppp.c
@@ -210,7 +210,7 @@ list(APPEND IDF_COMPONENTS
     spi_flash
     ulp
     usb
-    vfs
+    # vfs
     esp_http_client
 )
 
@@ -257,6 +257,17 @@ idf_component_register(
         ${MICROPY_LDFRAGMENTS}
     REQUIRES
         ${IDF_COMPONENTS}
+        esp_audio_render 
+        esp_audio_simple_player
+        esp_board_manager 
+        esp_capture
+        gmf_app_utils
+        gmf_loader
+        gmf_core
+        gmf_ai_audio
+        gmf_audio
+        gmf_io
+        gmf_misc
 )
 
 # Set the MicroPython target as the current (main) IDF component target.

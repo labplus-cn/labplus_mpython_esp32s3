@@ -24,3 +24,5 @@
 #ifndef MICROPY_PY_RFID
 #define MICROPY_PY_RFID                    (1)
 #endif
+
+#define MICROPY_HW_ESP_NEW_I2C_DRIVER       (1)
