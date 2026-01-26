@@ -150,7 +150,7 @@ const esp_board_device_desc_t g_esp_board_devices[] = {
         .type = "audio_codec",
         .cfg = &esp_bmgr_audio_dac_cfg,
         .cfg_size = sizeof(esp_bmgr_audio_dac_cfg),
-        .init_skip = true,
+        .init_skip = false,
     },
     {
         .next = &g_esp_board_devices[2],
@@ -158,7 +158,7 @@ const esp_board_device_desc_t g_esp_board_devices[] = {
         .type = "audio_codec",
         .cfg = &esp_bmgr_audio_adc_cfg,
         .cfg_size = sizeof(esp_bmgr_audio_adc_cfg),
-        .init_skip = true,
+        .init_skip = false,
     },
     {
         .next = NULL,
