@@ -142,8 +142,7 @@ soft_reset:
     #if MICROPY_PY_MACHINE_I2S
     machine_i2s_init0();
     #endif
-    // lcd_init();
-    // lcd_draw_logo();
+    
     esp_board_manager_init();
     dev_display_lcd_handles_t *disp_handle;
     esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);

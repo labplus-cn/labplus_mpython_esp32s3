@@ -9,7 +9,7 @@ set(SDKCONFIG_DEFAULTS
     boards/sdkconfig.240mhz
     boards/mpython_v3/sdkconfig.spiram 
     boards/mpython_v3/sdkconfig.board
-    boards/mpython_v3/sdkconfig.usb
+    # boards/mpython_v3/sdkconfig.usb
 )
 
 if(NOT MPY_PORT_DIR)
