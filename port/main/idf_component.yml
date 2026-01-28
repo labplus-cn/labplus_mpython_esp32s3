@@ -23,6 +23,7 @@ dependencies:
     version: ~1.5
     # matches:
     #   - if: "$CONFIG{ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT} == True"
+  # espressif/esp_lvgl_port: "2.7.0"
   espressif/gmf_loader:
     override_path: ../../esp-gmf/packages/gmf_loader
   espressif/gmf_app_utils:

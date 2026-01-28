@@ -11,7 +11,7 @@
 	path = port/usercmodule/esp-who/esp-who
 	url = https://github.com/labplus-cn/esp-who.git
 [submodule "port/usercmodule/lv_binding_micropython"]
-	path = port/usercmodule/lv_binding_micropython
+	path = port/usercmodule/lv_binding_micropython/lv_binding_micropython
 	url = https://github.com/labplus-cn/lv_binding_micropython.git
 [submodule "esp-gmf"]
 	path = esp-gmf
