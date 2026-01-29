@@ -1,6 +1,6 @@
 if(MPYTHON_V3_BOARD OR LABPLUS_LEDONG_V2_BOARD OR LABPLUS_XUNFEI_JS_PRIMARY_BOARD OR LABPLUS_XUNFEI_JS_MIDDLE_BOARD)
 # Add the lv_binding_micropython.
-include(${CMAKE_CURRENT_LIST_DIR}/lv_binding_micropython/lv_binding_micropython/micropython.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/lv_binding_micropython/micropython.cmake)
 # add esp-who module
 # include(${CMAKE_CURRENT_LIST_DIR}/esp-who/micropython.cmake)
 endif()
