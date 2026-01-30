@@ -9,7 +9,7 @@ endif()
 include(${CMAKE_CURRENT_LIST_DIR}/tft_lcd/micropython.cmake)
 
 # add lv displayer driver module
-# include(${CMAKE_CURRENT_LIST_DIR}/lv_displayer/micropython.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/lv_displayer/micropython.cmake)
 
 # # add tts module
 # include(${CMAKE_CURRENT_LIST_DIR}/tts/micropython.cmake)

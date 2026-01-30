@@ -1,54 +1,72 @@
 #include "esp_log.h"
-#include "esp_err.h"
 #include "esp_timer.h"
-#include "misc/lv_types.h"
 #include "py/runtime.h"
 #include "lvgl.h"
 #include "py/obj.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_board_manager.h"
 #include "dev_display_lcd.h"
-#include <stdint.h>
-#include "esp_lvgl_port.h"
-#include "esp_lvgl_port_disp.h"
 
-static const char *TAG = "mod_LV_DISP";
-static lv_display_t *lvgl_disp = NULL;
+typedef struct _displayer_t
+{
+    mp_obj_base_t base;
+    dev_display_lcd_handles_t *disp_handle;
+
+    size_t buf_size;
+    uint16_t *buf1;
+    uint16_t *buf2;
+
+    lv_display_t *lv_display;
+} displayer_t;
+
+displayer_t *displayer;
+static void flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *data)
+{
+    displayer_t *disp = (displayer_t *) lv_display_get_user_data(display);
+
+    lv_draw_sw_rgb565_swap(data, disp->buf_size);
+    esp_lcd_panel_draw_bitmap(disp->disp_handle->panel_handle, area->x1, area->y1, area->x2 + 1, area->y2 + 1, (uint16_t *)data);
+}
+
+static void transfer_done_cb(void *user_data)
+{
+    displayer_t *disp = (displayer_t *) user_data;
+    lv_disp_flush_ready(disp->lv_display);
+}
+
+static uint32_t tick_get_cb()
+{
+    return esp_timer_get_time() / 1000;
+}
 
 static mp_obj_t lv_displayer_init(void)
 {
-    if(lvgl_disp == NULL){
-        lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-        lvgl_cfg.task_stack_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT;
-        lvgl_port_init(&lvgl_cfg);
+    if(!displayer){
+        displayer = calloc(1, sizeof(displayer_t));
 
-                /* Add LCD screen */
-        ESP_LOGD(TAG, "Add LCD screen");
-        dev_display_lcd_handles_t *disp_handle;
-        esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);
+        esp_board_manager_get_device_handle("display_lcd", (void **)&displayer->disp_handle);
         dev_display_lcd_config_t *cfg = NULL;
-        esp_board_device_get_config_by_handle(disp_handle, (void **)&cfg);
+        esp_board_device_get_config_by_handle(displayer->disp_handle, (void **)&cfg);
 
-        const lvgl_port_display_cfg_t disp_cfg = {
-            .io_handle = disp_handle->io_handle,
-            .panel_handle = disp_handle->panel_handle,
-            .buffer_size = cfg->lcd_width * cfg->lcd_height * sizeof(uint16_t),
-            .double_buffer = true,
-            .hres = cfg->lcd_width,
-            .vres = cfg->lcd_height,
-            .monochrome = false,
-            /* Rotation values must be same as used in esp_lcd for initial settings of the screen */
-            .rotation = {
-                .swap_xy = false,
-                .mirror_x = false,
-                .mirror_y = false,
-            },
-            .flags = {
-                .buff_dma = true,
-                .swap_bytes = true,
-            }
-        };
-        lvgl_disp = lvgl_port_add_disp(&disp_cfg);
+        if (!lv_is_initialized()){
+            lv_init();
+        }
+    
+        displayer->lv_display = lv_display_create(cfg->lcd_width, cfg->lcd_height);
+    
+        displayer->buf_size = cfg->lcd_width * cfg->lcd_height;
+        displayer->buf1 = heap_caps_malloc(displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+        assert(displayer->buf1);
+        displayer->buf2 = heap_caps_malloc(displayer->buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+        assert(displayer->buf2);
+    
+        lv_display_set_buffers(displayer->lv_display, displayer->buf1, displayer->buf2, displayer->buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+        displayer->disp_handle->transfer_done_cb = transfer_done_cb;
+        displayer->disp_handle->transfer_done_user_data = (void *) displayer;
+        lv_display_set_flush_cb(displayer->lv_display, flush_cb);
+        lv_display_set_user_data(displayer->lv_display, displayer);
+        lv_tick_set_cb(tick_get_cb);
     }
 
     return mp_obj_new_int_from_uint(0);
@@ -57,8 +75,32 @@ static MP_DEFINE_CONST_FUN_OBJ_0(lv_displayer_init_obj, lv_displayer_init);
 
 static mp_obj_t lv_displayer_deinit(void)
 {
-    lvgl_port_remove_disp(lvgl_disp);
-    lvgl_port_deinit();
+    if(displayer){
+        lv_tick_set_cb(NULL);
+        displayer->disp_handle->transfer_done_cb = NULL;
+        displayer->disp_handle->transfer_done_user_data = NULL;
+    
+        if (displayer->lv_display != NULL){
+            lv_display_delete(displayer->lv_display);
+            displayer->lv_display = NULL;
+        }
+    
+        displayer->buf_size = 0;
+        if (displayer->buf1 != NULL){
+            heap_caps_free(displayer->buf1);
+            displayer->buf1 = NULL;
+        }
+        if (displayer->buf2 != NULL){
+            heap_caps_free(displayer->buf2);
+            displayer->buf2 = NULL;
+        }
+    
+        if (lv_is_initialized()){
+            lv_deinit();
+        }
+
+        free(displayer);
+    }
 
     return mp_obj_new_int_from_uint(0);
 }
