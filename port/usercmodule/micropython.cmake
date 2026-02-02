@@ -24,4 +24,5 @@ if(LABPLUS_LEDONG_V2_BOARD)
 include(${CMAKE_CURRENT_LIST_DIR}/touchpad/micropython.cmake)
 endif()
 
+# add audio module
 include(${CMAKE_CURRENT_LIST_DIR}/audio/micropython.cmake)
