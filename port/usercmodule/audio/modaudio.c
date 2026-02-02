@@ -84,11 +84,10 @@ static int mock_event_callback(esp_asp_event_pkt_t *event, void *ctx)
 static mp_obj_t audio_init(void)
 {
     esp_gmf_app_codec_info_t codec_info = ESP_GMF_APP_CODEC_INFO_DEFAULT();
-    codec_info.play_info.sample_rate = 48000;
+    codec_info.play_info.sample_rate = 16000;
     codec_info.play_info.channel = 2;
     codec_info.play_info.bits_per_sample = 16;
     codec_info.record_info = codec_info.play_info;
-    // codec_info.record_info.channel = 1;
     esp_gmf_app_setup_codec_dev(&codec_info);
 
     // Set default output volume range from [0, 100]
