@@ -26,11 +26,7 @@
 #define __MODAUDIO_H_
 
 #include "py/obj.h"
-#include "audio_element.h"
-#include "audio_hal.h"
 
-extern audio_element_handle_t i2s_writer_el;
-extern audio_element_handle_t i2s_reader_el;
-extern audio_hal_handle_t audio_hal;
+extern const mp_obj_module_t tts_module;
 
 #endif //__MODAUDIO_H_

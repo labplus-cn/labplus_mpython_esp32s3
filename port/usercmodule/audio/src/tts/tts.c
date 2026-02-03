@@ -4,14 +4,13 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
 #include "freertos/semphr.h"
+#include "esp_system.h"
 #include "esp_log.h"
 #include "esp_tts.h"
 #include "esp_tts_voice_xiaole.h"
 #include "esp_tts_voice_template.h"
 #include "esp_tts_player.h"
-// #include "ringbuf.h"
 #include "unity.h"
 
 #include "esp_partition.h"
@@ -22,10 +21,9 @@
 
 static const char *TAG = "AUDIO_TTS";
 static esp_tts_handle_t *g_tts_handle = NULL;
-SemaphoreHandle_t tts_semaphore;
 
-volatile int tts_flag = 0;
 volatile bool is_tts_initialized = false;
+SemaphoreHandle_t tts_semaphore;
 
 extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
                                              const char * const pcName,
@@ -52,13 +50,15 @@ void model_init(void)
             return;
         }
 
-        // 初始化语音模型，使用模板初始化
         esp_tts_voice_t *voice = esp_tts_voice_set_init(&esp_tts_voice_template, (int16_t *)voicedata);
         if (voice == NULL) {
             ESP_LOGE(TAG, "TTS voice init failed!\n");
             return;
         }
         g_tts_handle = esp_tts_create(voice);
+        tts_semaphore = xSemaphoreCreateBinary();
+        assert(tts_semaphore != NULL);
+        xSemaphoreGive(tts_semaphore);
         is_tts_initialized=1;
     }
 }
@@ -68,13 +68,12 @@ static void text_to_speech_task(void *arg)
     const char *text = (const char *)arg;
     if (g_tts_handle == NULL) {
         ESP_LOGE(TAG, "TTS model not initialized!\n");
-        xSemaphoreGive(tts_semaphore);
-        vTaskDelete(NULL);
-        return;
+        goto end;
     }
 
+    xSemaphoreTake(tts_semaphore, portMAX_DELAY); //不允许语音合成时，其它任务再调用语音合成。
     esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_playback_handle();
-    esp_codec_dev_set_out_vol(codec_dev, 80);
+    // esp_codec_dev_set_out_vol(codec_dev, 80);
 
     esp_ae_ch_cvt_cfg_t config;
     float w_data[2] = {1.0, 1.0};
@@ -91,39 +90,24 @@ static void text_to_speech_task(void *arg)
     TEST_ASSERT_NOT_EQUAL(buffer, NULL);
 
     if (esp_tts_parse_chinese(g_tts_handle, text)) {
-        tts_flag = 1;
         int len;
-
         do {
             short *pcm = esp_tts_stream_play(g_tts_handle, &len, 0);
             esp_ae_ch_cvt_process(c_handle, len, (void *)pcm, buffer);
             esp_codec_dev_write(codec_dev, (int8_t *)buffer, len * 4);
         } while (len > 0);
-
-        tts_flag = 0;
     }
 
     esp_tts_stream_reset(g_tts_handle);
-    xSemaphoreGive(tts_semaphore);
     esp_ae_ch_cvt_close(c_handle);
     free(buffer);
+    xSemaphoreGive(tts_semaphore);
+end:
     vTaskDelete(NULL);
 }
 
 void text_to_speech(const char *text)
 {
-    // sc_stop_flag = 1;
-    tts_semaphore = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(text_to_speech_task, "tts_task", 4*1024, (void *)text, 5, NULL, 0);
-    xSemaphoreTake(tts_semaphore, portMAX_DELAY);
-    // sc_stop_flag = 0;
-    vSemaphoreDelete(tts_semaphore);
 }
 
-int get_tts_flag(void) {
-    return tts_flag;
-}
-
-int get_is_tts_initialized(void) {
-    return is_tts_initialized;
-}
