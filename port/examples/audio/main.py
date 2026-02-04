@@ -4,7 +4,7 @@ import network
 import audio
 
 my_wifi = wifi()
-my_wifi.connectWiFi("labplus_dev", "helloworld")
+# my_wifi.connectWiFi("labplus_dev", "helloworld")
 my_wifi.connectWiFi("office", "wearemaker")
 
 audio.player_init()

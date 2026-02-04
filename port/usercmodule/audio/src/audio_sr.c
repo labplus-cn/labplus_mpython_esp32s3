@@ -1,20 +1,13 @@
 #include "py/obj.h"
 #include "py/runtime.h"
-#include "sc.h"
 #include "esp_mn_speech_commands.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "sr.h"
 
 static mp_obj_dict_t *callback_dict = NULL;
 
-enum { ARG_wakeup, ARG_timeout, ARG_flag };
-static const mp_arg_t allowed_args[] = {
-    { MP_QSTR_wakeup_word, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },  // 唤醒词
-    { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 6000} },              // 超时时间
-    { MP_QSTR_flag, MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false} }               // 布尔标志
-};
-
-void sc_invoke_callback_for_id(int command_id) {
+void sr_invoke_callback_for_id(int command_id) {
     if (callback_dict == NULL) {
         return;
     }
@@ -29,8 +22,13 @@ void sc_invoke_callback_for_id(int command_id) {
 }
 
 // MicroPython 绑定函数
-static mp_obj_t mp_sc_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mp_sr_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
+    enum { ARG_wakeup, ARG_timeout };
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_wakeup_word, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },  // 唤醒应答词
+        { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 6000} },              // 超时时间
+    };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -40,13 +38,12 @@ static mp_obj_t mp_sc_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw
     }
 
     uint16_t t = args[1].u_int;
-    bool f = args[2].u_bool;
 
-    sc_init(word, t, f);
+    sr_init(word, t);
+    // test();
     return mp_const_none;
 }
-
-static MP_DEFINE_CONST_FUN_OBJ_KW(mp_sc_init_obj, 0, mp_sc_init);
+static MP_DEFINE_CONST_FUN_OBJ_KW(mp_sr_init_obj, 0, mp_sr_init);
 
 // 清空语音指令
 static mp_obj_t mp_esp_mn_commands_clear(void) {
@@ -72,59 +69,52 @@ static mp_obj_t mp_esp_mn_commands_update(void) {
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_esp_mn_commands_update_obj, mp_esp_mn_commands_update);
 
 // Micropython接口：设置指定命令 id 对应的回调函数
-static mp_obj_t mp_sc_set_callback(mp_obj_t command_id_obj, mp_obj_t callback_obj) {
-    if (!mp_obj_is_callable(callback_obj)) {
-        mp_raise_TypeError("回调函数必须可调用");
-    }
-    // 如果字典还未初始化，则初始化一个容量为4的字典
-    if (callback_dict == NULL) {
-        callback_dict = mp_obj_new_dict(4);
-    }
-    mp_obj_dict_store(callback_dict, command_id_obj, callback_obj);
+static mp_obj_t mp_sr_set_callback(mp_obj_t command_id_obj, mp_obj_t callback_obj) {
+    // if (!mp_obj_is_callable(callback_obj)) {
+    //     mp_raise_TypeError("回调函数必须可调用");
+    // }
+    // // 如果字典还未初始化，则初始化一个容量为4的字典
+    // if (callback_dict == NULL) {
+    //     callback_dict = mp_obj_new_dict(4);
+    // }
+    // mp_obj_dict_store(callback_dict, command_id_obj, callback_obj);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(mp_sc_set_callback_obj, mp_sc_set_callback);
+static MP_DEFINE_CONST_FUN_OBJ_2(mp_sr_set_callback_obj, mp_sr_set_callback);
 
-static mp_obj_t mp_sc_get_latest_command_id(void) {
+static mp_obj_t mp_sr_get_latest_command_id(void) {
     int cmd_id = get_latest_command_id();
     reset_latest_command_id();
     return mp_obj_new_int(cmd_id);
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_get_latest_command_id_obj, mp_sc_get_latest_command_id);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_get_latest_command_id_obj, mp_sr_get_latest_command_id);
 
-static mp_obj_t mp_sc_get_wakeup_flag(void) {
+static mp_obj_t mp_sr_get_wakeup_flag(void) {
     int cmd_id = get_wakeup_flag();
     return mp_obj_new_int(cmd_id);
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_get_wakeup_flag_obj, mp_sc_get_wakeup_flag);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_get_wakeup_flag_obj, mp_sr_get_wakeup_flag);
 
-static mp_obj_t mp_sc_start_vad_record(void) {
-    start_vad_record();
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_start_vad_record_obj, mp_sc_start_vad_record);
+// static mp_obj_t mp_sr_start_vad_record(void) {
+//     start_vad_record();
+//     return mp_const_none;
+// }
+// static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_start_vad_record_obj, mp_sr_start_vad_record);
 
-// 模块定义
-static const mp_rom_map_elem_t sc_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sc) },
-    { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&mp_sc_init_obj) },
+static const mp_rom_map_elem_t sr_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sr) },
+    { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&mp_sr_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_clear),  MP_ROM_PTR(&mp_esp_mn_commands_clear_obj) },
     { MP_ROM_QSTR(MP_QSTR_add),    MP_ROM_PTR(&mp_esp_mn_commands_add_obj) },
     { MP_ROM_QSTR(MP_QSTR_update), MP_ROM_PTR(&mp_esp_mn_commands_update_obj) },
-    { MP_ROM_QSTR(MP_QSTR_set_callback),     MP_ROM_PTR(&mp_sc_set_callback_obj) },
-    { MP_ROM_QSTR(MP_QSTR_get_latest_id),    MP_ROM_PTR(&mp_sc_get_latest_command_id_obj) },
-    { MP_ROM_QSTR(MP_QSTR_get_wakeup_flag),    MP_ROM_PTR(&mp_sc_get_wakeup_flag_obj) },
-    { MP_ROM_QSTR(MP_QSTR_start_vad_record),    MP_ROM_PTR(&mp_sc_start_vad_record_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_callback),     MP_ROM_PTR(&mp_sr_set_callback_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_latest_id),    MP_ROM_PTR(&mp_sr_get_latest_command_id_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_wakeup_flag),    MP_ROM_PTR(&mp_sr_get_wakeup_flag_obj) },
+    // { MP_ROM_QSTR(MP_QSTR_start_vad_record),    MP_ROM_PTR(&mp_sr_start_vad_record_obj) },
 };
-static MP_DEFINE_CONST_DICT(sc_module_globals, sc_module_globals_table);
+static MP_DEFINE_CONST_DICT(sr_module_globals, sr_module_globals_table);
 
-// 模块结构体
-const mp_obj_module_t sc_module = {
+const mp_obj_module_t sr_module = {
     .base = { &mp_type_module },
-    .globals = (mp_obj_dict_t*)&sc_module_globals,
+    .globals = (mp_obj_dict_t*)&sr_module_globals,
 };
-
-// 注册模块
-MP_REGISTER_MODULE(MP_QSTR_sc, sc_module);
-
-

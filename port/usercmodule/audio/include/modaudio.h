@@ -28,5 +28,7 @@
 #include "py/obj.h"
 
 extern const mp_obj_module_t tts_module;
+extern const mp_obj_module_t sr_module;
+// extern const mp_obj_module_t baidu_tts_module;
 
 #endif //__MODAUDIO_H_

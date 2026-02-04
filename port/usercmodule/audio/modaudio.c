@@ -94,7 +94,7 @@ static mp_obj_t audio_init(void)
 
     // Set default output volume range from [0, 100]
     esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_playback_handle();
-    esp_codec_dev_set_out_vol(codec_dev , 70);
+    esp_codec_dev_set_out_vol(codec_dev, 80);
     esp_codec_dev_set_in_gain(codec_dev, 35.0);
 
     return mp_const_none;
@@ -228,7 +228,7 @@ static const mp_rom_map_elem_t audio_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_player_status),  MP_ROM_PTR(&audio_get_status_obj)},
 
     { MP_ROM_QSTR(MP_QSTR_tts), MP_ROM_PTR(&tts_module) },
-
+    { MP_ROM_QSTR(MP_QSTR_sr), MP_ROM_PTR(&sr_module) },
 };
 
 static MP_DEFINE_CONST_DICT(audio_module_globals, audio_module_globals_table);
