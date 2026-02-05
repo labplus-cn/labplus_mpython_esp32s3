@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
+#include "unity.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -27,6 +27,9 @@
 #include "sr.h"
 #include "tts.h"
 #include "audio_data.c"
+#include "esp_gmf_cap.h"
+#include "esp_gmf_caps_def.h"
+#include "esp_gmf_ch_cvt.h"
 #define VOICE2FILE     (false)
 
 #ifdef CONFIG_GMF_AI_AUDIO_WAKEUP_ENABLE
@@ -80,8 +83,8 @@ void esp_gmf_afe_event_cb(esp_gmf_obj_handle_t obj, esp_gmf_afe_evt_t *event, vo
                 esp_gmf_afe_wakeup_info_t *info = event->event_data;
                 ESP_LOGI(TAG, "WAKEUP_START [%d : %d]", info->wake_word_index, info->wakenet_model_index);
                 
-                model_init();
-	            text_to_speech(wakeup_word);
+                // model_init();
+	            // text_to_speech(wakeup_word);
             } else {
                 ESP_LOGI(TAG, "WAKEUP_START");
             }
@@ -182,18 +185,23 @@ static esp_gmf_err_io_t afe_acquire_read(void *handle, esp_gmf_payload_t *load, 
         if (offset + wanted_size > total_size) {
             wanted_size = total_size - offset;
         }
+        ESP_LOGD(TAG, "afe_acquire_read wanted:%d offset:%d", wanted_size, offset);
         memcpy(load->buf, &audio_data[offset], wanted_size);
         offset += wanted_size;
         load->valid_size = wanted_size;
-
+        ESP_LOGD(TAG, "afe_acquire_read loaded:%d new_offset:%d", load->valid_size, offset);
         if (offset == total_size) {
+            /* loop audio instead of marking done so AFE receives continuous stream */
             offset = 0;
-            load->is_done = true;
+            /* do not set load->is_done to allow continuous feeding */
+            vTaskDelay(pdMS_TO_TICKS(500));
         }
     } else {
         load->valid_size = 0;
-        load->is_done = true;
+        /* keep streaming: do not mark done */
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
+    vTaskDelay(pdMS_TO_TICKS(10));
     return ESP_GMF_IO_OK;
 }
 
@@ -233,29 +241,93 @@ static int quit(void)
 
 static void sr_task(void *arg)
 {
+    esp_log_level_set("AFE_MANAGER", ESP_LOG_DEBUG);
+    esp_log_level_set("AFE", ESP_LOG_DEBUG);
     g_event_group = xEventGroupCreate();
 
     esp_gmf_pool_handle_t pool = NULL;
     esp_gmf_pool_init(&pool);
-    gmf_loader_setup_all_defaults(pool);
+    // gmf_loader_setup_all_defaults(pool);
+
+    esp_gmf_err_t ret = ESP_GMF_ERR_OK;
+    esp_gmf_io_handle_t dev = NULL;
+    codec_dev_io_cfg_t rx_codec_dev_cfg = ESP_GMF_IO_CODEC_DEV_CFG_DEFAULT();
+    rx_codec_dev_cfg.dir = ESP_GMF_IO_DIR_READER;
+    rx_codec_dev_cfg.dev = NULL;
+    ret = esp_gmf_io_codec_dev_init(&rx_codec_dev_cfg, &dev);
+    ESP_GMF_RET_ON_ERROR(TAG, ret, {}, "Failed to init codec dev io");
+    ret = esp_gmf_pool_register_io(pool, dev, NULL);
+    ESP_GMF_RET_ON_ERROR(TAG, ret, {esp_gmf_io_deinit(dev); {};}, "Failed to register codec dev io");
+
+    esp_gmf_io_handle_t dev1 = NULL;
+    codec_dev_io_cfg_t tx_codec_dev_cfg = ESP_GMF_IO_CODEC_DEV_CFG_DEFAULT();
+    tx_codec_dev_cfg.dir = ESP_GMF_IO_DIR_WRITER;
+    tx_codec_dev_cfg.dev = NULL;
+    ret = esp_gmf_io_codec_dev_init(&tx_codec_dev_cfg, &dev1);
+    ESP_GMF_RET_ON_ERROR(TAG, ret, {}, "Failed to init codec dev io");
+    ret = esp_gmf_pool_register_io(pool, dev1, NULL);
+    ESP_GMF_RET_ON_ERROR(TAG, ret, {esp_gmf_io_deinit(dev1); {};}, "Failed to register codec dev io");
+
+    esp_gmf_element_handle_t hd = NULL;
+    esp_ae_ch_cvt_cfg_t es_ch_cvt_cfg = DEFAULT_ESP_GMF_CH_CVT_CONFIG();
+    es_ch_cvt_cfg.dest_ch = 1;
+    ret = esp_gmf_ch_cvt_init(&es_ch_cvt_cfg, &hd);
+    ESP_GMF_RET_ON_ERROR(TAG, ret, {}, "Failed to init audio ch cvt");
+    ret = esp_gmf_pool_register_element(pool, hd, NULL);
+    ESP_GMF_RET_ON_ERROR(TAG, ret, {esp_gmf_element_deinit(hd); {};}, "Failed to register element in pool");
+
+    // gmf_loader_setup_ai_audio_default(pool);
+    esp_gmf_afe_manager_handle_t afe_manager = NULL;
+    srmodel_list_t *models = esp_srmodel_init("sr_module");
+    const char *ch_format = "M";
+    afe_config_t *afe_cfg = afe_config_init(ch_format, models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
+    afe_cfg->vad_init = true;
+    afe_cfg->vad_mode = VAD_MODE_2;
+    afe_cfg->vad_min_speech_ms = 64;
+    afe_cfg->vad_min_noise_ms = 100;
+    afe_cfg->wakenet_init = true;
+    afe_cfg->aec_init = true;
+    esp_gmf_afe_manager_cfg_t afe_manager_cfg = DEFAULT_GMF_AFE_MANAGER_CFG(afe_cfg, NULL, NULL, NULL, NULL);
+    /* prioritize fetch task to reduce latency of result processing */
+    // afe_manager_cfg.fetch_task_setting.prio = 7;
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_afe_manager_create(&afe_manager_cfg, &afe_manager));
+    esp_gmf_element_handle_t gmf_afe = NULL;
+    esp_gmf_afe_cfg_t gmf_afe_cfg = DEFAULT_GMF_AFE_CFG(afe_manager, esp_gmf_afe_event_cb, NULL, models);
+    gmf_afe_cfg.vcmd_detect_en = true;
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_afe_init(&gmf_afe_cfg, &gmf_afe));
+    esp_gmf_cap_t *caps = NULL;
+    esp_gmf_cap_t *out_caps = {0};
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_element_get_caps(gmf_afe, (const esp_gmf_cap_t **)&caps));
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_AEC, &out_caps));
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_NS, &out_caps));
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_AGC, &out_caps));
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_VAD, &out_caps));
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_WWE, &out_caps));
+    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_VCMD, &out_caps));
+
+    esp_gmf_err_t ret1 = esp_gmf_pool_register_element(pool, gmf_afe, NULL);
+    ESP_GMF_RET_ON_ERROR(TAG, ret1, {esp_gmf_element_deinit(gmf_afe); {};}, "Failed to register element in pool");
 
     esp_gmf_pipeline_handle_t pipe = NULL;
+    // const char *name[] = {"aud_ch_cvt", "ai_afe"};
     const char *name[] = {"ai_afe"};
-    esp_gmf_pool_new_pipeline(pool, NULL, name, sizeof(name) / sizeof(char *), NULL, &pipe);
+    esp_gmf_pool_new_pipeline(pool, "io_codec_dev", name, sizeof(name) / sizeof(char *), "io_codec_dev", &pipe);
     if (pipe == NULL) {
         ESP_LOGE(TAG, "There is no pipeline");
         goto __quit;
     }
-    // esp_gmf_io_codec_dev_set_dev(ESP_GMF_PIPELINE_GET_IN_INSTANCE(pipe), esp_gmf_app_get_record_handle());
+    esp_gmf_io_codec_dev_set_dev(ESP_GMF_PIPELINE_GET_IN_INSTANCE(pipe), esp_gmf_app_get_record_handle());
+    esp_gmf_io_codec_dev_set_dev(ESP_GMF_PIPELINE_GET_OUT_INSTANCE(pipe), esp_gmf_app_get_playback_handle());
 
-    esp_gmf_pipeline_get_el_by_name(pipe, "ai_afe", &g_afe);
-    ESP_LOGI(TAG, "Create AFE, %s-%p", OBJ_GET_TAG((esp_gmf_obj_t *)g_afe), (esp_gmf_obj_t *)g_afe);
-    esp_gmf_afe_set_event_cb(g_afe, esp_gmf_afe_event_cb, NULL);
+    esp_gmf_element_handle_t gmf_afe1 = NULL;
+    esp_gmf_pipeline_get_el_by_name(pipe, "ai_afe", &gmf_afe1);
+    ESP_LOGE(TAG, "New an object,%s-%p", OBJ_GET_TAG(gmf_afe1), gmf_afe1);
+    esp_gmf_afe_set_event_cb(gmf_afe1, esp_gmf_afe_event_cb, NULL);
 
-    esp_gmf_port_handle_t inport = NEW_ESP_GMF_PORT_IN_BYTE(afe_acquire_read, afe_release_read, NULL, NULL, 2048, 100);
-    esp_gmf_pipeline_reg_el_port(pipe, name[0], ESP_GMF_IO_DIR_READER, inport);
-    esp_gmf_port_handle_t outport = NEW_ESP_GMF_PORT_OUT_BYTE(outport_acquire_write, outport_release_write, NULL, NULL, 2048, 100);
-    esp_gmf_pipeline_reg_el_port(pipe, name[0], ESP_GMF_IO_DIR_WRITER, outport);
+    // esp_gmf_port_handle_t inport = NEW_ESP_GMF_PORT_IN_BYTE(afe_acquire_read, afe_release_read, NULL, NULL, 2048, 100);
+    // esp_gmf_pipeline_reg_el_port(pipe, name[0], ESP_GMF_IO_DIR_READER, inport);
+    // esp_gmf_port_handle_t outport = NEW_ESP_GMF_PORT_OUT_BYTE(outport_acquire_write, outport_release_write, NULL, NULL, 2048, 100);
+    // esp_gmf_pipeline_reg_el_port(pipe, name[1], ESP_GMF_IO_DIR_WRITER, outport);
 
     esp_gmf_info_sound_t info = {
         .sample_rates = 16000,
@@ -293,6 +365,66 @@ __quit:
     esp_gmf_pool_deinit(pool);
     vEventGroupDelete(g_event_group);
     ESP_LOGW(TAG, "Wake word engine demo finished");
+
+    // esp_log_level_set("*", ESP_LOG_INFO);
+    // ESP_GMF_MEM_SHOW(TAG);
+
+    // printf("\r\n///////////////////// AFE /////////////////////\r\n");
+    // g_event_group = xEventGroupCreate();
+    // TEST_ASSERT_NOT_NULL(g_event_group);
+
+    // esp_gmf_port_handle_t inport = NEW_ESP_GMF_PORT_IN_BYTE(afe_acquire_read, afe_release_read, NULL, NULL, 1024, 100);
+    // esp_gmf_port_handle_t outport = NEW_ESP_GMF_PORT_OUT_BYTE(outport_acquire_write, outport_release_write, NULL, NULL, 1024, 100);
+
+    // esp_gmf_afe_manager_handle_t afe_manager = NULL;
+    // srmodel_list_t *models = esp_srmodel_init("sr_module");
+    // const char *ch_format = "M";
+    // afe_config_t *afe_cfg = afe_config_init(ch_format, models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
+    // afe_cfg->vad_init = true;
+    // afe_cfg->vad_mode = VAD_MODE_2;
+    // afe_cfg->vad_min_speech_ms = 64;
+    // afe_cfg->vad_min_noise_ms = 100;
+    // afe_cfg->wakenet_init = true;
+    // afe_cfg->aec_init = true;
+    // esp_gmf_afe_manager_cfg_t afe_manager_cfg = DEFAULT_GMF_AFE_MANAGER_CFG(afe_cfg, NULL, NULL, NULL, NULL);
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_afe_manager_create(&afe_manager_cfg, &afe_manager));
+    // esp_gmf_element_handle_t gmf_afe = NULL;
+    // esp_gmf_afe_cfg_t gmf_afe_cfg = DEFAULT_GMF_AFE_CFG(afe_manager, esp_gmf_afe_event_cb, NULL, models);
+    // gmf_afe_cfg.vcmd_detect_en = true;
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_afe_init(&gmf_afe_cfg, &gmf_afe));
+    // esp_gmf_cap_t *caps = NULL;
+    // esp_gmf_cap_t *out_caps = {0};
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_element_get_caps(gmf_afe, (const esp_gmf_cap_t **)&caps));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_AEC, &out_caps));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_NS, &out_caps));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_AGC, &out_caps));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_VAD, &out_caps));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_WWE, &out_caps));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_VCMD, &out_caps));
+
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_element_register_in_port(gmf_afe, inport));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_element_register_out_port(gmf_afe, outport));
+    // TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_element_process_open(gmf_afe, NULL));
+    // esp_gmf_job_err_t ret = ESP_GMF_JOB_ERR_OK;
+    // do {
+    //     ret = esp_gmf_element_process_running(gmf_afe, NULL);
+    //     if (ret == ESP_GMF_JOB_ERR_FAIL) {
+    //         ESP_LOGE(TAG, "AFE process failed");
+    //         break;
+    //     } else if (ret == ESP_GMF_JOB_ERR_DONE) {
+    //         ESP_LOGI(TAG, "AFE process done");
+    //         break;
+    //     }
+    //     vTaskDelay(pdMS_TO_TICKS(20));
+    // } while (true);
+    // TEST_ASSERT_EQUAL(BIT0, xEventGroupWaitBits(g_event_group, BIT0, pdTRUE, pdTRUE, pdMS_TO_TICKS(10 * 1000)));
+    // esp_gmf_element_process_close(gmf_afe, NULL);
+    // esp_gmf_obj_delete(gmf_afe);
+    // afe_config_free(afe_cfg);
+    // esp_gmf_afe_manager_destroy(afe_manager);
+    // esp_srmodel_deinit(models);
+    // vEventGroupDelete(g_event_group);
+    // g_event_group = NULL;
 }
 
 int get_latest_command_id(void) {
