@@ -97,11 +97,11 @@ const static periph_i2s_config_t esp_bmgr_i2s_audio_in_cfg = {
                             .bit_order_lsb = false,
                         },
                     .gpio_cfg = {
-                            .mclk = -1,
-                            .bclk = -1,
-                            .ws = -1,
-                            .dout = -1,
-                            .din = -1,
+                            .mclk = 39,
+                            .bclk = 41,
+                            .ws = 42,
+                            .dout = 38,
+                            .din = 40,
                             .invert_flags = {
                                     .mclk_inv = false,
                                     .bclk_inv = false,
