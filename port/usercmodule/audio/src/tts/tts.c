@@ -93,8 +93,10 @@ static void text_to_speech_task(void *arg)
         int len;
         do {
             short *pcm = esp_tts_stream_play(g_tts_handle, &len, 0);
-            esp_ae_ch_cvt_process(c_handle, len, (void *)pcm, buffer);
-            esp_codec_dev_write(codec_dev, (int8_t *)buffer, len * 4);
+            if(len > 0){
+                esp_ae_ch_cvt_process(c_handle, len, (void *)pcm, buffer);
+                esp_codec_dev_write(codec_dev, (int8_t *)buffer, len * 4);
+            }
         } while (len > 0);
     }
 

@@ -8,9 +8,10 @@ sr.add(1,'kai deng')
 sr.add(2,'guan deng')
 sr.update()
 print('hello')
-# while True:
-#     res = sr.get_latest_id()
-#     if res == 1:
-#         print('开灯')
-#     elif res == 2:
-#         print('关灯')
+while True:
+    res = sr.get_latest_id()
+    if res == 1:
+        print('opened')
+    elif res == 2:
+        print('closed')
+    time.sleep(1)
