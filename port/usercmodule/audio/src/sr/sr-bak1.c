@@ -37,7 +37,7 @@ static uint16_t timeout  = 6000;
 static bool vad_record_flag = false;
 // const char *file_path = "vad_record.pcm";
 SemaphoreHandle_t recording_done_semaphore = NULL;
-afe_fetch_result_t *res = NULL;
+afe_fetch_result_t *afe_result = NULL;
 
 extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
                                              const char * const pcName,
@@ -50,7 +50,7 @@ extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
 
 void vad_record()
 {
-    // if (res->vad_state == VAD_SPEECH) {
+    // if (afe_result->vad_state == VAD_SPEECH) {
     //     if (!recording) {
     //         silence_counter = 0;
     //         // 第一次检测到语音，开始录音
@@ -80,23 +80,25 @@ void vad_record()
     //     }
     // }
     // if (recording && wav_codec) {
-    //     if (res->vad_cache_size > 0) {
-    //         printf("写入 vad cache: %d 字节\n",res->vad_cache_size);
+    //     if (afe_result->vad_cache_size > 0) {
+    //         printf("写入 vad cache: %d 字节\n",afe_result->vad_cache_size);
     //         lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
     //                         &wav_codec->lfs2_file->file,
-    //                         res->vad_cache,
-    //                         res->vad_cache_size);
+    //                         afe_result->vad_cache,
+    //                         afe_result->vad_cache_size);
     //     }
-    //     if (res->vad_state == 1) {
+    //     if (afe_result->vad_state == 1) {
     //         lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
     //                         &wav_codec->lfs2_file->file,
-    //                         res->data,
-    //                         res->data_size);
+    //                         afe_result->data,
+    //                         afe_result->data_size);
     //     }
     // }
 }
 
 //AFE支持两路MIC或一路mic输入，但单路数据少，处理更快，所以用通道转换，把两路mic输入转一路送AFE
+//如果使用双mic送AFE,注释掉所有通道转换相关代码。这种方式，似乎配置成"MM"有问题，需要配置成"M",然后
+//能完配置afe_config->pcm_config相关参数为双通道才行。
 void feed_Task(void *arg)
 {
     esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
@@ -135,7 +137,7 @@ void feed_Task(void *arg)
 
     heap_caps_free(i2s_buff);
     heap_caps_free(afe_buff);
-    // esp_ae_ch_cvt_close(c_handle);
+    esp_ae_ch_cvt_close(c_handle);
     vTaskDelete(NULL);
 }
 
@@ -160,8 +162,8 @@ void detect_Task(void *arg)
     // ESP_LOGI(TAG, "------------detect start------------");
 
     while (task_flag) {
-        res = afe_handle->fetch(afe_data);
-        if (!res || res->ret_value == ESP_FAIL) {
+        afe_result = afe_handle->fetch(afe_data);
+        if (!afe_result || afe_result->ret_value == ESP_FAIL) {
             ESP_LOGE(TAG, "fetch error!");
             break;
         }
@@ -171,7 +173,7 @@ void detect_Task(void *arg)
             continue;
         }
 
-        if (res->wakeup_state == WAKENET_DETECTED) {
+        if (afe_result->wakeup_state == WAKENET_DETECTED) {
             ESP_LOGI(TAG, "WAKEWORD DETECTED");
 	        multinet->clean(model_data);
 
@@ -182,16 +184,16 @@ void detect_Task(void *arg)
 
         }
 
-        if (res->raw_data_channels == 1 && res->wakeup_state == WAKENET_DETECTED) {
+        if (afe_result->raw_data_channels == 1 && afe_result->wakeup_state == WAKENET_DETECTED) {
             wakeup_flag = 1;
-        } else if (res->raw_data_channels > 1 && res->wakeup_state == WAKENET_CHANNEL_VERIFIED) {
+        } else if (afe_result->raw_data_channels > 1 && afe_result->wakeup_state == WAKENET_CHANNEL_VERIFIED) {
             // For a multi-channel AFE, it is necessary to wait for the channel to be verified.
-            ESP_LOGI(TAG, "AFE_FETCH_CHANNEL_VERIFIED, channel index: %d", res->trigger_channel_id);
+            ESP_LOGI(TAG, "AFE_FETCH_CHANNEL_VERIFIED, channel index: %d", afe_result->trigger_channel_id);
             wakeup_flag = 1;
         }
 
         if (wakeup_flag == 1) {
-            esp_mn_state_t mn_state = multinet->detect(model_data, res->data);
+            esp_mn_state_t mn_state = multinet->detect(model_data, afe_result->data);
 
             if (mn_state == ESP_MN_STATE_DETECTING) {
                 continue;
@@ -210,7 +212,7 @@ void detect_Task(void *arg)
                     ESP_LOGI(TAG, "-----------awaits to be waken up-----------");
                     continue;
                 }
-//                printf("\n-----------listening-----------\n");
+//                ESP_LOGI(TAG, "-----------listening-----------");
             }
 
             if (mn_state == ESP_MN_STATE_TIMEOUT) {
