@@ -119,8 +119,9 @@ void esp_gmf_afe_event_cb(esp_gmf_obj_handle_t obj, esp_gmf_afe_evt_t *event, vo
             break;
         }
         default: {
+            esp_gmf_afe_vcmd_detection_cancel(obj);
             esp_gmf_afe_vcmd_info_t *info = event->event_data;
-            ESP_LOGE(TAG, "Command %d, phrase_id %d, prob %f, str: %s",
+            ESP_LOGI(TAG, "Command %d, phrase_id %d, prob %f, str: %s",
                      event->type, info->phrase_id, info->prob, info->str);
             latest_command_id = event->type;
             break;
