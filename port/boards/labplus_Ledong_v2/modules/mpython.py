@@ -734,6 +734,8 @@ class Magnetic(object):
 # Magnetic
 if 48 in i2c.scan():
     magnetic = Magnetic()
+else:
+    print("Magnetic sensor not found.")
 
 class PinMode(object):
     IN = 1
@@ -832,6 +834,8 @@ rgb.write()
 # light sensor LTR-308ALS 
 if 83 in i2c.scan():    
     light = LTR_308ALS(i2c)
+else:
+    print("light sensor not found!")
 
 # sound sensor
 sound = ADC(Pin(6))
@@ -940,7 +944,10 @@ class Ledong_shield(object):
         data = max(min(data, 4200), 3300)
         return data
 
-ledong_shield = Ledong_shield()
+if 17 in i2c.scan():    
+    ledong_shield = Ledong_shield()
+else:
+    print("Ledong shield not found!")
 
 
 """

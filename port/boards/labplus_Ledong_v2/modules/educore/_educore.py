@@ -595,13 +595,24 @@ class _dht11():
         self.tim = Timer(16)
         self.tim.init(period=1000, mode=Timer.PERIODIC, callback=self.timer_tick)
         time.sleep(1.5)
-        self.dht11.measure()
+        attempts = 0
+        while True:
+            try:
+                self.dht11.measure()
+            except Exception as e:
+                attempts = attempts + 1
+                time.sleep_ms(500)
+                if attempts > 5:
+                    break
+            else:
+                break
+                    
 
     def timer_tick(self,_):
         try: 
             self.dht11.measure()
         except: 
-            pass
+            time.sleep_ms(500)
 
     def read(self):
         return self.dht11.temperature(),self.dht11.humidity()
