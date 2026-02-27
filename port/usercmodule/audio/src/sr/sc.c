@@ -18,7 +18,6 @@
 #include "esp_mn_speech_commands.h"
 #include "sc_module.h"
 #include "tts.h"
-#include "wav_codec.h"
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
@@ -34,11 +33,11 @@ static bool enable_flag = false;
 volatile int sc_stop_flag = 0;
 
 #define SILENCE_THRESHOLD 50
-static wav_codec_t *wav_codec = NULL;
+static FILE *vad_file = NULL;
 static bool vad_record_flag = false;
 static bool recording = false;
 static int silence_counter = 0;
-const char *file_path = "vad_record.pcm";
+const char *file_path = "/littlefs/vad_record.pcm";
 SemaphoreHandle_t recording_done_semaphore = NULL;
 afe_fetch_result_t *res = NULL;
 
@@ -57,24 +56,20 @@ void vad_record()
         if (!recording) {
             silence_counter = 0;
             // 第一次检测到语音，开始录音
-            wav_codec = (wav_codec_t*) heap_caps_malloc(sizeof(wav_codec_t), MALLOC_CAP_SPIRAM);
-            wav_codec->lfs2_file = vfs_lfs2_file_open(file_path, LFS2_O_WRONLY | LFS2_O_CREAT | LFS2_O_TRUNC);
+            vad_file = fopen(file_path, "wb");
             recording = true;
             printf("检测到语音，开始录音\n");
         }
-    }else {  // VAD_SILENCE
+    } else {  // VAD_SILENCE
         if (recording) {
             silence_counter++;
             if (silence_counter >= SILENCE_THRESHOLD) {
                 recording = false;
-                vad_record_flag=false;
+                vad_record_flag = false;
                 silence_counter = 0;
-                if (wav_codec) {
-                    vfs_lfs2_file_close(wav_codec->lfs2_file);
-                    if(wav_codec){
-                        heap_caps_free(wav_codec);
-                        wav_codec=NULL;
-                    }
+                if (vad_file) {
+                    fclose(vad_file);
+                    vad_file = NULL;
                 }
                 printf("检测到静音，停止录音\n");
                 // 录音结束，释放信号量
@@ -82,19 +77,13 @@ void vad_record()
             }
         }
     }
-    if (recording && wav_codec) {
+    if (recording && vad_file) {
         if (res->vad_cache_size > 0) {
-            printf("写入 vad cache: %d 字节\n",res->vad_cache_size);
-            lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
-                            &wav_codec->lfs2_file->file,
-                            res->vad_cache,
-                            res->vad_cache_size);
+            printf("写入 vad cache: %d 字节\n", res->vad_cache_size);
+            fwrite(res->vad_cache, 1, res->vad_cache_size, vad_file);
         }
         if (res->vad_state == 1) {
-            lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
-                            &wav_codec->lfs2_file->file,
-                            res->data,
-                            res->data_size);
+            fwrite(res->data, 1, res->data_size, vad_file);
         }
     }
 }

@@ -2,7 +2,7 @@ dependencies:
   esp_lcd_jd9853:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/port/components/esp_lcd_jd9853
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/port/components/esp_lcd_jd9853
       type: local
     version: 2.0.2
   espressif/cmake_utilities:
@@ -54,7 +54,7 @@ dependencies:
       type: service
     version: 2.1.5
   espressif/esp32-camera:
-    component_hash: f0a608b109935a5389221eee5090ec61f51b0df1a0749531fe59d33aaf263233
+    component_hash: ac4228c825b891378bc0806869170d4ebc5d45ba8ebc519b4f8886a56ad2d123
     dependencies:
     - name: espressif/esp_jpeg
       registry_url: https://components.espressif.com
@@ -66,7 +66,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 2.1.4
+    version: 2.1.5
   espressif/esp_audio_codec:
     component_hash: 04c2f0d5eca207cdfabd3aafc50ef4bca53532115ddf7689e5cfabd00eb88b02
     dependencies:
@@ -87,13 +87,13 @@ dependencies:
   espressif/esp_audio_simple_player:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/packages/esp_audio_simple_player
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/packages/esp_audio_simple_player
       type: local
     version: 0.9.5~1
   espressif/esp_board_manager:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/packages/esp_board_manager
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/packages/esp_board_manager
       type: local
     version: 0.5.3
   espressif/esp_cam_sensor:
@@ -124,7 +124,7 @@ dependencies:
   espressif/esp_capture:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/packages/esp_capture
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/packages/esp_capture
       type: local
     version: 0.7.8~1
   espressif/esp_codec_dev:
@@ -171,7 +171,7 @@ dependencies:
       type: service
     version: 1.3.1
   espressif/esp_muxer:
-    component_hash: cc0f78844aa85fe6da69aef543c039c18eda0ca43c0fa5c61ba3d6abe8a2369b
+    component_hash: 0e3f27c1ec96035c846b9ccc262190045e93b721defe13060d0e4ab712d98852
     dependencies:
     - name: idf
       require: private
@@ -179,7 +179,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.1.3
+    version: 1.2.0
   espressif/esp_new_jpeg:
     component_hash: 2f06f88e94fbc781b26a9be4291ff4ffc88596c90436a1e1358a7a38296b44ae
     dependencies: []
@@ -197,7 +197,7 @@ dependencies:
     - esp32c6
     version: 1.0.0
   espressif/esp_sccb_intf:
-    component_hash: 44dfa738680ccbc3705ae6940f59be603165f4f7e4d05c3eb5f433705fdc92be
+    component_hash: c071b189e49f40940722aea01a5489f873385cc39cd5b14012341135b85d1a9d
     dependencies:
     - name: idf
       require: private
@@ -205,7 +205,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.0.7
+    version: 0.0.8
   espressif/esp_video:
     component_hash: 2239aed49fa4eb1efdf3b0c2b95b05c03fc8b363c101bc2cd70f5e3bcd3c7cc4
     dependencies:
@@ -274,49 +274,49 @@ dependencies:
   espressif/gmf_ai_audio:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/elements/gmf_ai_audio
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/elements/gmf_ai_audio
       type: local
     version: 0.7.4~1
   espressif/gmf_app_utils:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/packages/gmf_app_utils
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/packages/gmf_app_utils
       type: local
     version: 0.7.8~1
   espressif/gmf_audio:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/elements/gmf_audio
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/elements/gmf_audio
       type: local
     version: 0.7.2
   espressif/gmf_core:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/gmf_core
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/gmf_core
       type: local
     version: 0.7.9
   espressif/gmf_io:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/elements/gmf_io
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/elements/gmf_io
       type: local
     version: 0.7.6
   espressif/gmf_loader:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/packages/gmf_loader
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/packages/gmf_loader
       type: local
     version: 0.7.3~1
   espressif/gmf_misc:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/elements/gmf_misc
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/elements/gmf_misc
       type: local
     version: 0.7.0
   espressif/gmf_video:
     dependencies: []
     source:
-      path: /home/jiang/share/labplus_mpython_esp32s3/esp-gmf/elements/gmf_video
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/esp-gmf/elements/gmf_video
       type: local
     version: 0.7.1
   espressif/mdns:
@@ -371,6 +371,16 @@ dependencies:
     source:
       type: idf
     version: 5.4.3
+  joltwallet/littlefs:
+    component_hash: dcea25bcef2de023f089f5f01e8d8c46ad1b8ffef75861ad5ffb4098555839df
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.20.4
 direct_dependencies:
 - compenents/esp_lcd_jd9853
 - espressif/cmake_utilities
@@ -397,6 +407,7 @@ direct_dependencies:
 - espressif/mdns
 - espressif/tinyusb
 - idf
-manifest_hash: cea843a0e83f98ba8eddd0070ae10445fab233fb64bce192ba37c7936d57b86f
+- joltwallet/littlefs
+manifest_hash: b7aa1c51e3a42ca28e95b7393ba5d0ab9f36ec7eefa43591fad130ddd9c4cbbb
 target: esp32s3
 version: 2.0.0
