@@ -20,3 +20,6 @@ endif()
 
 # add audio module
 include(${CMAKE_CURRENT_LIST_DIR}/audio/micropython.cmake)
+
+# add xiaozhi AI voice module
+include(${CMAKE_CURRENT_LIST_DIR}/xiaozhi/micropython.cmake)
