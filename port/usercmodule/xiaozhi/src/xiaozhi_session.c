@@ -45,12 +45,8 @@
 #include "esp_websocket_client.h"
 #include "cJSON.h"
 
-/* Opus 编解码器类型和配置 */
+/* Opus 解码器（播放侧） */
 #include "esp_audio_types.h"
-#include "esp_audio_enc.h"
-#include "esp_opus_enc.h"
-
-/* Opus 解码器 */
 #include "esp_audio_dec.h"
 #include "esp_opus_dec.h"
 
@@ -68,14 +64,8 @@
 #include "esp_audio_render.h"
 #include "esp_audio_render_types.h"
 
-/* GMF Capture（录音） */
-#include "esp_capture.h"
-#include "esp_capture_sink.h"
-#include "esp_capture_audio_dev_src.h"
-/* GMF Capture 高级 API：自定义 pipeline 构建 */
-#include "esp_capture_advance.h"
-/* GMF 音频编码器元素（esp_gmf_audio_enc_init / esp_gmf_audio_enc_reconfig） */
-#include "esp_gmf_audio_enc.h"
+/* 录音 pipeline 封装 */
+#include "audio_capture.h"
 
 /* ====================================================
  * 常量和宏定义
@@ -91,15 +81,11 @@
 #define OPUS_SAMPLE_RATE     16000
 #define OPUS_CHANNELS        1           /* Opus mono */
 
-/* 每帧样本数 (mono, 16kHz, 60ms) */
-#define FRAME_SAMPLES        (OPUS_SAMPLE_RATE * OPUS_FRAME_MS / 1000)  /* 960 */
-/* Opus 输出缓冲区最大大小 */
-#define OPUS_OUT_MAX_BYTES   512
 /* Opus 解码输出最大大小 (60ms @ 16kHz mono 16-bit, 留余量) */
 #define OPUS_DEC_OUT_BYTES   4096
 
-/* Opus 语音编码比特率 (bps) - 语音模式下 32kbps 足够 */
-#define OPUS_ENC_BITRATE     32000
+/* 播放队列中单帧最大字节数 */
+#define OPUS_OUT_MAX_BYTES   512
 
 /* 队列深度 */
 #define PLAY_QUEUE_SIZE      20
@@ -148,8 +134,7 @@ typedef struct {
     /* Opus 解码器句柄（播放侧：Opus→PCM） */
     void *opus_decoder;
 
-    /* 音频硬件句柄（仅用于初始化 GMF 组件） */
-    esp_codec_dev_handle_t rec_dev;
+    /* 音频播放设备句柄 */
     esp_codec_dev_handle_t play_dev;
 
     /* GMF Pool（供 esp_audio_render 格式转换使用） */
@@ -159,10 +144,8 @@ typedef struct {
     esp_audio_render_handle_t        render;
     esp_audio_render_stream_handle_t render_stream;
 
-    /* GMF Capture（录音：麦克风 → PCM 帧） */
-    esp_capture_audio_src_if_t      *capture_audio_src;
-    esp_capture_handle_t             capture;
-    esp_capture_sink_handle_t        capture_sink;
+    /* 录音 pipeline */
+    record_pipe_handle_t rec_pipe;
 
     /* 队列 */
     QueueHandle_t play_queue;  /* ws_recv → playback */
@@ -217,52 +200,6 @@ static int render_write_cb(uint8_t *pcm_data, uint32_t pcm_size, void *ctx)
     esp_codec_dev_handle_t dev = (esp_codec_dev_handle_t)ctx;
     esp_codec_dev_write(dev, pcm_data, (int)pcm_size);
     return 0;
-}
-
-/**
- * GMF Capture pipeline 事件回调：在 pipeline 构建完成后（capture 启动前）
- * 将 aud_enc 元素配置为 Opus 编码器（60ms 帧，VOIP 模式，32kbps VBR）。
- *
- * @note ctx 为 capture_sink 句柄
- */
-static esp_capture_err_t capture_pipeline_event_cb(esp_capture_event_t event, void *ctx)
-{
-    if (event != ESP_CAPTURE_EVENT_AUDIO_PIPELINE_BUILT) {
-        return ESP_CAPTURE_ERR_OK;
-    }
-
-    esp_capture_sink_handle_t sink = (esp_capture_sink_handle_t)ctx;
-    esp_gmf_element_handle_t enc_el = NULL;
-    esp_capture_sink_get_element_by_tag(sink, ESP_CAPTURE_STREAM_TYPE_AUDIO, "aud_enc", &enc_el);
-    if (!enc_el) {
-        ESP_LOGW(TAG, "capture_pipeline_event_cb: aud_enc not found");
-        return ESP_CAPTURE_ERR_OK;
-    }
-
-    esp_opus_enc_config_t opus_cfg = {
-        .sample_rate      = OPUS_SAMPLE_RATE,
-        .channel          = ESP_AUDIO_MONO,
-        .bits_per_sample  = ESP_AUDIO_BIT16,
-        .bitrate          = OPUS_ENC_BITRATE,
-        .frame_duration   = ESP_OPUS_ENC_FRAME_DURATION_60_MS,
-        .application_mode = ESP_OPUS_ENC_APPLICATION_VOIP,
-        .complexity       = 0,
-        .enable_fec       = false,
-        .enable_dtx       = false,
-        .enable_vbr       = true,
-    };
-    esp_audio_enc_config_t enc_cfg = {
-        .type   = ESP_AUDIO_TYPE_OPUS,
-        .cfg    = &opus_cfg,
-        .cfg_sz = sizeof(opus_cfg),
-    };
-    esp_gmf_err_t err = esp_gmf_audio_enc_reconfig(enc_el, &enc_cfg);
-    if (err != ESP_GMF_ERR_OK) {
-        ESP_LOGW(TAG, "Opus enc reconfig failed: %d (may use default settings)", err);
-    } else {
-        ESP_LOGI(TAG, "Opus encoder configured: 60ms VOIP %dbps VBR", OPUS_ENC_BITRATE);
-    }
-    return ESP_CAPTURE_ERR_OK;
 }
 
 /**
@@ -575,30 +512,27 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
 
 static void capture_task_fn(void *arg)
 {
-    ESP_LOGI(TAG, "Capture task started (GMF Opus pipeline)");
+    ESP_LOGI(TAG, "Capture task started");
 
     while (true) {
         if (xEventGroupGetBits(s_ctx->event_group) & EVT_STOP_REQUESTED) break;
 
-        /* 阻塞等待 GMF capture pipeline 输出一帧 Opus 数据 */
-        esp_capture_stream_frame_t frame = {
-            .stream_type = ESP_CAPTURE_STREAM_TYPE_AUDIO,
-        };
-        esp_capture_err_t cerr = esp_capture_sink_acquire_frame(
-            s_ctx->capture_sink, &frame, false /* wait */);
+        const uint8_t *data = NULL;
+        int size = 0;
+        record_pipe_acquire_frame(s_ctx->rec_pipe, &data, &size);
 
-        if (cerr != ESP_CAPTURE_ERR_OK || frame.size <= 0) {
+        if (size <= 0) {
             vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
 
-        /* LISTENING 状态：直接通过 WebSocket 发送 Opus 帧 */
+        /* LISTENING 状态：通过 WebSocket 发送 Opus 帧 */
         if (s_ctx->state == XIAOZHI_STATE_LISTENING &&
             s_ctx->ws_client &&
             esp_websocket_client_is_connected(s_ctx->ws_client)) {
             int ret = esp_websocket_client_send_bin(s_ctx->ws_client,
-                                                    (const char *)frame.data,
-                                                    frame.size,
+                                                    (const char *)data,
+                                                    size,
                                                     pdMS_TO_TICKS(1000));
             if (ret < 0) {
                 ESP_LOGW(TAG, "WS send_bin failed: %d", ret);
@@ -606,7 +540,7 @@ static void capture_task_fn(void *arg)
         }
         /* 其他状态（SPEAKING/CONNECTED）：丢弃帧以防止 pipeline 堵死 */
 
-        esp_capture_sink_release_frame(s_ctx->capture_sink, &frame);
+        record_pipe_release_frame(s_ctx->rec_pipe);
     }
 
     ESP_LOGI(TAG, "Capture task done");
@@ -715,6 +649,13 @@ static void get_mac_str(char *buf, size_t len)
  * 公开 API
  * ==================================================== */
 
+/* AFE 唤醒词检测回调：从 record_pipe 的 AFE 任务中调用 */
+static void session_wakeup_cb(void *ctx)
+{
+    (void)ctx;
+    xiaozhi_trigger_wakeup();
+}
+
 esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
 {
     if (!config || !config->url || !config->token) {
@@ -758,10 +699,10 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
     ESP_LOGI(TAG, "Init: device_id=%s", s_ctx->device_id);
 
     /* 获取音频硬件句柄（必须先调用 audio.init() 或 esp_gmf_app_setup_codec_dev()） */
-    s_ctx->rec_dev  = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
+    esp_codec_dev_handle_t rec_dev  = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
     s_ctx->play_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_playback_handle();
 
-    if (!s_ctx->rec_dev || !s_ctx->play_dev) {
+    if (!rec_dev || !s_ctx->play_dev) {
         ESP_LOGE(TAG, "Codec device not ready. Call audio.init() first.");
         free(s_ctx);
         s_ctx = NULL;
@@ -773,7 +714,7 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
         esp_codec_dev_set_out_vol(s_ctx->play_dev, config->output_volume);
     }
     if (config->input_gain_db > 0.0f) {
-        esp_codec_dev_set_in_gain(s_ctx->rec_dev, config->input_gain_db);
+        esp_codec_dev_set_in_gain(rec_dev, config->input_gain_db);
     }
 
     /* Opus 解码器（播放侧：Opus→PCM，由 playback_task 使用） */
@@ -828,84 +769,14 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
                                     &s_ctx->render_stream);
     }
 
-    /* GMF Capture（录音） */
-    {
-        esp_capture_audio_dev_src_cfg_t src_cfg = {
-            .record_handle = s_ctx->rec_dev,
-        };
-        s_ctx->capture_audio_src = esp_capture_new_audio_dev_src(&src_cfg);
-        if (!s_ctx->capture_audio_src) {
-            ESP_LOGE(TAG, "esp_capture_new_audio_dev_src failed");
-            esp_audio_render_destroy(s_ctx->render);
-            esp_gmf_pool_deinit(s_ctx->gmf_pool);
-            esp_opus_dec_close(s_ctx->opus_decoder);
-            free(s_ctx); s_ctx = NULL;
-            return ESP_FAIL;
-        }
-
-        esp_capture_cfg_t cap_cfg = {
-            .sync_mode = ESP_CAPTURE_SYNC_MODE_NONE,
-            .audio_src = s_ctx->capture_audio_src,
-            .video_src = NULL,
-        };
-        esp_capture_err_t cerr = esp_capture_open(&cap_cfg, &s_ctx->capture);
-        if (cerr != ESP_CAPTURE_ERR_OK || !s_ctx->capture) {
-            ESP_LOGE(TAG, "esp_capture_open failed: %d", cerr);
-            free(s_ctx->capture_audio_src);
-            esp_audio_render_destroy(s_ctx->render);
-            esp_gmf_pool_deinit(s_ctx->gmf_pool);
-            esp_opus_dec_close(s_ctx->opus_decoder);
-            free(s_ctx); s_ctx = NULL;
-            return ESP_FAIL;
-        }
-
-        /* 配置 Sink：输出 Opus 格式（mono 16kHz）
-         * GMF pipeline 内部完成 stereo→mono 通道转换和 Opus 编码，
-         * capture_task 直接获取 Opus 帧，无需手动编码。 */
-        esp_capture_sink_cfg_t sink_cfg = {
-            .audio_info = {
-                .format_id       = ESP_CAPTURE_FMT_ID_OPUS,
-                .sample_rate     = OPUS_SAMPLE_RATE,
-                .channel         = OPUS_CHANNELS,   /* 1 = mono */
-                .bits_per_sample = AUDIO_BITS,
-            },
-        };
-        cerr = esp_capture_sink_setup(s_ctx->capture, 0, &sink_cfg, &s_ctx->capture_sink);
-        if (cerr != ESP_CAPTURE_ERR_OK) {
-            ESP_LOGE(TAG, "esp_capture_sink_setup failed: %d", cerr);
-            esp_capture_close(s_ctx->capture);
-            free(s_ctx->capture_audio_src);
-            esp_audio_render_destroy(s_ctx->render);
-            esp_gmf_pool_deinit(s_ctx->gmf_pool);
-            esp_opus_dec_close(s_ctx->opus_decoder);
-            free(s_ctx); s_ctx = NULL;
-            return ESP_FAIL;
-        }
-
-        /* 构建捕获 pipeline：
-         *   aud_ch_cvt  → 硬件 stereo 转 mono
-         *   aud_enc     → Opus 编码（60ms 帧参数在 capture_pipeline_event_cb 中配置）
-         */
-        const char *aud_elements[] = {"aud_ch_cvt", "aud_enc"};
-        cerr = esp_capture_sink_build_pipeline(s_ctx->capture_sink,
-                                               ESP_CAPTURE_STREAM_TYPE_AUDIO,
-                                               aud_elements, 2);
-        if (cerr != ESP_CAPTURE_ERR_OK) {
-            ESP_LOGE(TAG, "esp_capture_sink_build_pipeline failed: %d", cerr);
-            esp_capture_close(s_ctx->capture);
-            free(s_ctx->capture_audio_src);
-            esp_audio_render_destroy(s_ctx->render);
-            esp_gmf_pool_deinit(s_ctx->gmf_pool);
-            esp_opus_dec_close(s_ctx->opus_decoder);
-            free(s_ctx); s_ctx = NULL;
-            return ESP_FAIL;
-        }
-
-        /* 注册 pipeline 事件回调，在 pipeline 构建完成后配置 Opus 编码器参数 */
-        esp_capture_set_event_cb(s_ctx->capture, capture_pipeline_event_cb,
-                                 s_ctx->capture_sink);
-
-        esp_capture_sink_enable(s_ctx->capture_sink, ESP_CAPTURE_RUN_MODE_ALWAYS);
+    /* 录音 pipeline */
+    if (record_pipe_open(rec_dev, session_wakeup_cb, NULL, &s_ctx->rec_pipe) != ESP_OK) {
+        ESP_LOGE(TAG, "record_pipe_open failed");
+        esp_audio_render_destroy(s_ctx->render);
+        esp_gmf_pool_deinit(s_ctx->gmf_pool);
+        esp_opus_dec_close(s_ctx->opus_decoder);
+        free(s_ctx); s_ctx = NULL;
+        return ESP_FAIL;
     }
 
     /* FreeRTOS 资源 */
@@ -918,8 +789,7 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
         if (s_ctx->play_queue)  vQueueDelete(s_ctx->play_queue);
         if (s_ctx->event_group) vEventGroupDelete(s_ctx->event_group);
         if (s_ctx->state_mutex) vSemaphoreDelete(s_ctx->state_mutex);
-        esp_capture_close(s_ctx->capture);
-        free(s_ctx->capture_audio_src);
+        record_pipe_close(s_ctx->rec_pipe);
         esp_audio_render_destroy(s_ctx->render);
         esp_gmf_pool_deinit(s_ctx->gmf_pool);
         esp_opus_dec_close(s_ctx->opus_decoder);
@@ -940,14 +810,10 @@ esp_err_t xiaozhi_deinit(void)
 
     esp_opus_dec_close(s_ctx->opus_decoder);
 
-    /* 销毁 GMF Capture */
-    if (s_ctx->capture) {
-        esp_capture_close(s_ctx->capture);
-        s_ctx->capture = NULL;
-    }
-    if (s_ctx->capture_audio_src) {
-        free(s_ctx->capture_audio_src);
-        s_ctx->capture_audio_src = NULL;
+    /* 销毁录音 pipeline */
+    if (s_ctx->rec_pipe) {
+        record_pipe_close(s_ctx->rec_pipe);
+        s_ctx->rec_pipe = NULL;
     }
 
     /* 销毁 GMF Audio Render */
@@ -1062,18 +928,15 @@ esp_err_t xiaozhi_start(void)
         }
     }
 
-    /* 启动 GMF Capture（开始从麦克风采集 PCM） */
-    {
-        esp_capture_err_t cerr = esp_capture_start(s_ctx->capture);
-        if (cerr != ESP_CAPTURE_ERR_OK) {
-            ESP_LOGE(TAG, "esp_capture_start failed: %d", cerr);
-            esp_audio_render_stream_close(s_ctx->render_stream);
-            esp_websocket_client_stop(s_ctx->ws_client);
-            esp_websocket_client_destroy(s_ctx->ws_client);
-            s_ctx->ws_client = NULL;
-            set_state(XIAOZHI_STATE_ERROR);
-            return ESP_FAIL;
-        }
+    /* 启动录音 pipeline */
+    if (record_pipe_start(s_ctx->rec_pipe) != ESP_OK) {
+        ESP_LOGE(TAG, "record_pipe_start failed");
+        esp_audio_render_stream_close(s_ctx->render_stream);
+        esp_websocket_client_stop(s_ctx->ws_client);
+        esp_websocket_client_destroy(s_ctx->ws_client);
+        s_ctx->ws_client = NULL;
+        set_state(XIAOZHI_STATE_ERROR);
+        return ESP_FAIL;
     }
 
     /* 启动音频任务 */
@@ -1129,9 +992,9 @@ esp_err_t xiaozhi_stop(void)
         s_ctx->ws_client = NULL;
     }
 
-    /* 停止 GMF Capture */
-    if (s_ctx->capture) {
-        esp_capture_stop(s_ctx->capture);
+    /* 停止录音 pipeline */
+    if (s_ctx->rec_pipe) {
+        record_pipe_stop(s_ctx->rec_pipe);
     }
 
     /* 关闭 Audio Render 流 */
@@ -1201,8 +1064,17 @@ void xiaozhi_set_wakeup_mode(bool enable)
 
 void xiaozhi_trigger_wakeup(void)
 {
-    if (s_ctx && s_ctx->on_wakeup) {
+    if (!s_ctx) return;
+
+    /* 通知 Python 层（on_wakeup 回调，通过 poll() 派发） */
+    if (s_ctx->on_wakeup) {
         s_ctx->on_wakeup();
+    }
+
+    /* 唤醒词模式下，CONNECTED 状态时自动进入 LISTENING */
+    if (s_ctx->wakeup_mode && s_ctx->state == XIAOZHI_STATE_CONNECTED) {
+        ESP_LOGI(TAG, "Wakeup triggered, starting listen");
+        xiaozhi_listen_start();
     }
 }
 

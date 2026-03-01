@@ -59,6 +59,7 @@
 #include "nvs_flash.h"
 #include "xiaozhi_session.h"
 #include "activate.h"
+#include "rec_to_file.h"
 
 #define TAG "modxiaozhi"
 
@@ -560,6 +561,44 @@ static mp_obj_t mp_xiaozhi_poll(void)
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_poll_obj, mp_xiaozhi_poll);
 
 /* ====================================================
+ * 录音测试
+ * ==================================================== */
+
+/**
+ * xiaozhi.record_to_file(path, duration_ms)
+ *
+ * 将麦克风录音保存到文件，同步阻塞直到录完。
+ *
+ * 文件格式：每帧 [uint16_be size][opus_frame_data]，可用于验证
+ * 录音 pipeline 是否正常工作（无需连接服务器）。
+ *
+ * 前置条件：audio.init() 已调用。不可与 xiaozhi.start() 同时运行。
+ *
+ * Args:
+ *   path        (str): 目标文件路径，如 "/rec.opus"
+ *   duration_ms (int): 录音时长（毫秒）
+ *
+ * 示例:
+ *   audio.init()
+ *   xiaozhi.record_to_file("/rec.opus", 5000)
+ *   import os; print(os.stat("/rec.opus"))
+ */
+static mp_obj_t mp_xiaozhi_record_to_file(mp_obj_t path_obj, mp_obj_t ms_obj)
+{
+    const char *path = mp_obj_str_get_str(path_obj);
+    uint32_t duration_ms = (uint32_t)mp_obj_get_int(ms_obj);
+
+    esp_err_t err = rec_to_file(path, duration_ms);
+    if (err != ESP_OK) {
+        mp_raise_msg_varg(&mp_type_RuntimeError,
+                          MP_ERROR_TEXT("record_to_file failed: %d"), err);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(mp_xiaozhi_record_to_file_obj,
+                                  mp_xiaozhi_record_to_file);
+
+/* ====================================================
  * 激活相关功能
  * ==================================================== */
 
@@ -717,8 +756,11 @@ static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_poll),         MP_ROM_PTR(&mp_xiaozhi_poll_obj)        },
 
     /* 激活 */
-    { MP_ROM_QSTR(MP_QSTR_activate),    MP_ROM_PTR(&mp_xiaozhi_activate_obj)   },
-    { MP_ROM_QSTR(MP_QSTR_load_config), MP_ROM_PTR(&mp_xiaozhi_load_config_obj)},
+    { MP_ROM_QSTR(MP_QSTR_activate),         MP_ROM_PTR(&mp_xiaozhi_activate_obj)        },
+    { MP_ROM_QSTR(MP_QSTR_load_config),      MP_ROM_PTR(&mp_xiaozhi_load_config_obj)     },
+
+    /* 测试工具 */
+    { MP_ROM_QSTR(MP_QSTR_record_to_file),   MP_ROM_PTR(&mp_xiaozhi_record_to_file_obj)  },
 
     /* 回调注册 */
     { MP_ROM_QSTR(MP_QSTR_on_state),   MP_ROM_PTR(&mp_xiaozhi_on_state_obj)  },

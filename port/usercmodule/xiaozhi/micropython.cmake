@@ -14,14 +14,18 @@ add_library(xiaozhi_module INTERFACE)
 
 target_sources(xiaozhi_module INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/xiaozhi_session.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/audio_capture.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/rec_to_file.c
     ${CMAKE_CURRENT_LIST_DIR}/src/activate.c
     ${CMAKE_CURRENT_LIST_DIR}/modxiaozhi.c
+    # vfs_lfs2: mpython_v3 板级 cmake 未编译此文件，在此补充
+    ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
 )
 
 target_include_directories(xiaozhi_module INTERFACE
     # 本模块头文件
     ${CMAKE_CURRENT_LIST_DIR}/src
-    ${CMAKE_CURRENT_LIST_DIR}/include
+    # ${CMAKE_CURRENT_LIST_DIR}/include
 
     # GMF 应用工具 (esp_gmf_app_setup_peripheral.h)
     ${MPY_PORT_DIR}/../esp-gmf/packages/gmf_app_utils/include
@@ -39,6 +43,15 @@ target_include_directories(xiaozhi_module INTERFACE
     ${MPY_PORT_DIR}/../esp-gmf/packages/esp_capture/include
     ${MPY_PORT_DIR}/../esp-gmf/packages/esp_capture/include/impl
 
+    # GMF AI Audio (esp_gmf_afe.h / esp_gmf_afe_manager.h)
+    ${MPY_PORT_DIR}/../esp-gmf/elements/gmf_ai_audio/include
+
+    # ESP-SR 模型加载 (model_path.h)
+    ${MPY_PORT_DIR}/managed_components/espressif__esp-sr/src/include
+
+    # ESP-SR AFE/WakeNet API (esp_afe_sr_models.h / esp_afe_config.h)
+    ${MPY_PORT_DIR}/managed_components/espressif__esp-sr/include/esp32s3
+
     # ESP Audio Codec (Opus 编解码器)
     ${MPY_PORT_DIR}/managed_components/espressif__esp_audio_codec/include
     ${MPY_PORT_DIR}/managed_components/espressif__esp_audio_codec/include/encoder
@@ -48,6 +61,9 @@ target_include_directories(xiaozhi_module INTERFACE
 
     # ESP Codec Device (音频硬件 I/O)
     ${MPY_PORT_DIR}/managed_components/espressif__esp_codec_dev/include
+
+    # Audio drivers (vfs_lfs2.h - LittleFS 文件 I/O 辅助)
+    ${MPY_PORT_DIR}/drivers/audio/include
 )
 
 target_link_libraries(usermod INTERFACE xiaozhi_module)

@@ -14,3 +14,24 @@ my_wifi = wifi()
 my_wifi.connectWiFi("office", "wearemaker")
 
 xiaozhi.activate("https://api.tenclass.net/xiaozhi/ota/", on_code=show_code)
+
+import audio
+# audio.init()   # 初始化音频硬件
+
+import xiaozhi
+xiaozhi.record_to_file("/rec.opus", 5000)   # 录音 5 秒
+
+import os
+print(os.stat("/rec.opus"))   # 确认文件大小
+# 文件格式（每帧）：[uint16_be 帧长度][Opus 帧数据]，可用如下 Python 脚本在 PC 上解包帧：
+
+
+# import struct
+# with open("rec.opus", "rb") as f:
+#     frames = []
+#     while True:
+#         hdr = f.read(2)
+#         if len(hdr) < 2: break
+#         size = struct.unpack(">H", hdr)[0]
+#         frames.append(f.read(size))
+# print(f"{len(frames)} frames")

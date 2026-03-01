@@ -46,6 +46,8 @@ dependencies:
     override_path: ../../esp-gmf/elements/gmf_video
   espressif/gmf_misc:
     override_path: ../../esp-gmf/elements/gmf_misc
+  espressif/esp_audio_render:
+    override_path: ../../esp-gmf/packages/esp_audio_render
   idf:
     version: '>=5.2.0'
   joltwallet/littlefs: ==1.20.4
