@@ -7,7 +7,7 @@
  *     → [aud_enc]  Opus 编码 (16kHz mono, 60ms 帧, 32kbps VBR, VOIP 模式)
  *     → Opus 帧（供调用方通过 acquire/release_frame 获取）
  *
- * 回退 pipeline（无 SR 模型或未设置 wakeup_cb 时）：
+ * 回退 pipeline（无 SR 模型或未设置 wakeup_cb 时，输入输出采样率相同）：
  *   硬件 stereo PCM (16kHz, 16-bit, 2ch)
  *     → [aud_ch_cvt]  stereo → mono
  *     → [aud_enc]     Opus 编码
@@ -187,6 +187,14 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
         return ESP_FAIL;
     }
 
+    esp_capture_audio_info_t fixed = {
+        .format_id      = ESP_CAPTURE_FMT_ID_PCM,  // 源只支持 PCM，必须填 PCM
+        .sample_rate    = 16000,
+        .channel        = 2,
+        .bits_per_sample = 16,
+    };
+    rp->audio_src->set_fixed_caps(rp->audio_src, &fixed);   // ← 关键调用
+
     /* Capture 实例 */
     esp_capture_cfg_t cap_cfg = {
         .sync_mode = ESP_CAPTURE_SYNC_MODE_NONE,
@@ -215,7 +223,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     if (rp->models) {
         /* AFE 配置：SR 模式（唤醒词检测），输入格式 "MM"（双声道麦克风，无参考信号） */
-        rp->afe_cfg = afe_config_init("M", rp->models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
+        rp->afe_cfg = afe_config_init("MM", rp->models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
         if (!rp->afe_cfg) {
             ESP_LOGW(TAG, "afe_config_init failed - wakeup detection disabled");
             esp_srmodel_deinit(rp->models);
@@ -225,11 +233,11 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     if (rp->afe_cfg) {
         /* AFE Manager（read_cb/result_cb 由 esp_gmf_afe 元素在 open 时自动设置） */
-        rp->afe_cfg->aec_init = false;
-        rp->afe_cfg->pcm_config.total_ch_num = 2; 
-        rp->afe_cfg->pcm_config.mic_num = 2; 
-        rp->afe_cfg->pcm_config.ref_num = 0;      
-        rp->afe_cfg->pcm_config.sample_rate = 16000;
+        // rp->afe_cfg->aec_init = false;
+        // rp->afe_cfg->pcm_config.total_ch_num = 2; 
+        // rp->afe_cfg->pcm_config.mic_num = 2; 
+        // rp->afe_cfg->pcm_config.ref_num = 0;      
+        // rp->afe_cfg->pcm_config.sample_rate = 16000;
         esp_gmf_afe_manager_cfg_t mgr_cfg = DEFAULT_GMF_AFE_MANAGER_CFG(
             rp->afe_cfg, NULL, NULL, NULL, NULL);
         mgr_cfg.feed_task_setting.stack_size  = AFE_FEED_TASK_STACK;
@@ -303,15 +311,12 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
                                                elements, 2);
         ESP_LOGI(TAG, "Pipeline: mic(stereo) → [ai_afe] → [aud_enc] → Opus");
     } else {
-        /* 回退：手动声道转换 + 采样率转换 + Opus
-         * aud_rate_cvt 会根据源（硬件实际采样率）与 sink（16kHz）自动配置：
-         * - 若硬件为 16kHz：aud_rate_cvt 为空操作
-         * - 若硬件为 48kHz：aud_rate_cvt 执行 48kHz→16kHz 下采样，修正 3× 变调问题 */
-        const char *elements[] = {"aud_ch_cvt", "aud_rate_cvt", "aud_enc"};
+        /* 回退：手动声道转换 + Opus（输入输出采样率相同，无需采样率转换） */
+        const char *elements[] = {"aud_ch_cvt", "aud_enc"};
         cerr = esp_capture_sink_build_pipeline(rp->capture_sink,
                                                ESP_CAPTURE_STREAM_TYPE_AUDIO,
-                                               elements, 3);
-        ESP_LOGI(TAG, "Pipeline: mic(stereo) → [aud_ch_cvt] → [aud_rate_cvt] → [aud_enc] → Opus");
+                                               elements, 2);
+        ESP_LOGI(TAG, "Pipeline: mic(stereo) → [aud_ch_cvt] → [aud_enc] → Opus");
     }
 
     if (cerr != ESP_CAPTURE_ERR_OK) {

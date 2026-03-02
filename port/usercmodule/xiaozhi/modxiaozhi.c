@@ -60,6 +60,9 @@
 #include "xiaozhi_session.h"
 #include "activate.h"
 #include "rec_to_file.h"
+#include "audio_capture.h"
+#include "esp_codec_dev.h"
+#include "esp_gmf_app_setup_peripheral.h"
 
 #define TAG "modxiaozhi"
 
@@ -599,6 +602,83 @@ static MP_DEFINE_CONST_FUN_OBJ_2(mp_xiaozhi_record_to_file_obj,
                                   mp_xiaozhi_record_to_file);
 
 /* ====================================================
+ * AFE 唤醒词测试
+ * ==================================================== */
+
+static volatile int s_test_wakeup_count = 0;
+
+static void test_wakeup_cb(void *ctx)
+{
+    s_test_wakeup_count++;
+    ESP_LOGI(TAG, "*** Wakeup detected! count=%d ***", s_test_wakeup_count);
+}
+
+/**
+ * xiaozhi.test_afe(duration_ms) -> int
+ *
+ * 使用 ai_afe pipeline 测试唤醒词检测，同步阻塞直到录音结束。
+ * 返回在 duration_ms 内检测到唤醒词的次数。
+ *
+ * 若 SR 模型未加载（flash 中无 "sr_module" 分区），将回退到无 AFE 的 pipeline，
+ * 返回值始终为 0。
+ *
+ * 前置条件：audio.init() 已调用。不可与 xiaozhi.start() 同时运行。
+ *
+ * Args:
+ *   duration_ms (int): 测试时长（毫秒）
+ *
+ * 示例:
+ *   audio.init()
+ *   count = xiaozhi.test_afe(10000)  # 10 秒内说唤醒词
+ *   print("Wakeup count:", count)
+ */
+static mp_obj_t mp_xiaozhi_test_afe(mp_obj_t ms_obj)
+{
+    uint32_t duration_ms = (uint32_t)mp_obj_get_int(ms_obj);
+
+    esp_codec_dev_handle_t rec_dev =
+        (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
+    if (!rec_dev) {
+        mp_raise_msg(&mp_type_RuntimeError,
+                     MP_ERROR_TEXT("Audio hardware not ready. Call audio.init() first."));
+    }
+
+    s_test_wakeup_count = 0;
+
+    record_pipe_handle_t rp = NULL;
+    esp_err_t err = record_pipe_open(rec_dev, test_wakeup_cb, NULL, &rp);
+    if (err != ESP_OK) {
+        mp_raise_msg_varg(&mp_type_RuntimeError,
+                          MP_ERROR_TEXT("record_pipe_open failed: %d"), err);
+    }
+
+    err = record_pipe_start(rp);
+    if (err != ESP_OK) {
+        record_pipe_close(rp);
+        mp_raise_msg_varg(&mp_type_RuntimeError,
+                          MP_ERROR_TEXT("record_pipe_start failed: %d"), err);
+    }
+
+    TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(duration_ms);
+    while (xTaskGetTickCount() < deadline) {
+        const uint8_t *data = NULL;
+        int size = 0;
+        record_pipe_acquire_frame(rp, &data, &size);
+        if (size > 0) {
+            record_pipe_release_frame(rp);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+
+    record_pipe_stop(rp);
+    record_pipe_close(rp);
+
+    return MP_OBJ_NEW_SMALL_INT(s_test_wakeup_count);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mp_xiaozhi_test_afe_obj, mp_xiaozhi_test_afe);
+
+/* ====================================================
  * 激活相关功能
  * ==================================================== */
 
@@ -761,6 +841,7 @@ static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
 
     /* 测试工具 */
     { MP_ROM_QSTR(MP_QSTR_record_to_file),   MP_ROM_PTR(&mp_xiaozhi_record_to_file_obj)  },
+    { MP_ROM_QSTR(MP_QSTR_test_afe),         MP_ROM_PTR(&mp_xiaozhi_test_afe_obj)        },
 
     /* 回调注册 */
     { MP_ROM_QSTR(MP_QSTR_on_state),   MP_ROM_PTR(&mp_xiaozhi_on_state_obj)  },
