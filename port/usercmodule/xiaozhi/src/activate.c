@@ -110,6 +110,7 @@ static esp_err_t nvs_set_str_if_changed(nvs_handle_t handle, const char *key, co
     if (strcmp(existing, value) != 0) {
         return nvs_set_str(handle, key, value);
     }
+    ESP_LOGI(TAG, "NVS key unchanged: %s = %s", key, existing);
     return ESP_OK;
 }
 

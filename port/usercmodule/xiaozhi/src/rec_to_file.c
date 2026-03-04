@@ -15,6 +15,7 @@
 
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "vfs_lfs2.h"          /* vfs_lfs2_file_open/close, mp_obj_vfs_lfs2_file_t */
 #include "lib/littlefs/lfs2.h" /* lfs2_file_write */
@@ -173,7 +174,16 @@ static lfs2_ssize_t ogg_write_opus_comment_header(ogg_state_t *st,
 /* 原始采样率（仅写入 ID 头的 informational 字段） */
 #define OPUS_ORIG_RATE   16000
 
-esp_err_t rec_to_file(const char *path, uint32_t duration_ms)
+static volatile int s_wakeup_count = 0;
+
+static void rec_wakeup_cb(void *ctx)
+{
+    s_wakeup_count++;
+    ESP_LOGI(TAG, "*** Wakeup detected! count=%d ***", s_wakeup_count);
+}
+
+esp_err_t rec_to_file(const char *path, uint32_t duration_ms,
+                      bool use_afe, int *out_wakeup_count)
 {
     if (!path || !duration_ms) return ESP_ERR_INVALID_ARG;
 
@@ -203,9 +213,12 @@ esp_err_t rec_to_file(const char *path, uint32_t duration_ms)
     ogg_write_opus_id_header(&ogg, &f->vfs->lfs, &f->file, 1, OPUS_ORIG_RATE, 312);
     ogg_write_opus_comment_header(&ogg, &f->vfs->lfs, &f->file);
 
-    /* 打开录音 pipeline（无唤醒词检测） */
+    /* 打开录音 pipeline */
     record_pipe_handle_t rp = NULL;
-    esp_err_t err = record_pipe_open(rec_dev, NULL, NULL, &rp);
+    s_wakeup_count = 0;
+    record_pipe_wakeup_cb_t wakeup_cb = use_afe ? rec_wakeup_cb : NULL;
+    esp_err_t err = record_pipe_open(rec_dev, wakeup_cb, NULL, &rp);
+    ESP_LOGI(TAG, "Pipeline: %s", use_afe ? "AFE wakeup detection enabled" : "fallback (no wakeup detection)");
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "record_pipe_open failed: %d", err);
         vfs_lfs2_file_close(f);
@@ -255,7 +268,16 @@ esp_err_t rec_to_file(const char *path, uint32_t duration_ms)
 
     vfs_lfs2_file_close(f);
 
+    if (out_wakeup_count) {
+        *out_wakeup_count = use_afe ? s_wakeup_count : 0;
+    }
+
     if (write_err) return ESP_ERR_NO_MEM;
-    ESP_LOGI(TAG, "Saved %lu Opus frames → %s", (unsigned long)frames, path);
+    ESP_LOGI(TAG, "Saved %lu Opus frames → %s%s",
+             (unsigned long)frames, path,
+             use_afe ? "" : " (wakeup detection disabled)");
+    if (use_afe) {
+        ESP_LOGI(TAG, "Wakeup count: %d", s_wakeup_count);
+    }
     return ESP_OK;
 }

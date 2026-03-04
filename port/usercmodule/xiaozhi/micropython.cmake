@@ -9,18 +9,30 @@
 ##   - esp_websocket_client (WebSocket 通信)
 ##   - cJSON (JSON 解析，ESP-IDF 内置)
 ##
+## 功能开关（生产版本关闭以节省约 4KB flash + 1KB RAM）：
+##   cmake -DXIAOZHI_ENABLE_REC_TO_FILE=OFF ...
+##
+
+## record_to_file 录音测试功能（默认开启；关闭后 xiaozhi.record_to_file 不可用）
+option(XIAOZHI_ENABLE_REC_TO_FILE "Include record-to-file test feature" ON)
 
 add_library(xiaozhi_module INTERFACE)
 
 target_sources(xiaozhi_module INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/xiaozhi_session.c
     ${CMAKE_CURRENT_LIST_DIR}/src/audio_capture.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/rec_to_file.c
     ${CMAKE_CURRENT_LIST_DIR}/src/activate.c
     ${CMAKE_CURRENT_LIST_DIR}/modxiaozhi.c
-    # vfs_lfs2: mpython_v3 板级 cmake 未编译此文件，在此补充
-    ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
 )
+
+if(XIAOZHI_ENABLE_REC_TO_FILE)
+    target_sources(xiaozhi_module INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/src/rec_to_file.c
+        # vfs_lfs2: mpython_v3 板级 cmake 未编译此文件，在此补充
+        ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
+    )
+    target_compile_definitions(xiaozhi_module INTERFACE XIAOZHI_ENABLE_REC_TO_FILE=1)
+endif()
 
 target_include_directories(xiaozhi_module INTERFACE
     # 本模块头文件

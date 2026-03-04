@@ -3,41 +3,81 @@
  *
  * 向 MicroPython 层暴露小智AI语音会话功能。
  *
- * Python 用法示例:
+ * ── 首次使用：激活设备 ────────────────────────────────────────
  *
  *   import xiaozhi
+ *   from mpython import wifi
  *
+ *   # 连接 WiFi
+ *   w = wifi()
+ *   w.connectWiFi("ssid", "password")
+ *
+ *   # 激活（获取验证码后在 xiaozhi.me 绑定设备）
+ *   def show_code(code, msg):
+ *       print("验证码:", code)
+ *
+ *   xiaozhi.activate("https://api.tenclass.net/xiaozhi/ota/",
+ *                    on_code=show_code)
+ *   # 激活成功后 url/token 自动写入 NVS，后续无需重复激活
+ *
+ * ── 日常使用：语音会话 ────────────────────────────────────────
+ *
+ *   import audio, xiaozhi
+ *   from mpython import wifi
+ *
+ *   w = wifi()
+ *   w.connectWiFi("ssid", "password")
+ *
+ *   audio.init()          # 初始化音频硬件（麦克风 + 扬声器）
+ *
+ *   # 回调（可选）
  *   def on_state(state):
- *       states = ["idle", "connecting", "listening", "speaking", "error"]
- *       print("State:", states[state])
+ *       names = ["idle", "connecting", "connected",
+ *                "listening", "speaking", "error"]
+ *       print("State:", names[state])
  *
  *   def on_stt(text):
- *       print("You said:", text)
+ *       print("识别:", text)
  *
  *   def on_tts(state, text):
  *       print("TTS:", state, text or "")
  *
- *   # 初始化
- *   xiaozhi.init("wss://api.tenclass.net/xiaozhi/v1/", "your-token")
+ *   def on_wakeup():
+ *       print("唤醒词检测到！")
  *
- *   # 注册回调（可选）
+ *   # 初始化（url/token 自动从 NVS 读取）
+ *   xiaozhi.init()            # 可选: xiaozhi.init(volume=70)
  *   xiaozhi.on_state(on_state)
  *   xiaozhi.on_stt(on_stt)
  *   xiaozhi.on_tts(on_tts)
+ *   xiaozhi.on_wakeup(on_wakeup)
  *
- *   # 启动语音会话
+ *   # 启动会话（阻塞直到握手完成，然后进入 LISTENING 空闲状态）
  *   xiaozhi.start()
  *
- *   # ... 等待 ...
+ *   # 主循环：派发回调 + 手动触发录音（按键模式示例）
+ *   while True:
+ *       xiaozhi.poll()
+ *       if button_a.value() == 0:           # 按下 A 键开始说话
+ *           xiaozhi.listen_start()
+ *       elif button_b.value() == 0:         # 按下 B 键停止
+ *           xiaozhi.listen_stop()
+ *       time.sleep_ms(20)
  *
- *   # 中断说话（切回监听）
- *   xiaozhi.abort()
+ *   # 中断 TTS 播放（切回空闲）
+ *   # xiaozhi.abort()
  *
  *   # 结束会话
- *   xiaozhi.stop()
+ *   # xiaozhi.stop()
+ *   # xiaozhi.deinit()
  *
- *   # 查询状态
- *   print(xiaozhi.state())  # 0=idle 1=connecting 2=listening 3=speaking 4=error
+ * ── 状态常量 ──────────────────────────────────────────────────
+ *   xiaozhi.STATE_IDLE       = 0  无连接
+ *   xiaozhi.STATE_CONNECTING = 1  TCP 连接中
+ *   xiaozhi.STATE_CONNECTED  = 2  握手阶段（等待服务器 hello）
+ *   xiaozhi.STATE_LISTENING  = 3  空闲待机（唤醒/listen_start 后上传音频）
+ *   xiaozhi.STATE_SPEAKING   = 4  播放 TTS
+ *   xiaozhi.STATE_ERROR      = 5  错误
  */
 
 #include <stdio.h>
@@ -60,9 +100,6 @@
 #include "xiaozhi_session.h"
 #include "activate.h"
 #include "rec_to_file.h"
-#include "audio_capture.h"
-#include "esp_codec_dev.h"
-#include "esp_gmf_app_setup_peripheral.h"
 
 #define TAG "modxiaozhi"
 
@@ -178,39 +215,44 @@ static void c_on_wakeup_impl(void)
  * ==================================================== */
 
 /**
- * xiaozhi.init(url, token, device_id=None, client_id=None, volume=80)
+ * xiaozhi.init(volume=80)
  *
- * 初始化小智会话。
+ * 从 NVS 读取激活后保存的 WebSocket 配置（url 和 token），初始化小智会话。
+ * 若 NVS 中无配置（设备未激活），抛出 RuntimeError。
  *
  * Args:
- *   url       (str): WebSocket URL
- *   token     (str): Bearer 令牌
- *   device_id (str, optional): 设备 ID（默认使用 WiFi MAC）
- *   client_id (str, optional): 客户端 UUID（默认自动生成）
- *   volume    (int, optional): 扬声器音量 0-100（默认 80）
+ *   volume (int, optional): 扬声器音量 0-100（默认 80）
  */
 static mp_obj_t mp_xiaozhi_init(size_t n_args, const mp_obj_t *pos_args,
                                  mp_map_t *kw_args)
 {
-    enum { ARG_url, ARG_token, ARG_device_id, ARG_client_id, ARG_volume };
+    enum { ARG_volume };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_url,       MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-        { MP_QSTR_token,     MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-        { MP_QSTR_device_id, MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-        { MP_QSTR_client_id, MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-        { MP_QSTR_volume,    MP_ARG_KW_ONLY  | MP_ARG_INT, {.u_int = 80} },
+        { MP_QSTR_volume, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 80} },
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args),
                      allowed_args, args);
 
-    const char *url       = mp_obj_str_get_str(args[ARG_url].u_obj);
-    const char *token     = mp_obj_str_get_str(args[ARG_token].u_obj);
-    const char *device_id = (args[ARG_device_id].u_obj != mp_const_none)
-                            ? mp_obj_str_get_str(args[ARG_device_id].u_obj) : NULL;
-    const char *client_id = (args[ARG_client_id].u_obj != mp_const_none)
-                            ? mp_obj_str_get_str(args[ARG_client_id].u_obj) : NULL;
+    /* 从 NVS 读取激活后保存的 WebSocket 配置 */
+    char url[256]   = {0};
+    char token[256] = {0};
+    nvs_handle_t h;
+    if (nvs_open("websocket", NVS_READONLY, &h) == ESP_OK) {
+        size_t url_len   = sizeof(url);
+        size_t token_len = sizeof(token);
+        nvs_get_str(h, "url",   url,   &url_len);
+        nvs_get_str(h, "token", token, &token_len);
+        nvs_close(h);
+    }
+    if (url[0] == '\0' || token[0] == '\0') {
+        mp_raise_msg(&mp_type_RuntimeError,
+                     MP_ERROR_TEXT("Not activated. Call xiaozhi.activate() first."));
+    }
+
     int volume = args[ARG_volume].u_int;
+    ESP_LOGI(TAG, "init: url=%s", url);
+    ESP_LOGI(TAG, "init: token=%s volume=%d", token, volume);
 
     /* 初始化互斥锁 */
     if (!s_msg_mutex) {
@@ -220,8 +262,8 @@ static mp_obj_t mp_xiaozhi_init(size_t n_args, const mp_obj_t *pos_args,
     xiaozhi_config_t config = {
         .url              = url,
         .token            = token,
-        .device_id        = device_id,
-        .client_id        = client_id,
+        .device_id        = NULL,
+        .client_id        = NULL,
         .frame_duration_ms= 60,
         .output_volume    = volume,
         .input_gain_db    = 35.0f,
@@ -243,7 +285,7 @@ static mp_obj_t mp_xiaozhi_init(size_t n_args, const mp_obj_t *pos_args,
 
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_init_obj, 2, mp_xiaozhi_init);
+static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_init_obj, 0, mp_xiaozhi_init);
 
 /**
  * xiaozhi.deinit()
@@ -269,29 +311,14 @@ static mp_obj_t mp_xiaozhi_deinit(void)
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_deinit_obj, mp_xiaozhi_deinit);
 
 /**
- * xiaozhi.start(wakeup_mode=False)
+ * xiaozhi.start()
  *
  * 启动语音会话（连接服务器，完成握手）。
  * 此函数会阻塞直到握手完成或超时（最多 10 秒）。
- *
- * Args:
- *   wakeup_mode (bool, optional): 唤醒词模式（默认 False）
- *     False: 连接后直接进入 LISTENING（自动收音）
- *     True:  连接后进入 CONNECTED，等待 listen_start() 或 trigger_wakeup()
+ * 握手完成后进入 LISTENING 空闲状态，等待唤醒或 listen_start() 触发录音。
  */
-static mp_obj_t mp_xiaozhi_start(size_t n_args, const mp_obj_t *pos_args,
-                                  mp_map_t *kw_args)
+static mp_obj_t mp_xiaozhi_start(void)
 {
-    enum { ARG_wakeup_mode };
-    static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_wakeup_mode, MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false} },
-    };
-    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all(n_args, pos_args, kw_args,
-                     MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-
-    xiaozhi_set_wakeup_mode(args[ARG_wakeup_mode].u_bool);
-
     esp_err_t err = xiaozhi_start();
     if (err != ESP_OK) {
         mp_raise_msg_varg(&mp_type_RuntimeError,
@@ -299,7 +326,7 @@ static mp_obj_t mp_xiaozhi_start(size_t n_args, const mp_obj_t *pos_args,
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_start_obj, 0, mp_xiaozhi_start);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_start_obj, mp_xiaozhi_start);
 
 /**
  * xiaozhi.stop()
@@ -334,37 +361,29 @@ static mp_obj_t mp_xiaozhi_abort(void)
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_abort_obj, mp_xiaozhi_abort);
 
 /**
- * xiaozhi.listen_start()
+ * xiaozhi.listen_start() -> bool
  *
- * 开始监听（发送语音）。
- * 可在 CONNECTED 状态下调用，切换为 LISTENING 并向服务器发送 listen start。
- * 也可在 SPEAKING 状态下调用（相当于先 abort 再 listen）。
+ * 开始录音并上传。
+ * 可在 LISTENING 空闲状态或 SPEAKING 状态（先 abort 再录音）下调用。
+ * 返回 True 表示成功，False 表示当前状态不允许（不抛出异常，适合轮询按键）。
  */
 static mp_obj_t mp_xiaozhi_listen_start(void)
 {
     esp_err_t err = xiaozhi_listen_start();
-    if (err != ESP_OK) {
-        mp_raise_msg_varg(&mp_type_RuntimeError,
-                          MP_ERROR_TEXT("xiaozhi_listen_start failed: %d"), err);
-    }
-    return mp_const_none;
+    return mp_obj_new_bool(err == ESP_OK);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_listen_start_obj, mp_xiaozhi_listen_start);
 
 /**
- * xiaozhi.listen_stop()
+ * xiaozhi.listen_stop() -> bool
  *
- * 停止监听，切换为 CONNECTED 状态。
- * 可在 LISTENING 状态下调用。
+ * 停止录音上传，状态保持 LISTENING（空闲）。
+ * 返回 True 表示成功，False 表示当前状态不允许（不抛出异常）。
  */
 static mp_obj_t mp_xiaozhi_listen_stop(void)
 {
     esp_err_t err = xiaozhi_listen_stop();
-    if (err != ESP_OK) {
-        mp_raise_msg_varg(&mp_type_RuntimeError,
-                          MP_ERROR_TEXT("xiaozhi_listen_stop failed: %d"), err);
-    }
-    return mp_const_none;
+    return mp_obj_new_bool(err == ESP_OK);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_listen_stop_obj, mp_xiaozhi_listen_stop);
 
@@ -568,115 +587,54 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_poll_obj, mp_xiaozhi_poll);
  * ==================================================== */
 
 /**
- * xiaozhi.record_to_file(path, duration_ms)
+ * xiaozhi.record_to_file(path, duration_ms, use_afe=False) -> int
  *
- * 将麦克风录音保存到文件，同步阻塞直到录完。
- *
- * 文件格式：每帧 [uint16_be size][opus_frame_data]，可用于验证
- * 录音 pipeline 是否正常工作（无需连接服务器）。
+ * 将麦克风录音保存到 OGG/Opus 文件，同步阻塞直到录完。
+ * 返回录音期间检测到唤醒词的次数（use_afe=False 时始终为 0）。
  *
  * 前置条件：audio.init() 已调用。不可与 xiaozhi.start() 同时运行。
  *
  * Args:
- *   path        (str): 目标文件路径，如 "/rec.opus"
- *   duration_ms (int): 录音时长（毫秒）
+ *   path        (str):  目标文件路径，如 "/rec.opus"
+ *   duration_ms (int):  录音时长（毫秒）
+ *   use_afe     (bool): True：AFE pipeline（ai_afe → aud_enc，启用唤醒词检测）
+ *                       False（默认）：回退 pipeline（aud_ch_cvt → aud_enc）
  *
  * 示例:
  *   audio.init()
+ *   # 回退 pipeline
  *   xiaozhi.record_to_file("/rec.opus", 5000)
- *   import os; print(os.stat("/rec.opus"))
+ *   # AFE pipeline + 唤醒词检测
+ *   count = xiaozhi.record_to_file("/rec.opus", 10000, use_afe=True)
+ *   print("Wakeup count:", count)
  */
-static mp_obj_t mp_xiaozhi_record_to_file(mp_obj_t path_obj, mp_obj_t ms_obj)
+static mp_obj_t mp_xiaozhi_record_to_file(size_t n_args, const mp_obj_t *pos_args,
+                                           mp_map_t *kw_args)
 {
-    const char *path = mp_obj_str_get_str(path_obj);
-    uint32_t duration_ms = (uint32_t)mp_obj_get_int(ms_obj);
+    enum { ARG_path, ARG_duration_ms, ARG_use_afe };
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_path,        MP_ARG_REQUIRED | MP_ARG_OBJ,  {.u_obj  = mp_const_none} },
+        { MP_QSTR_duration_ms, MP_ARG_REQUIRED | MP_ARG_INT,  {.u_int  = 0}             },
+        { MP_QSTR_use_afe,     MP_ARG_KW_ONLY  | MP_ARG_BOOL, {.u_bool = false}         },
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, pos_args, kw_args,
+                     MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-    esp_err_t err = rec_to_file(path, duration_ms);
+    const char *path        = mp_obj_str_get_str(args[ARG_path].u_obj);
+    uint32_t    duration_ms = (uint32_t)args[ARG_duration_ms].u_int;
+    bool        use_afe     = args[ARG_use_afe].u_bool;
+
+    int wakeup_count = 0;
+    esp_err_t err = rec_to_file(path, duration_ms, use_afe, &wakeup_count);
     if (err != ESP_OK) {
         mp_raise_msg_varg(&mp_type_RuntimeError,
                           MP_ERROR_TEXT("record_to_file failed: %d"), err);
     }
-    return mp_const_none;
+    return MP_OBJ_NEW_SMALL_INT(wakeup_count);
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(mp_xiaozhi_record_to_file_obj,
-                                  mp_xiaozhi_record_to_file);
-
-/* ====================================================
- * AFE 唤醒词测试
- * ==================================================== */
-
-static volatile int s_test_wakeup_count = 0;
-
-static void test_wakeup_cb(void *ctx)
-{
-    s_test_wakeup_count++;
-    ESP_LOGI(TAG, "*** Wakeup detected! count=%d ***", s_test_wakeup_count);
-}
-
-/**
- * xiaozhi.test_afe(duration_ms) -> int
- *
- * 使用 ai_afe pipeline 测试唤醒词检测，同步阻塞直到录音结束。
- * 返回在 duration_ms 内检测到唤醒词的次数。
- *
- * 若 SR 模型未加载（flash 中无 "sr_module" 分区），将回退到无 AFE 的 pipeline，
- * 返回值始终为 0。
- *
- * 前置条件：audio.init() 已调用。不可与 xiaozhi.start() 同时运行。
- *
- * Args:
- *   duration_ms (int): 测试时长（毫秒）
- *
- * 示例:
- *   audio.init()
- *   count = xiaozhi.test_afe(10000)  # 10 秒内说唤醒词
- *   print("Wakeup count:", count)
- */
-static mp_obj_t mp_xiaozhi_test_afe(mp_obj_t ms_obj)
-{
-    uint32_t duration_ms = (uint32_t)mp_obj_get_int(ms_obj);
-
-    esp_codec_dev_handle_t rec_dev =
-        (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
-    if (!rec_dev) {
-        mp_raise_msg(&mp_type_RuntimeError,
-                     MP_ERROR_TEXT("Audio hardware not ready. Call audio.init() first."));
-    }
-
-    s_test_wakeup_count = 0;
-
-    record_pipe_handle_t rp = NULL;
-    esp_err_t err = record_pipe_open(rec_dev, test_wakeup_cb, NULL, &rp);
-    if (err != ESP_OK) {
-        mp_raise_msg_varg(&mp_type_RuntimeError,
-                          MP_ERROR_TEXT("record_pipe_open failed: %d"), err);
-    }
-
-    err = record_pipe_start(rp);
-    if (err != ESP_OK) {
-        record_pipe_close(rp);
-        mp_raise_msg_varg(&mp_type_RuntimeError,
-                          MP_ERROR_TEXT("record_pipe_start failed: %d"), err);
-    }
-
-    TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(duration_ms);
-    while (xTaskGetTickCount() < deadline) {
-        const uint8_t *data = NULL;
-        int size = 0;
-        record_pipe_acquire_frame(rp, &data, &size);
-        if (size > 0) {
-            record_pipe_release_frame(rp);
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-    }
-
-    record_pipe_stop(rp);
-    record_pipe_close(rp);
-
-    return MP_OBJ_NEW_SMALL_INT(s_test_wakeup_count);
-}
-static MP_DEFINE_CONST_FUN_OBJ_1(mp_xiaozhi_test_afe_obj, mp_xiaozhi_test_afe);
+static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_record_to_file_obj, 2,
+                                   mp_xiaozhi_record_to_file);
 
 /* ====================================================
  * 激活相关功能
@@ -773,32 +731,30 @@ static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_activate_obj, 1, mp_xiaozhi_activat
 /**
  * xiaozhi.load_config() -> dict or None
  *
- * 从 NVS 读取激活流程写入的 WebSocket 连接配置。
- *
- * Returns:
- *   dict: {"url": str, "token": str}  已配置时返回
- *   None:                              未配置（尚未激活）时返回
+ * 从 NVS 读取激活后保存的 WebSocket 配置。
+ * 返回 {"url": str, "token": str}，或 None（设备未激活时）。
  *
  * 示例:
  *   cfg = xiaozhi.load_config()
  *   if cfg:
- *       xiaozhi.init(cfg["url"], cfg["token"])
- *       xiaozhi.start()
+ *       print("url:", cfg["url"])
+ *       print("token:", cfg["token"])
+ *   else:
+ *       print("未激活，请先调用 xiaozhi.activate()")
  */
 static mp_obj_t mp_xiaozhi_load_config(void)
 {
-    nvs_handle_t h;
-    if (nvs_open("websocket", NVS_READONLY, &h) != ESP_OK) {
-        return mp_const_none;
-    }
-
     char url[256]   = {0};
     char token[256] = {0};
-    size_t url_len   = sizeof(url);
-    size_t token_len = sizeof(token);
-    nvs_get_str(h, "url",   url,   &url_len);
-    nvs_get_str(h, "token", token, &token_len);
-    nvs_close(h);
+
+    nvs_handle_t h;
+    if (nvs_open("websocket", NVS_READONLY, &h) == ESP_OK) {
+        size_t url_len   = sizeof(url);
+        size_t token_len = sizeof(token);
+        nvs_get_str(h, "url",   url,   &url_len);
+        nvs_get_str(h, "token", token, &token_len);
+        nvs_close(h);
+    }
 
     if (url[0] == '\0' || token[0] == '\0') {
         return mp_const_none;
@@ -806,14 +762,15 @@ static mp_obj_t mp_xiaozhi_load_config(void)
 
     mp_obj_t dict = mp_obj_new_dict(2);
     mp_obj_dict_store(dict,
-        mp_obj_new_str("url", 3),
-        mp_obj_new_str(url, strlen(url)));
+        mp_obj_new_str("url",     3),
+        mp_obj_new_str(url,     strlen(url)));
     mp_obj_dict_store(dict,
-        mp_obj_new_str("token", 5),
-        mp_obj_new_str(token, strlen(token)));
+        mp_obj_new_str("token",   5),
+        mp_obj_new_str(token,   strlen(token)));
     return dict;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_load_config_obj, mp_xiaozhi_load_config);
+
 
 /* ====================================================
  * 状态常量
@@ -841,7 +798,6 @@ static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
 
     /* 测试工具 */
     { MP_ROM_QSTR(MP_QSTR_record_to_file),   MP_ROM_PTR(&mp_xiaozhi_record_to_file_obj)  },
-    { MP_ROM_QSTR(MP_QSTR_test_afe),         MP_ROM_PTR(&mp_xiaozhi_test_afe_obj)        },
 
     /* 回调注册 */
     { MP_ROM_QSTR(MP_QSTR_on_state),   MP_ROM_PTR(&mp_xiaozhi_on_state_obj)  },
@@ -854,10 +810,10 @@ static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
     /* 状态常量 */
     { MP_ROM_QSTR(MP_QSTR_STATE_IDLE),       MP_ROM_INT(XIAOZHI_STATE_IDLE)       },
     { MP_ROM_QSTR(MP_QSTR_STATE_CONNECTING), MP_ROM_INT(XIAOZHI_STATE_CONNECTING) },
+    { MP_ROM_QSTR(MP_QSTR_STATE_CONNECTED),  MP_ROM_INT(XIAOZHI_STATE_CONNECTED)  },
     { MP_ROM_QSTR(MP_QSTR_STATE_LISTENING),  MP_ROM_INT(XIAOZHI_STATE_LISTENING)  },
     { MP_ROM_QSTR(MP_QSTR_STATE_SPEAKING),   MP_ROM_INT(XIAOZHI_STATE_SPEAKING)   },
     { MP_ROM_QSTR(MP_QSTR_STATE_ERROR),      MP_ROM_INT(XIAOZHI_STATE_ERROR)      },
-    { MP_ROM_QSTR(MP_QSTR_STATE_CONNECTED),  MP_ROM_INT(XIAOZHI_STATE_CONNECTED)  },
 };
 
 static MP_DEFINE_CONST_DICT(xiaozhi_module_globals, xiaozhi_module_globals_table);

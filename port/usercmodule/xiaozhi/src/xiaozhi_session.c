@@ -44,6 +44,8 @@
 
 #include "esp_websocket_client.h"
 #include "cJSON.h"
+#include "nvs.h"
+#include "nvs_flash.h"
 
 /* Opus 解码器（播放侧） */
 #include "esp_audio_types.h"
@@ -91,12 +93,12 @@
 #define PLAY_QUEUE_SIZE      20
 
 /* FreeRTOS 事件位 */
-#define EVT_CONNECTED        (1 << 0)
-#define EVT_DISCONNECTED     (1 << 1)
-#define EVT_STOP_REQUESTED   (1 << 2)
+#define EVT_CONNECTED        (1 << 0)  /* 收到服务器 hello，握手完成 */
+#define EVT_DISCONNECTED     (1 << 1)  /* WebSocket 断开 */
+#define EVT_STOP_REQUESTED   (1 << 2)  /* 上层请求停止 */
 
 /* WebSocket 接收缓冲区 */
-#define WS_RECV_BUF_SIZE     4096
+#define WS_RECV_BUF_SIZE     8192
 
 /* FreeRTOS 任务参数 */
 #define CAPTURE_TASK_STACK   6144
@@ -125,6 +127,7 @@ typedef struct {
 
     /* 状态 */
     volatile xiaozhi_state_t state;
+    volatile bool recording_active;  /* true=正在上传音频；由 listen_start/stop 控制 */
     char session_id[64];
     bool hello_received;
 
@@ -136,6 +139,9 @@ typedef struct {
 
     /* 音频播放设备句柄 */
     esp_codec_dev_handle_t play_dev;
+
+    /* 录音设备句柄（由 xiaozhi_start() 用于 record_pipe_open） */
+    esp_codec_dev_handle_t rec_dev;
 
     /* GMF Pool（供 esp_audio_render 格式转换使用） */
     esp_gmf_pool_handle_t  gmf_pool;
@@ -167,7 +173,7 @@ typedef struct {
     xiaozhi_on_wakeup_t    on_wakeup;
 
     /* 唤醒词模式：true=连接后进入 CONNECTED，false=直接进入 LISTENING */
-    bool wakeup_mode;
+    /* (已移除，统一使用 LISTENING 空闲状态) */
 
 } xiaozhi_ctx_t;
 
@@ -267,6 +273,7 @@ static esp_err_t ws_send_text(const char *text)
         ESP_LOGE(TAG, "ws_send_text failed: %d", ret);
         return ESP_FAIL;
     }
+    ESP_LOGD(TAG, "ws_send_text ok, bytes=%d", ret);
     return ESP_OK;
 }
 
@@ -275,6 +282,8 @@ static esp_err_t send_hello(void)
     cJSON *root  = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "type", "hello");
     cJSON_AddNumberToObject(root, "version", 1);
+    cJSON *features = cJSON_AddObjectToObject(root, "features");
+    cJSON_AddBoolToObject(features, "mcp", true);
     cJSON_AddStringToObject(root, "transport", "websocket");
 
     cJSON *audio = cJSON_AddObjectToObject(root, "audio_params");
@@ -287,7 +296,7 @@ static esp_err_t send_hello(void)
     cJSON_Delete(root);
     if (!str) return ESP_ERR_NO_MEM;
 
-    ESP_LOGD(TAG, "→ hello: %s", str);
+    ESP_LOGI(TAG, "→ hello: %s", str);
     esp_err_t err = ws_send_text(str);
     free(str);
     return err;
@@ -385,6 +394,7 @@ static void handle_json_message(const char *json_str)
             }
             s_ctx->hello_received = true;
             ESP_LOGI(TAG, "← hello ok, session=%s", s_ctx->session_id);
+            set_state(XIAOZHI_STATE_LISTENING);  /* 握手完成，进入空闲待机 */
             xEventGroupSetBits(s_ctx->event_group, EVT_CONNECTED);
         }
     }
@@ -408,7 +418,8 @@ static void handle_json_message(const char *json_str)
         ESP_LOGI(TAG, "← tts state=%s", tts_state);
 
         if (strcmp(tts_state, "start") == 0) {
-            /* 清空播放队列，切换为 SPEAKING */
+            /* 服务器开始 TTS：停止录音上传，清空播放队列，切换为 SPEAKING */
+            s_ctx->recording_active = false;
             opus_packet_t tmp;
             while (xQueueReceive(s_ctx->play_queue, &tmp, 0) == pdTRUE) {}
             set_state(XIAOZHI_STATE_SPEAKING);
@@ -455,7 +466,11 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
     switch (event_id) {
     case WEBSOCKET_EVENT_CONNECTED:
         ESP_LOGI(TAG, "WS connected, sending hello");
-        send_hello();
+        set_state(XIAOZHI_STATE_CONNECTED);
+        if (send_hello() != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to send hello");
+            xEventGroupSetBits(s_ctx->event_group, EVT_DISCONNECTED);
+        }
         break;
 
     case WEBSOCKET_EVENT_DISCONNECTED:
@@ -465,10 +480,23 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
         break;
 
     case WEBSOCKET_EVENT_DATA:
-        if (!data || !data->data_ptr || data->data_len <= 0) break;
-
+        if (!data) break;
+        /* 关闭帧：记录状态码和原因（辅助调试） */
+        if (data->op_code == WS_TRANSPORT_OPCODES_CLOSE) {  /* opcode 8 = close */
+            if (data->data_len >= 2) {
+                uint16_t code = ((uint8_t)data->data_ptr[0] << 8) | (uint8_t)data->data_ptr[1];
+                ESP_LOGW(TAG, "← WS close frame: code=%u, reason=%.*s",
+                         code, data->data_len - 2, data->data_ptr + 2);
+            } else {
+                ESP_LOGW(TAG, "← WS close frame: no code");
+            }
+            break;
+        }
+        if (!data->data_ptr || data->data_len <= 0) break;
         if (data->op_code == WS_TRANSPORT_OPCODES_BINARY) {
             /* 二进制：Opus 音频帧（仅 SPEAKING 状态下入队） */
+            ESP_LOGI(TAG, "← binary %d bytes (Opus)", data->data_len);
+
             if (s_ctx->state == XIAOZHI_STATE_SPEAKING) {
                 opus_packet_t pkt;
                 int copy_len = (data->data_len < (int)sizeof(pkt.data))
@@ -482,6 +510,7 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
         } else if (data->op_code == WS_TRANSPORT_OPCODES_TEXT) {
             /* 文本：JSON 控制消息 */
             /* 注意：data->data_ptr 可能不以 null 结尾 */
+            ESP_LOGI(TAG, "← text %d bytes", data->data_len);
             char *buf = malloc(data->data_len + 1);
             if (buf) {
                 memcpy(buf, data->data_ptr, data->data_len);
@@ -503,6 +532,9 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
     }
 }
 
+/* 前向声明：session_wakeup_cb 定义在下方，capture_task_fn 中需要用到 */
+static void session_wakeup_cb(void *ctx);
+
 /* ====================================================
  * 音频捕获发送任务：GMF pipeline Opus 帧 → WebSocket
  *
@@ -512,6 +544,23 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
 
 static void capture_task_fn(void *arg)
 {
+    /* 在任务内部打开并启动录音 pipeline：任务本身即消费者，AFE 启动时立即有下游排水 */
+    if (record_pipe_open(s_ctx->rec_dev, session_wakeup_cb, NULL, &s_ctx->rec_pipe) != ESP_OK) {
+        ESP_LOGE(TAG, "capture_task: record_pipe_open failed");
+        set_state(XIAOZHI_STATE_ERROR);
+        s_ctx->capture_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+    if (record_pipe_start(s_ctx->rec_pipe) != ESP_OK) {
+        ESP_LOGE(TAG, "capture_task: record_pipe_start failed");
+        record_pipe_close(s_ctx->rec_pipe);
+        s_ctx->rec_pipe = NULL;
+        set_state(XIAOZHI_STATE_ERROR);
+        s_ctx->capture_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
     ESP_LOGI(TAG, "Capture task started");
 
     while (true) {
@@ -526,21 +575,29 @@ static void capture_task_fn(void *arg)
             continue;
         }
 
-        /* LISTENING 状态：通过 WebSocket 发送 Opus 帧 */
-        if (s_ctx->state == XIAOZHI_STATE_LISTENING &&
+        /* recording_active=true 且非 SPEAKING 时，通过 WebSocket 发送 Opus 帧 */
+        if (s_ctx->recording_active &&
+            s_ctx->state != XIAOZHI_STATE_SPEAKING &&
             s_ctx->ws_client &&
             esp_websocket_client_is_connected(s_ctx->ws_client)) {
             int ret = esp_websocket_client_send_bin(s_ctx->ws_client,
                                                     (const char *)data,
                                                     size,
-                                                    pdMS_TO_TICKS(1000));
+                                                    pdMS_TO_TICKS(0));
             if (ret < 0) {
-                ESP_LOGW(TAG, "WS send_bin failed: %d", ret);
+                ESP_LOGW(TAG, "WS send_bin failed (drop frame): %d", ret);
             }
         }
-        /* 其他状态（SPEAKING/CONNECTED）：丢弃帧以防止 pipeline 堵死 */
+        /* recording_active=false 时丢弃帧（防止 pipeline 堵死） */
 
         record_pipe_release_frame(s_ctx->rec_pipe);
+    }
+
+    /* 正常退出：停止并关闭录音 pipeline；xiaozhi_stop 中的 NULL 检查会跳过重复操作 */
+    if (s_ctx->rec_pipe) {
+        record_pipe_stop(s_ctx->rec_pipe);
+        record_pipe_close(s_ctx->rec_pipe);
+        s_ctx->rec_pipe = NULL;
     }
 
     ESP_LOGI(TAG, "Capture task done");
@@ -572,21 +629,17 @@ static void playback_task_fn(void *arg)
 
         opus_packet_t pkt;
         BaseType_t got = xQueueReceive(s_ctx->play_queue, &pkt, pdMS_TO_TICKS(100));
-
+        
         if (got != pdTRUE) {
             if (s_ctx->state == XIAOZHI_STATE_SPEAKING) {
+                ESP_LOGI(TAG, "Playback: got opus packet..., len=%d", pkt.len);
                 if (!tts_stop_pending) {
                     tts_stop_pending = true;
                     tts_stop_ts = xTaskGetTickCount();
                 } else if ((xTaskGetTickCount() - tts_stop_ts) > pdMS_TO_TICKS(200)) {
-                    if (s_ctx->wakeup_mode) {
-                        ESP_LOGI(TAG, "Play queue drained, back to CONNECTED (wakeup mode)");
-                        set_state(XIAOZHI_STATE_CONNECTED);
-                    } else {
-                        ESP_LOGI(TAG, "Play queue drained, back to LISTENING");
-                        set_state(XIAOZHI_STATE_LISTENING);
-                        send_listen_start();
-                    }
+                    ESP_LOGI(TAG, "Play queue drained, back to LISTENING");
+                    s_ctx->recording_active = false;
+                    set_state(XIAOZHI_STATE_LISTENING);
                     tts_stop_pending = false;
                 }
             }
@@ -641,7 +694,7 @@ static void get_mac_str(char *buf, size_t len)
 {
     uint8_t mac[6] = {0};
     esp_wifi_get_mac(WIFI_IF_STA, mac);
-    snprintf(buf, len, "%02X:%02X:%02X:%02X:%02X:%02X",
+    snprintf(buf, len, "%02x:%02x:%02x:%02x:%02x:%02x",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
@@ -672,7 +725,7 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
     /* 复制配置 */
     strncpy(s_ctx->url,   config->url,   sizeof(s_ctx->url)   - 1);
     strncpy(s_ctx->token, config->token, sizeof(s_ctx->token) - 1);
-    s_ctx->frame_ms = (config->frame_duration_ms > 0) ? config->frame_duration_ms : 60;
+    s_ctx->frame_ms         = (config->frame_duration_ms > 0) ? config->frame_duration_ms : 60;
 
     /* 设备 ID */
     if (config->device_id && config->device_id[0]) {
@@ -681,22 +734,36 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
         get_mac_str(s_ctx->device_id, sizeof(s_ctx->device_id));
     }
 
-    /* 客户端 UUID (基于 MAC) */
+    /* 客户端 UUID：从 NVS board/uuid 读取（与 activate.c 保持一致） */
     if (config->client_id && config->client_id[0]) {
         strncpy(s_ctx->client_id, config->client_id, sizeof(s_ctx->client_id) - 1);
     } else {
-        uint8_t mac[6] = {0};
-        esp_wifi_get_mac(WIFI_IF_STA, mac);
-        snprintf(s_ctx->client_id, sizeof(s_ctx->client_id),
-                 "%02x%02x%02x%02x-%02x%02x-4%02x%02x-8%02x%02x-%02x%02x%02x%02x%02x%02x",
-                 mac[0], mac[1], mac[2], mac[3],
-                 mac[4], mac[5],
-                 mac[0] ^ 0x5A, mac[1],
-                 mac[2] | 0x80, mac[3],
-                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        nvs_handle_t nvs_h;
+        bool got_uuid = false;
+        if (nvs_open("board", NVS_READONLY, &nvs_h) == ESP_OK) {
+            size_t uuid_len = sizeof(s_ctx->client_id);
+            if (nvs_get_str(nvs_h, "uuid", s_ctx->client_id, &uuid_len) == ESP_OK
+                    && s_ctx->client_id[0] != '\0') {
+                got_uuid = true;
+            }
+            nvs_close(nvs_h);
+        }
+        if (!got_uuid) {
+            /* NVS 中无 UUID（未激活），降级为 MAC 派生 */
+            uint8_t mac[6] = {0};
+            esp_wifi_get_mac(WIFI_IF_STA, mac);
+            snprintf(s_ctx->client_id, sizeof(s_ctx->client_id),
+                     "%02x%02x%02x%02x-%02x%02x-4%02x%02x-8%02x%02x-%02x%02x%02x%02x%02x%02x",
+                     mac[0], mac[1], mac[2], mac[3],
+                     mac[4], mac[5],
+                     mac[0] ^ 0x5A, mac[1],
+                     mac[2] | 0x80, mac[3],
+                     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        }
     }
 
-    ESP_LOGI(TAG, "Init: device_id=%s", s_ctx->device_id);
+    ESP_LOGI(TAG, "Config: url=%s, token=%s, device_id=%s, client_id=%s, frame_ms=%d",
+             s_ctx->url, s_ctx->token, s_ctx->device_id, s_ctx->client_id, s_ctx->frame_ms);
 
     /* 获取音频硬件句柄（必须先调用 audio.init() 或 esp_gmf_app_setup_codec_dev()） */
     esp_codec_dev_handle_t rec_dev  = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
@@ -708,6 +775,7 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
         s_ctx = NULL;
         return ESP_ERR_INVALID_STATE;
     }
+    s_ctx->rec_dev = rec_dev;
 
     /* 设置音量和增益（可选） */
     if (config->output_volume > 0) {
@@ -769,16 +837,6 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
                                     &s_ctx->render_stream);
     }
 
-    /* 录音 pipeline */
-    if (record_pipe_open(rec_dev, session_wakeup_cb, NULL, &s_ctx->rec_pipe) != ESP_OK) {
-        ESP_LOGE(TAG, "record_pipe_open failed");
-        esp_audio_render_destroy(s_ctx->render);
-        esp_gmf_pool_deinit(s_ctx->gmf_pool);
-        esp_opus_dec_close(s_ctx->opus_decoder);
-        free(s_ctx); s_ctx = NULL;
-        return ESP_FAIL;
-    }
-
     /* FreeRTOS 资源 */
     s_ctx->play_queue  = xQueueCreate(PLAY_QUEUE_SIZE,  sizeof(opus_packet_t));
     s_ctx->event_group = xEventGroupCreate();
@@ -789,7 +847,6 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config)
         if (s_ctx->play_queue)  vQueueDelete(s_ctx->play_queue);
         if (s_ctx->event_group) vEventGroupDelete(s_ctx->event_group);
         if (s_ctx->state_mutex) vSemaphoreDelete(s_ctx->state_mutex);
-        record_pipe_close(s_ctx->rec_pipe);
         esp_audio_render_destroy(s_ctx->render);
         esp_gmf_pool_deinit(s_ctx->gmf_pool);
         esp_opus_dec_close(s_ctx->opus_decoder);
@@ -853,10 +910,16 @@ esp_err_t xiaozhi_start(void)
     memset(s_ctx->session_id, 0, sizeof(s_ctx->session_id));
     xQueueReset(s_ctx->play_queue);
 
-    /* 构造 Authorization 头 */
+    /* 构造 Authorization 头
+     * 参考实现：若 token 中已含空格（如 "Bearer xxxx"），则不再加前缀 */
     char auth_hdr[300];
-    snprintf(auth_hdr, sizeof(auth_hdr), "Bearer %s", s_ctx->token);
-
+    if (strchr(s_ctx->token, ' ') == NULL) {
+        snprintf(auth_hdr, sizeof(auth_hdr), "Bearer %s", s_ctx->token);
+    } else {
+        strncpy(auth_hdr, s_ctx->token, sizeof(auth_hdr) - 1);
+        auth_hdr[sizeof(auth_hdr) - 1] = '\0';
+    }
+    ESP_LOGI(TAG, "auth_hdr: %s", auth_hdr);
     /* WebSocket 配置 */
     esp_websocket_client_config_t ws_cfg = {
         .uri                    = s_ctx->url,
@@ -876,10 +939,10 @@ esp_err_t xiaozhi_start(void)
     }
 
     /* 添加 HTTP 请求头 */
-    esp_websocket_client_append_header(s_ctx->ws_client, "Authorization", auth_hdr);
+    esp_websocket_client_append_header(s_ctx->ws_client, "Authorization",    auth_hdr);
     esp_websocket_client_append_header(s_ctx->ws_client, "Protocol-Version", "1");
-    esp_websocket_client_append_header(s_ctx->ws_client, "Device-Id", s_ctx->device_id);
-    esp_websocket_client_append_header(s_ctx->ws_client, "Client-Id",  s_ctx->client_id);
+    esp_websocket_client_append_header(s_ctx->ws_client, "Device-Id",        s_ctx->device_id);
+    esp_websocket_client_append_header(s_ctx->ws_client, "Client-Id",        s_ctx->client_id);
 
     /* 注册事件回调 */
     esp_websocket_register_events(s_ctx->ws_client, WEBSOCKET_EVENT_ANY,
@@ -895,13 +958,13 @@ esp_err_t xiaozhi_start(void)
         return err;
     }
 
-    /* 等待服务器 hello 或超时 (10s) */
+    /* 等待服务器 hello 响应 (10s)；hello 已在 WEBSOCKET_EVENT_CONNECTED 回调中发送 */
     EventBits_t bits = xEventGroupWaitBits(s_ctx->event_group,
                                            EVT_CONNECTED | EVT_DISCONNECTED,
                                            pdFALSE, pdFALSE,
                                            pdMS_TO_TICKS(10000));
     if (!(bits & EVT_CONNECTED) || (bits & EVT_DISCONNECTED)) {
-        ESP_LOGE(TAG, "Hello timeout or disconnected");
+        ESP_LOGE(TAG, "Server hello timeout or disconnected");
         esp_websocket_client_stop(s_ctx->ws_client);
         esp_websocket_client_destroy(s_ctx->ws_client);
         s_ctx->ws_client = NULL;
@@ -928,34 +991,14 @@ esp_err_t xiaozhi_start(void)
         }
     }
 
-    /* 启动录音 pipeline */
-    if (record_pipe_start(s_ctx->rec_pipe) != ESP_OK) {
-        ESP_LOGE(TAG, "record_pipe_start failed");
-        esp_audio_render_stream_close(s_ctx->render_stream);
-        esp_websocket_client_stop(s_ctx->ws_client);
-        esp_websocket_client_destroy(s_ctx->ws_client);
-        s_ctx->ws_client = NULL;
-        set_state(XIAOZHI_STATE_ERROR);
-        return ESP_FAIL;
-    }
-
-    /* 启动音频任务 */
+    /* 启动音频任务（capture 任务内部负责 record_pipe open+start） */
     xTaskCreate(capture_task_fn,  "xz_cap",  CAPTURE_TASK_STACK,  NULL,
                 CAPTURE_TASK_PRIO,  &s_ctx->capture_task);
     xTaskCreate(playback_task_fn, "xz_play", PLAYBACK_TASK_STACK, NULL,
                 PLAYBACK_TASK_PRIO, &s_ctx->playback_task);
 
-    /* 根据模式决定初始状态 */
-    if (s_ctx->wakeup_mode) {
-        /* 唤醒词模式：进入 CONNECTED，等待 listen_start() */
-        set_state(XIAOZHI_STATE_CONNECTED);
-        ESP_LOGI(TAG, "Session started (wakeup mode, waiting for trigger)");
-    } else {
-        /* 自动模式：直接进入 LISTENING */
-        set_state(XIAOZHI_STATE_LISTENING);
-        send_listen_start();
-        ESP_LOGI(TAG, "Session started (auto listen mode)");
-    }
+    /* 握手完成，已进入 LISTENING 空闲状态，等待唤醒或 listen_start() 触发 */
+    ESP_LOGI(TAG, "Session started, waiting for trigger");
     return ESP_OK;
 }
 
@@ -992,9 +1035,11 @@ esp_err_t xiaozhi_stop(void)
         s_ctx->ws_client = NULL;
     }
 
-    /* 停止录音 pipeline */
+    /* 停止并关闭录音 pipeline（下次 start 时重新 open，防止 AFE 空转） */
     if (s_ctx->rec_pipe) {
         record_pipe_stop(s_ctx->rec_pipe);
+        record_pipe_close(s_ctx->rec_pipe);
+        s_ctx->rec_pipe = NULL;
     }
 
     /* 关闭 Audio Render 流 */
@@ -1022,8 +1067,8 @@ esp_err_t xiaozhi_abort(void)
     while (xQueueReceive(s_ctx->play_queue, &pkt, 0) == pdTRUE) {}
 
     send_abort_msg();
+    s_ctx->recording_active = false;
     set_state(XIAOZHI_STATE_LISTENING);
-    send_listen_start();
     return ESP_OK;
 }
 
@@ -1057,11 +1102,6 @@ void xiaozhi_set_on_wakeup(xiaozhi_on_wakeup_t cb)
     if (s_ctx) s_ctx->on_wakeup = cb;
 }
 
-void xiaozhi_set_wakeup_mode(bool enable)
-{
-    if (s_ctx) s_ctx->wakeup_mode = enable;
-}
-
 void xiaozhi_trigger_wakeup(void)
 {
     if (!s_ctx) return;
@@ -1071,8 +1111,8 @@ void xiaozhi_trigger_wakeup(void)
         s_ctx->on_wakeup();
     }
 
-    /* 唤醒词模式下，CONNECTED 状态时自动进入 LISTENING */
-    if (s_ctx->wakeup_mode && s_ctx->state == XIAOZHI_STATE_CONNECTED) {
+    /* LISTENING 空闲状态下自动触发录音 */
+    if (s_ctx->state == XIAOZHI_STATE_LISTENING && !s_ctx->recording_active) {
         ESP_LOGI(TAG, "Wakeup triggered, starting listen");
         xiaozhi_listen_start();
     }
@@ -1088,12 +1128,14 @@ esp_err_t xiaozhi_listen_start(void)
         opus_packet_t pkt;
         while (xQueueReceive(s_ctx->play_queue, &pkt, 0) == pdTRUE) {}
         send_abort_msg();
-    } else if (cur != XIAOZHI_STATE_CONNECTED) {
-        ESP_LOGW(TAG, "listen_start: invalid state %d", (int)cur);
+        set_state(XIAOZHI_STATE_LISTENING);
+    } else if (cur != XIAOZHI_STATE_LISTENING) {
+        ESP_LOGW(TAG, "listen_start: invalid state %d (need LISTENING=%d)",
+                 (int)cur, (int)XIAOZHI_STATE_LISTENING);
         return ESP_ERR_INVALID_STATE;
     }
 
-    set_state(XIAOZHI_STATE_LISTENING);
+    s_ctx->recording_active = true;
     return send_listen_start();
 }
 
@@ -1104,6 +1146,6 @@ esp_err_t xiaozhi_listen_stop(void)
         ESP_LOGW(TAG, "listen_stop: not listening, state=%d", (int)s_ctx->state);
         return ESP_ERR_INVALID_STATE;
     }
-    set_state(XIAOZHI_STATE_CONNECTED);
+    s_ctx->recording_active = false;
     return send_listen_stop();
 }

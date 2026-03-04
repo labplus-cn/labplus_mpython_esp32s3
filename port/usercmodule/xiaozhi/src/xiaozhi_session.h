@@ -27,11 +27,11 @@ extern "C" {
 
 typedef enum {
     XIAOZHI_STATE_IDLE       = 0,  /*!< 空闲，无连接 */
-    XIAOZHI_STATE_CONNECTING = 1,  /*!< 正在连接服务器，等待握手 */
-    XIAOZHI_STATE_LISTENING  = 2,  /*!< 正在收音并发送给服务器 */
-    XIAOZHI_STATE_SPEAKING   = 3,  /*!< 正在播放服务器返回的语音 */
-    XIAOZHI_STATE_ERROR      = 4,  /*!< 连接或运行出错 */
-    XIAOZHI_STATE_CONNECTED  = 5,  /*!< 已连接服务器，等待唤醒/外部触发 */
+    XIAOZHI_STATE_CONNECTING = 1,  /*!< 正在建立 TCP 连接 */
+    XIAOZHI_STATE_CONNECTED  = 2,  /*!< WS 已连接，握手中（等待服务器 hello） */
+    XIAOZHI_STATE_LISTENING  = 3,  /*!< 握手完成，空闲待机；唤醒/listen_start 后开始上传音频 */
+    XIAOZHI_STATE_SPEAKING   = 4,  /*!< 正在播放服务器返回的语音 */
+    XIAOZHI_STATE_ERROR      = 5,  /*!< 连接或运行出错 */
 } xiaozhi_state_t;
 
 /* ====================
@@ -110,10 +110,11 @@ esp_err_t xiaozhi_deinit(void);
 /**
  * 启动语音会话
  *
- * 连接 WebSocket 服务器，完成握手后进入 LISTENING 状态。
+ * 连接 WebSocket 服务器，握手阶段处于 CONNECTED 状态，
+ * 握手完成后自动进入 LISTENING 状态。
  * 可在 IDLE 或 ERROR 状态时调用。
  *
- * @return  ESP_OK 成功启动连接流程（异步，通过 on_state 回调通知结果）
+ * @return  ESP_OK 成功
  */
 esp_err_t xiaozhi_start(void);
 
@@ -129,26 +130,28 @@ esp_err_t xiaozhi_stop(void);
 /**
  * 中断当前说话（TTS 播放）
  *
- * 可在 SPEAKING 状态下调用，终止当前 TTS 并切换为 LISTENING。
+ * 可在 SPEAKING 或 LISTENING（录音中）状态下调用，
+ * 终止当前 TTS/录音并回到 LISTENING 空闲状态。
  *
  * @return  ESP_OK 成功
  */
 esp_err_t xiaozhi_abort(void);
 
 /**
- * 开始监听（发送语音）
+ * 开始录音并上传
  *
- * 可在 CONNECTED 状态下调用，切换为 LISTENING 并向服务器发送 listen start。
- * 也可在 SPEAKING 状态下调用（相当于先 abort 再 listen）。
+ * 可在 LISTENING 状态下调用，向服务器发送 listen start 并开始上传音频。
+ * 也可在 SPEAKING 状态下调用（相当于先 abort 再开始录音）。
  *
  * @return  ESP_OK 成功
  */
 esp_err_t xiaozhi_listen_start(void);
 
 /**
- * 停止监听
+ * 停止录音上传
  *
- * 可在 LISTENING 状态下调用，切换为 CONNECTED 并向服务器发送 listen stop。
+ * 可在 LISTENING（录音中）状态下调用，发送 listen stop 停止上传。
+ * 状态保持 LISTENING（空闲），等待服务器回复 TTS。
  *
  * @return  ESP_OK 成功
  */
@@ -182,22 +185,11 @@ void xiaozhi_set_on_message(xiaozhi_on_message_t cb);
 void xiaozhi_set_on_wakeup(xiaozhi_on_wakeup_t cb);
 
 /**
- * 设置唤醒词模式
- *
- * enable=true:  xiaozhi_start() 连接后进入 CONNECTED（等待唤醒），
- *               TTS 结束后也回到 CONNECTED。
- * enable=false: 默认行为，连接后直接进入 LISTENING，TTS 结束后回到 LISTENING。
- *
- * 必须在 xiaozhi_init() 之后、xiaozhi_start() 之前调用。
- */
-void xiaozhi_set_wakeup_mode(bool enable);
-
-/**
  * 触发唤醒事件
  *
  * 供 AFE 检测到唤醒词后调用，或由 Python 层（按钮等）直接触发。
  * 会调用已注册的 on_wakeup 回调（通过 poll() 派发到 Python）。
- * 在唤醒词模式下，通常在回调里调用 xiaozhi_listen_start()。
+ * 在 LISTENING 空闲状态下自动调用 xiaozhi_listen_start()。
  */
 void xiaozhi_trigger_wakeup(void);
 

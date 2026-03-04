@@ -148,7 +148,7 @@ class wifi:
         self.sta = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
 
-    def connectWiFi(self, ssid, passwd, timeout=10):
+    def connectWiFi(self, ssid, passwd, timeout=10000):
         if self.sta.isconnected():
             self.sta.disconnect()
         self.sta.active(True)

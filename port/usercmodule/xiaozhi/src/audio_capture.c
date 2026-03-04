@@ -223,7 +223,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     if (rp->models) {
         /* AFE 配置：SR 模式（唤醒词检测），输入格式 "MM"（双声道麦克风，无参考信号） */
-        rp->afe_cfg = afe_config_init("MM", rp->models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
+        rp->afe_cfg = afe_config_init("M", rp->models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
         if (!rp->afe_cfg) {
             ESP_LOGW(TAG, "afe_config_init failed - wakeup detection disabled");
             esp_srmodel_deinit(rp->models);
@@ -233,11 +233,12 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     if (rp->afe_cfg) {
         /* AFE Manager（read_cb/result_cb 由 esp_gmf_afe 元素在 open 时自动设置） */
-        // rp->afe_cfg->aec_init = false;
-        // rp->afe_cfg->pcm_config.total_ch_num = 2; 
-        // rp->afe_cfg->pcm_config.mic_num = 2; 
-        // rp->afe_cfg->pcm_config.ref_num = 0;      
-        // rp->afe_cfg->pcm_config.sample_rate = 16000;
+        rp->afe_cfg->aec_init = false;
+        rp->afe_cfg->pcm_config.total_ch_num = 2;
+        rp->afe_cfg->pcm_config.mic_num = 1;  /* 单麦模式：关闭 SE(BSS)，降低 FETCH 算力，缓解 FEED is full */
+        rp->afe_cfg->pcm_config.ref_num = 0;
+        rp->afe_cfg->pcm_config.sample_rate = 16000;
+        rp->afe_cfg->afe_ringbuf_size = 50;  /* 增大 ring buffer，缓解下游处理不及时时的 FEED is full 警告 */
         esp_gmf_afe_manager_cfg_t mgr_cfg = DEFAULT_GMF_AFE_MANAGER_CFG(
             rp->afe_cfg, NULL, NULL, NULL, NULL);
         mgr_cfg.feed_task_setting.stack_size  = AFE_FEED_TASK_STACK;
