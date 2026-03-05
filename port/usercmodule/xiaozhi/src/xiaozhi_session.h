@@ -64,6 +64,15 @@ typedef void (*xiaozhi_on_message_t)(const char *json_text);
 /** 唤醒词检测回调（AFE 检测到唤醒词时触发） */
 typedef void (*xiaozhi_on_wakeup_t)(void);
 
+/**
+ * MCP 请求回调
+ * @param json_rpc_req  JSON-RPC 请求字符串
+ * @param response_buf  用于存放响应的缓冲区（需为 JSON 格式）
+ * @param buf_size      缓冲区大小
+ * @return              是否成功处理（并填写了 response_buf）
+ */
+typedef bool (*xiaozhi_on_mcp_t)(const char *json_rpc_req, char *response_buf, size_t buf_size);
+
 /* ====================
  * 配置结构
  * ==================== */
@@ -183,6 +192,9 @@ void xiaozhi_set_on_message(xiaozhi_on_message_t cb);
 
 /** 注册唤醒词检测回调 */
 void xiaozhi_set_on_wakeup(xiaozhi_on_wakeup_t cb);
+
+/** 注册 MCP 请求回调 */
+void xiaozhi_set_on_mcp(xiaozhi_on_mcp_t cb);
 
 /**
  * 触发唤醒事件

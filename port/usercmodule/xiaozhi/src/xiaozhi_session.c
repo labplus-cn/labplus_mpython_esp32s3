@@ -171,6 +171,7 @@ typedef struct {
     xiaozhi_on_llm_t       on_llm;
     xiaozhi_on_message_t   on_message;
     xiaozhi_on_wakeup_t    on_wakeup;
+    xiaozhi_on_mcp_t       on_mcp;
 
     /* TTS 结束标志：收到 tts.state=stop 后置 true，playback_task 检测队列排空后才退出 SPEAKING */
     volatile bool tts_stop_received;
@@ -448,6 +449,38 @@ static void handle_json_message(const char *json_str)
             strcmp(cmd_j->valuestring, "reboot") == 0) {
             ESP_LOGW(TAG, "Server requested reboot");
             esp_restart();
+        }
+    }
+    /* ---- mcp ---- */
+    else if (strcmp(type, "mcp") == 0) {
+        cJSON *payload_j = cJSON_GetObjectItem(root, "payload");
+        if (payload_j && s_ctx->on_mcp) {
+            char *req_str = cJSON_PrintUnformatted(payload_j);
+            if (req_str) {
+                char *resp_buf = malloc(WS_RECV_BUF_SIZE);
+                if (resp_buf) {
+                    if (s_ctx->on_mcp(req_str, resp_buf, WS_RECV_BUF_SIZE)) {
+                        /* 发送响应 */
+                        cJSON *resp_root = cJSON_CreateObject();
+                        if (s_ctx->session_id[0]) {
+                            cJSON_AddStringToObject(resp_root, "session_id", s_ctx->session_id);
+                        }
+                        cJSON_AddStringToObject(resp_root, "type", "mcp");
+                        cJSON *resp_payload = cJSON_Parse(resp_buf);
+                        if (resp_payload) {
+                            cJSON_AddItemToObject(resp_root, "payload", resp_payload);
+                            char *resp_str = cJSON_PrintUnformatted(resp_root);
+                            if (resp_str) {
+                                ws_send_text(resp_str);
+                                free(resp_str);
+                            }
+                        }
+                        cJSON_Delete(resp_root);
+                    }
+                    free(resp_buf);
+                }
+                free(req_str);
+            }
         }
     }
 
@@ -1113,6 +1146,11 @@ void xiaozhi_set_on_message(xiaozhi_on_message_t cb)
 void xiaozhi_set_on_wakeup(xiaozhi_on_wakeup_t cb)
 {
     if (s_ctx) s_ctx->on_wakeup = cb;
+}
+
+void xiaozhi_set_on_mcp(xiaozhi_on_mcp_t cb)
+{
+    if (s_ctx) s_ctx->on_mcp = cb;
 }
 
 void xiaozhi_trigger_wakeup(void)

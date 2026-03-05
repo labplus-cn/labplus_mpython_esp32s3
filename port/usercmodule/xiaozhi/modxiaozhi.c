@@ -113,6 +113,7 @@ static mp_obj_t s_on_tts_cb      = mp_const_none;
 static mp_obj_t s_on_llm_cb      = mp_const_none;
 static mp_obj_t s_on_message_cb  = mp_const_none;
 static mp_obj_t s_on_wakeup_cb   = mp_const_none;
+static mp_obj_t s_on_mcp_cb      = mp_const_none;
 
 /* ====================================================
  * 内部 C 回调 → 调度到 MicroPython 调度器
@@ -136,13 +137,15 @@ typedef struct { mp_obj_t cb; mp_obj_t arg; } mp_cb_pair_t;
 /* 这是在 FreeRTOS 任务和 MicroPython 线程间传递数据的简化方式 */
 
 /* 最新消息缓冲区（用于跨任务传递） */
-#define MSG_BUF_SIZE 512
+#define MSG_BUF_SIZE 4096
 static char s_last_stt[MSG_BUF_SIZE]     = {0};
 static char s_last_tts_state[32]         = {0};
 static char s_last_tts_text[MSG_BUF_SIZE]= {0};
 static char s_last_llm_emotion[64]       = {0};
 static char s_last_llm_text[MSG_BUF_SIZE]= {0};
 static char s_last_message[MSG_BUF_SIZE] = {0};
+static char s_last_mcp_req[MSG_BUF_SIZE] = {0};
+static char s_last_mcp_resp[MSG_BUF_SIZE] = {0};
 static volatile int s_last_state = 0;
 
 /* FreeRTOS 通知标志（用于标记有新数据待处理） */
@@ -153,6 +156,10 @@ static volatile uint32_t s_cb_flags = 0;
 #define FLAG_LLM     (1 << 3)
 #define FLAG_MESSAGE (1 << 4)
 #define FLAG_WAKEUP  (1 << 5)
+#define FLAG_MCP     (1 << 6)
+
+/* 用于同步 MCP 响应 */
+static SemaphoreHandle_t s_mcp_sem = NULL;
 
 /* 用于保护 s_last_* 的互斥 */
 static SemaphoreHandle_t s_msg_mutex = NULL;
@@ -210,6 +217,32 @@ static void c_on_wakeup_impl(void)
     s_cb_flags |= FLAG_WAKEUP;
 }
 
+static bool c_on_mcp_impl(const char *req, char *resp, size_t buf_size)
+{
+    if (!req) return false;
+
+    if (s_msg_mutex) xSemaphoreTake(s_msg_mutex, portMAX_DELAY);
+    strncpy(s_last_mcp_req, req, MSG_BUF_SIZE - 1);
+    s_last_mcp_req[MSG_BUF_SIZE - 1] = '\0';
+    if (s_msg_mutex) xSemaphoreGive(s_msg_mutex);
+
+    s_cb_flags |= FLAG_MCP;
+
+    /* 等待 Python 处理响应 */
+    if (s_mcp_sem) {
+        /* 等待最多 5 秒 */
+        if (xSemaphoreTake(s_mcp_sem, pdMS_TO_TICKS(5000)) == pdTRUE) {
+            if (s_msg_mutex) xSemaphoreTake(s_msg_mutex, portMAX_DELAY);
+            strncpy(resp, s_last_mcp_resp, buf_size - 1);
+            resp[buf_size - 1] = '\0';
+            if (s_msg_mutex) xSemaphoreGive(s_msg_mutex);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /* ====================================================
  * MicroPython 模块函数
  * ==================================================== */
@@ -258,6 +291,9 @@ static mp_obj_t mp_xiaozhi_init(size_t n_args, const mp_obj_t *pos_args,
     if (!s_msg_mutex) {
         s_msg_mutex = xSemaphoreCreateMutex();
     }
+    if (!s_mcp_sem) {
+        s_mcp_sem = xSemaphoreCreateBinary();
+    }
 
     xiaozhi_config_t config = {
         .url              = url,
@@ -282,6 +318,7 @@ static mp_obj_t mp_xiaozhi_init(size_t n_args, const mp_obj_t *pos_args,
     xiaozhi_set_on_llm(c_on_llm_impl);
     xiaozhi_set_on_message(c_on_message_impl);
     xiaozhi_set_on_wakeup(c_on_wakeup_impl);
+    xiaozhi_set_on_mcp(c_on_mcp_impl);
 
     return mp_const_none;
 }
@@ -502,6 +539,40 @@ static mp_obj_t mp_xiaozhi_on_wakeup(mp_obj_t cb)
 static MP_DEFINE_CONST_FUN_OBJ_1(mp_xiaozhi_on_wakeup_obj, mp_xiaozhi_on_wakeup);
 
 /**
+ * xiaozhi.on_mcp(callback)
+ *
+ * 注册 MCP 请求回调。
+ * callback(json_req: str) 在收到 MCP 请求时被调用。
+ * 处理完请求后，需调用 xiaozhi.mcp_send_response(json_resp) 返回结果。
+ */
+static mp_obj_t mp_xiaozhi_on_mcp(mp_obj_t cb)
+{
+    s_on_mcp_cb = cb;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mp_xiaozhi_on_mcp_obj, mp_xiaozhi_on_mcp);
+
+/**
+ * xiaozhi.mcp_send_response(json_resp: str)
+ *
+ * 向当前的 MCP 请求发送响应。
+ */
+static mp_obj_t mp_xiaozhi_mcp_send_response(mp_obj_t resp_obj)
+{
+    const char *resp = mp_obj_str_get_str(resp_obj);
+    if (s_msg_mutex) xSemaphoreTake(s_msg_mutex, portMAX_DELAY);
+    strncpy(s_last_mcp_resp, resp, MSG_BUF_SIZE - 1);
+    s_last_mcp_resp[MSG_BUF_SIZE - 1] = '\0';
+    if (s_msg_mutex) xSemaphoreGive(s_msg_mutex);
+
+    if (s_mcp_sem) {
+        xSemaphoreGive(s_mcp_sem);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mp_xiaozhi_mcp_send_response_obj, mp_xiaozhi_mcp_send_response);
+
+/**
  * xiaozhi.poll()
  *
  * 轮询待处理的回调事件并触发 Python 回调。
@@ -576,6 +647,20 @@ static mp_obj_t mp_xiaozhi_poll(void)
     if ((flags & FLAG_WAKEUP) && s_on_wakeup_cb != mp_const_none) {
         mp_call_function_n_kw(s_on_wakeup_cb, 0, 0, NULL);
         handled = true;
+    }
+
+    if (flags & FLAG_MCP) {
+        if (s_on_mcp_cb != mp_const_none) {
+            if (s_msg_mutex) xSemaphoreTake(s_msg_mutex, portMAX_DELAY);
+            mp_obj_t req_obj = mp_obj_new_str(s_last_mcp_req, strlen(s_last_mcp_req));
+            if (s_msg_mutex) xSemaphoreGive(s_msg_mutex);
+            mp_obj_t args[1] = { req_obj };
+            mp_call_function_n_kw(s_on_mcp_cb, 1, 0, args);
+            handled = true;
+        } else {
+            /* 若无回调，自动给一个空响应防止 C 层永久阻塞 */
+            if (s_mcp_sem) xSemaphoreGive(s_mcp_sem);
+        }
     }
 
     return handled ? mp_const_true : mp_const_false;
@@ -806,6 +891,8 @@ static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_on_llm),     MP_ROM_PTR(&mp_xiaozhi_on_llm_obj)    },
     { MP_ROM_QSTR(MP_QSTR_on_message), MP_ROM_PTR(&mp_xiaozhi_on_message_obj)},
     { MP_ROM_QSTR(MP_QSTR_on_wakeup),  MP_ROM_PTR(&mp_xiaozhi_on_wakeup_obj) },
+    { MP_ROM_QSTR(MP_QSTR_on_mcp),     MP_ROM_PTR(&mp_xiaozhi_on_mcp_obj)    },
+    { MP_ROM_QSTR(MP_QSTR_mcp_send_response), MP_ROM_PTR(&mp_xiaozhi_mcp_send_response_obj) },
 
     /* 状态常量 */
     { MP_ROM_QSTR(MP_QSTR_STATE_IDLE),       MP_ROM_INT(XIAOZHI_STATE_IDLE)       },
