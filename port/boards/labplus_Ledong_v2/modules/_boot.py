@@ -7,7 +7,7 @@ import ubinascii
 import machine
 from machine import Pin
 
-Pin(12, Pin.OUT, value=0)
+Pin(21, Pin.OUT, value=0)
 
 print("boot...")
 

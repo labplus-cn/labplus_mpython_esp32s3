@@ -18,10 +18,10 @@ class SmartCameraK230:
         self.tf_sn = ''
         self.rx_buffer = bytearray()
 
-        time.sleep(0.1)
+        time.sleep(0.01)
         self.wait_for_ai_init()
-        self.tim9 = Timer(9)
-        self.tim9.init(period=35, mode=Timer.PERIODIC, callback=self.timer9_tick)
+        self.tim9 = Timer(-1)
+        self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
         # self.thread_listen()
   
     def wait_for_ai_init(self): 
@@ -130,8 +130,6 @@ class SmartCameraK230:
             for i in range(5):
                 AI_Uart_CMD(self.uart,DEFAULT_MODE,0x01)
                 time.sleep_ms(100) 
-        elif(cur_state==FACE_REG_PLUS_MODE):
-            AI_Uart_CMD(self.uart,FACE_REG_PLUS_MODE,0x01)
         elif(cur_state==FACE_DETECTION_MODE):
             self.face_detect = FACE_DETECT(self.uart)
         elif(cur_state==HAND_DETECTION):
@@ -162,11 +160,15 @@ class SmartCameraK230:
             self.bar_code = BarCodeRecognization(self.uart)
         elif(cur_state==FACE_RECOGNITION_MODE):
             self.fcr = FaceRecogization(self.uart)
+        elif(cur_state==APS_MODE):
+            self.amr = AMR(self.uart)
+        elif(cur_state==FACE_REG_PLUS_MODE):
+            AI_Uart_CMD(self.uart,FACE_REG_PLUS_MODE,0x01)
         
         self.mode = cur_state
     
     def switcher_mode(self, mode):
-        self.model_init(mode) # mode 0默认 1人脸检测
+        self.model_init(mode) # mode 0默认 1人脸检测 2目标识别 3手势检测 4手势分类 5车牌识别 6人体检测 7跌倒检测 8二维码识别 9条码识别 10人脸识别 36道路自动驾驶系统
 
     def color_obj_count_init(self,cur_mode):
         self.color_obj_count = ColorCount(self.uart, cur_mode=cur_mode)
@@ -282,8 +284,6 @@ class SmartCameraK230:
                                 self.person_keypoint_detect.keypoints = []
                         elif(CMD[2]==0x02 and CMD[3]==PERSON_KEYPOINT_DETECT and CMD[4]==0x01):
                             b = bytes(CMD[22:-1])  
-                            # _str = str(b.decode('UTF-8','ignore'))
-                            # data = eval(_str)
                             data = json.loads(b.decode('UTF-8','ignore'))
                             self.person_keypoint_detect.lock = True
                             self.person_keypoint_detect.keypoints = data.get('keypoints',[])
@@ -469,6 +469,25 @@ class SmartCameraK230:
                     else:
                         self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
                         self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
+                elif(self.mode==APS_MODE and self.amr!=None):
+                    if(len(CMD)>0):
+                        # print(CMD)
+                        # if(CMD[2]==0x01 and CMD[3]==APS_MODE and CMD[4]==0x01):
+                        #     if(CMD[5]==0xff):
+                        #         self.amr.lock = True
+                        #         self.amr.res = {
+                        #                 "F": "none",
+                        #                 "AGL": 0,
+                        #                 "SW": [],
+                        #                 "GL": [],
+                        #                 "RL": [],
+                        #                 "UT": []
+                        #             }
+                        if(CMD[2]==0x02 and CMD[3]==APS_MODE and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.amr.lock = True
+                            self.amr.res = data
                 # elif(self.mode==APRILTAG_MODE and self.apriltag!=None):
                 #     if(len(CMD)>0):
                 #         if(CMD[2]==0x01 and CMD[3]==AI['apriltag'][0] and CMD[4]==AI['apriltag'][2] and CMD[5]==0xff):
@@ -481,13 +500,6 @@ class SmartCameraK230:
                 #             self.apriltag.tag_family,self.apriltag.tag_id = int(data[0]),int(data[1])
                 #     else:
                 #         self.apriltag.tag_family,self.apriltag.tag_id = None,None
-                # elif(self.mode==FACTORY_MODE):
-                #     if(len(CMD)>0):
-                #         if(CMD[2]==0x02 and CMD[3]==FACTORY_MODE and CMD[4]==0x01):
-                #             _str = str(CMD[-2].decode('UTF-8','ignore'))
-                #             data = eval(_str)
-                #             self.a_status,self.b_status,self.tf_status = CMD[5],CMD[6],CMD[7]
-                #             self.tf_sn = data[0]
                 else:
                     pass
         except Exception as e:

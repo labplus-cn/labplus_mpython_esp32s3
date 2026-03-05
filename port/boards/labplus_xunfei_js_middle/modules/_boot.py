@@ -6,7 +6,7 @@ from neopixel import NeoPixel
 import ubinascii
 from machine import Pin, unique_id
 
-Pin(12, Pin.OUT, value=0)
+Pin(21, Pin.OUT, value=0)
 
 print("boot...")
 try:

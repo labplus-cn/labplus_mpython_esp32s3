@@ -6,8 +6,7 @@
 
 mPython掌控板是一块MicroPython微控制器板，它集成ESP32高性能双核芯片，使用当下最流行的Python编程语言，以便您轻松地将代码从桌面传输到微控制器或嵌入式系统。
 
-
-![](https://github.com/labplus-cn/mPython/blob/master/docs/images/掌控-立1.png)  
+![](https://github.com/labplus-cn/mPython/blob/master/docs/images/掌控-立1.png)
 
 # 编程软件
 
@@ -15,7 +14,7 @@ mPython掌控板是一块MicroPython微控制器板，它集成ESP32高性能双
 
 <table >
 <tr style="height: 100px;">
-<td style="width: 100px; height: 100px;"><img style="display: block; margin-left: auto; margin-right: auto;" src="http://wiki.labplus.cn/images/2/2d/MPythonX.png" width="60" height="60" /></td>
+<td style="width: 100px; height: 100px;"><img style="display: block; margin-left: auto; margin-right: auto;" src="https://cdn.makeymonkey.com/files/mpython-logo.png" width="60" height="60" /></td>
 <td style="width: 247px; height: 106px;">官方推荐编程软件,mPython是一款专用于掌控板的编程教育软件，给掌控板“注入”你想实现的功能，
 它可以让你从图形化编程入手，进而轻松掌握Python编程语言。</td>
 </tr>
@@ -33,7 +32,6 @@ mPython掌控板是一块MicroPython微控制器板，它集成ESP32高性能双
 
 掌控板论坛: https://www.labplus.cn/forum
 
-
 # 相关链接
 
 GitHub: https://github.com/labplus-cn/mPython         <br/>
@@ -47,10 +45,9 @@ GitHub: https://github.com/labplus-cn/mPython         <br/>
 ![License: CERN v1.2](https://img.shields.io/badge/License-CERN%20v1.2-lightgrey.svg)
 ![License: CC0](https://img.shields.io/badge/License-CC0-blue.svg)
 
-
 掌控板是一个[OSHWA](https://certification.oshwa.org/cn000006.html) 认证的开源硬件项目,代码和设计都是开源。但软件须在[GPL-3](http://www.gnu.org/licenses/gpl.html)许可下使用,硬件在CERN许可下使用,文档在CC0许可下使用。
-
 
 # 联系我们
 
 如果您对文档或掌控板的使用有任何建议或疑问，请在Github上创建一个问题，以便与他人共享答案和解决方案。
+

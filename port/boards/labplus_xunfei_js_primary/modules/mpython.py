@@ -644,27 +644,27 @@ class EncoderMotor(object):
         :param int speed: 左电机速度 0 -- 100。
         :param int angle: 左电机速度 0 -- 360
         """
-        if (self.batch == 1):
-            if speed < 0:
-                speed = 0
-            if speed > 100:
-                speed = 100
-            if dir !=3 and dir != 4:
-                return
-            tmp = [0]*2
-            tmp[0] = angle & 0xff
-            tmp[1] = (angle >> 8) & 0xff
-         
-            attempts=0
-            while True:
-                try:
-                    i2c.writeto(self.i2c_addr, bytearray([dir, speed, tmp[0], tmp[1]]))
-                except Exception as e:
-                    attempts = attempts + 1
-                    if attempts > 2:
-                        break
-                else:
+
+        if speed < 0:
+            speed = 0
+        if speed > 100:
+            speed = 100
+        if dir !=3 and dir != 4:
+            return
+        tmp = [0]*2
+        tmp[0] = angle & 0xff
+        tmp[1] = (angle >> 8) & 0xff
+        
+        attempts=0
+        while True:
+            try:
+                i2c.writeto(self.i2c_addr, bytearray([dir, speed, tmp[0], tmp[1]]))
+            except Exception as e:
+                attempts = attempts + 1
+                if attempts > 2:
                     break
+            else:
+                break
 
 
     def move_distance(self, speed, distance):
