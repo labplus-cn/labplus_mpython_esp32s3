@@ -243,7 +243,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
             rp->afe_cfg, NULL, NULL, NULL, NULL);
         mgr_cfg.feed_task_setting.stack_size  = AFE_FEED_TASK_STACK;
         mgr_cfg.fetch_task_setting.stack_size = AFE_FETCH_TASK_STACK;
-
+        mgr_cfg.fetch_task_setting.prio = 10;
         if (esp_gmf_afe_manager_create(&mgr_cfg, &rp->afe_manager) != ESP_GMF_ERR_OK) {
             ESP_LOGW(TAG, "afe_manager_create failed - wakeup detection disabled");
             free(rp->afe_cfg);

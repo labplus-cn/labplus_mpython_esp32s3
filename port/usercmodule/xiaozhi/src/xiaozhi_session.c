@@ -38,6 +38,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/idf_additions.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/event_groups.h"
@@ -529,7 +530,7 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
         if (!data->data_ptr || data->data_len <= 0) break;
         if (data->op_code == WS_TRANSPORT_OPCODES_BINARY) {
             /* 二进制：Opus 音频帧（仅 SPEAKING 状态下入队） */
-            ESP_LOGI(TAG, "← binary %d bytes (Opus)", data->data_len);
+            // ESP_LOGI(TAG, "← binary %d bytes (Opus)", data->data_len);
 
             if (s_ctx->state == XIAOZHI_STATE_SPEAKING) {
                 opus_packet_t pkt;
@@ -544,7 +545,7 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
         } else if (data->op_code == WS_TRANSPORT_OPCODES_TEXT) {
             /* 文本：JSON 控制消息 */
             /* 注意：data->data_ptr 可能不以 null 结尾 */
-            ESP_LOGI(TAG, "← text %d bytes", data->data_len);
+            // ESP_LOGI(TAG, "← text %d bytes", data->data_len);
             char *buf = malloc(data->data_len + 1);
             if (buf) {
                 memcpy(buf, data->data_ptr, data->data_len);
@@ -627,7 +628,7 @@ static void capture_task_fn(void *arg)
             int ret = esp_websocket_client_send_bin(s_ctx->ws_client,
                                                     (const char *)frame_buf,
                                                     send_size,
-                                                    pdMS_TO_TICKS(0));
+                                                    pdMS_TO_TICKS(10));
             if (ret < 0) {
                 ESP_LOGW(TAG, "WS send_bin failed (drop frame): %d", ret);
             }
@@ -1034,8 +1035,8 @@ esp_err_t xiaozhi_start(void)
     }
 
     /* 启动音频任务（capture 任务内部负责 record_pipe open+start） */
-    xTaskCreate(capture_task_fn,  "xz_cap",  CAPTURE_TASK_STACK,  NULL,
-                CAPTURE_TASK_PRIO,  &s_ctx->capture_task);
+    xTaskCreatePinnedToCore(capture_task_fn,  "xz_cap",  CAPTURE_TASK_STACK,  NULL,
+                CAPTURE_TASK_PRIO,  &s_ctx->capture_task, 1);
     xTaskCreate(playback_task_fn, "xz_play", PLAYBACK_TASK_STACK, NULL,
                 PLAYBACK_TASK_PRIO, &s_ctx->playback_task);
 
