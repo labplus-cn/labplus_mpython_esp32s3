@@ -103,7 +103,7 @@
 /* FreeRTOS 任务参数 */
 #define CAPTURE_TASK_STACK   6144
 #define CAPTURE_TASK_PRIO    7
-#define PLAYBACK_TASK_STACK  8192
+#define PLAYBACK_TASK_STACK  16384
 #define PLAYBACK_TASK_PRIO   7
 
 /* ====================================================
@@ -172,8 +172,8 @@ typedef struct {
     xiaozhi_on_message_t   on_message;
     xiaozhi_on_wakeup_t    on_wakeup;
 
-    /* 唤醒词模式：true=连接后进入 CONNECTED，false=直接进入 LISTENING */
-    /* (已移除，统一使用 LISTENING 空闲状态) */
+    /* TTS 结束标志：收到 tts.state=stop 后置 true，playback_task 检测队列排空后才退出 SPEAKING */
+    volatile bool tts_stop_received;
 
 } xiaozhi_ctx_t;
 
@@ -420,12 +420,13 @@ static void handle_json_message(const char *json_str)
         if (strcmp(tts_state, "start") == 0) {
             /* 服务器开始 TTS：停止录音上传，清空播放队列，切换为 SPEAKING */
             s_ctx->recording_active = false;
+            s_ctx->tts_stop_received = false;  /* 重置，等待新的 stop 信号 */
             opus_packet_t tmp;
             while (xQueueReceive(s_ctx->play_queue, &tmp, 0) == pdTRUE) {}
             set_state(XIAOZHI_STATE_SPEAKING);
         } else if (strcmp(tts_state, "stop") == 0) {
-            /* TTS 结束后等待播放队列清空，再切回 LISTENING */
-            /* 由 playback_task 检测队列空并自动切换 */
+            /* 服务器已发完所有音频帧，通知 playback_task 待队列排空后退出 SPEAKING */
+            s_ctx->tts_stop_received = true;
         }
 
         if (s_ctx->on_tts_state) s_ctx->on_tts_state(tts_state, tts_text);
@@ -571,26 +572,33 @@ static void capture_task_fn(void *arg)
         record_pipe_acquire_frame(s_ctx->rec_pipe, &data, &size);
 
         if (size <= 0) {
-            vTaskDelay(pdMS_TO_TICKS(5));
+            /* acquire 出错（pipeline 刚启动或已停止）：等一帧时长再重试，避免 CPU 空转 */
+            vTaskDelay(pdMS_TO_TICKS(s_ctx->frame_ms));
             continue;
         }
 
+        /* 将帧数据复制到栈缓冲，立即释放 pipeline 缓冲，减少 AFE FETCH 阻塞时间 */
+        uint8_t frame_buf[512];
+        int send_size = (size <= (int)sizeof(frame_buf)) ? size : (int)sizeof(frame_buf);
+        if (send_size > 0) {
+            memcpy(frame_buf, data, send_size);
+        }
+        record_pipe_release_frame(s_ctx->rec_pipe);
+
         /* recording_active=true 且非 SPEAKING 时，通过 WebSocket 发送 Opus 帧 */
-        if (s_ctx->recording_active &&
+        if (send_size > 0 &&
+            s_ctx->recording_active &&
             s_ctx->state != XIAOZHI_STATE_SPEAKING &&
             s_ctx->ws_client &&
             esp_websocket_client_is_connected(s_ctx->ws_client)) {
             int ret = esp_websocket_client_send_bin(s_ctx->ws_client,
-                                                    (const char *)data,
-                                                    size,
+                                                    (const char *)frame_buf,
+                                                    send_size,
                                                     pdMS_TO_TICKS(0));
             if (ret < 0) {
                 ESP_LOGW(TAG, "WS send_bin failed (drop frame): %d", ret);
             }
         }
-        /* recording_active=false 时丢弃帧（防止 pipeline 堵死） */
-
-        record_pipe_release_frame(s_ctx->rec_pipe);
     }
 
     /* 正常退出：停止并关闭录音 pipeline；xiaozhi_stop 中的 NULL 检查会跳过重复操作 */
@@ -631,8 +639,8 @@ static void playback_task_fn(void *arg)
         BaseType_t got = xQueueReceive(s_ctx->play_queue, &pkt, pdMS_TO_TICKS(100));
         
         if (got != pdTRUE) {
-            if (s_ctx->state == XIAOZHI_STATE_SPEAKING) {
-                ESP_LOGI(TAG, "Playback: got opus packet..., len=%d", pkt.len);
+            /* 队列超时：无新包，仅在收到 tts.state=stop 后才检测是否已播完 */
+            if (s_ctx->state == XIAOZHI_STATE_SPEAKING && s_ctx->tts_stop_received) {
                 if (!tts_stop_pending) {
                     tts_stop_pending = true;
                     tts_stop_ts = xTaskGetTickCount();
@@ -645,6 +653,7 @@ static void playback_task_fn(void *arg)
             }
             continue;
         }
+        /* 成功取到包，重置排空计时 */
         tts_stop_pending = false;
 
         /* Opus 解码 → mono PCM */
@@ -1012,6 +1021,11 @@ esp_err_t xiaozhi_stop(void)
     /* 发停止信号给任务 */
     xEventGroupSetBits(s_ctx->event_group, EVT_STOP_REQUESTED);
 
+    /* 先停止录音 pipeline：让阻塞在 acquire_frame 中的 capture_task 及时返回 */
+    if (s_ctx->rec_pipe) {
+        record_pipe_stop(s_ctx->rec_pipe);
+    }
+
     /* 发送 goodbye */
     if (s_ctx->ws_client && esp_websocket_client_is_connected(s_ctx->ws_client)) {
         send_listen_stop();
@@ -1035,9 +1049,8 @@ esp_err_t xiaozhi_stop(void)
         s_ctx->ws_client = NULL;
     }
 
-    /* 停止并关闭录音 pipeline（下次 start 时重新 open，防止 AFE 空转） */
+    /* 关闭录音 pipeline（stop 已在等待任务前调用，此处只需 close） */
     if (s_ctx->rec_pipe) {
-        record_pipe_stop(s_ctx->rec_pipe);
         record_pipe_close(s_ctx->rec_pipe);
         s_ctx->rec_pipe = NULL;
     }
