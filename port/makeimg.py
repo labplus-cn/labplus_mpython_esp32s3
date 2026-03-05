@@ -151,7 +151,7 @@ max_size_sr = 0
 # factory,    app,  factory,   0x10000,   0x6E0000,
 # vfs,        data, spiffs,    0x6F0000,  0x200000,
 # voice_data, data, fat,       0x8F0000,  0x3CD000,
-# sr_module,  data, spiffs,    0xCBD000,  0x31F000,
+# model,  data, spiffs,    0xCBD000,  0x31F000,
 # fr,         data,   ,        0xFDC000,  0x20000
 # user_nvs,   data, nvs,       0xFFC000,  0x4000,
 
@@ -171,7 +171,7 @@ for part in partition_table:
     elif part.name == "voice_data":
         offset_voice_data = part.offset
         max_size_voice_data = part.size
-    elif part.name == "sr_module":
+    elif part.name == "model":
         offset_sr = part.offset
         max_size_sr = part.size
 
@@ -182,7 +182,7 @@ files_in = [
     ("application", offset_application, max_size_application, arg_application_bin),
     ("vfs", offset_vfs, max_size_vfs, arg_vfs_bin),
     ("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin),
-    ("sr_module", offset_sr, max_size_sr, arg_sr_bin),
+    ("model", offset_sr, max_size_sr, arg_sr_bin),
 ]
 file_out = arg_output_bin
 

@@ -214,7 +214,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     if (wakeup_cb) {
         /* 加载 flash 分区 "model" 中的 SR 模型 */
-        rp->models = esp_srmodel_init("sr_module");
+        rp->models = esp_srmodel_init("model");
         if (!rp->models || rp->models->num <= 0) {
             ESP_LOGW(TAG, "SR models not found - wakeup detection disabled");
             rp->models = NULL;

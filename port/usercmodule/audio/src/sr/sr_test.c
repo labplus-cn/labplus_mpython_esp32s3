@@ -130,7 +130,7 @@ void test(void)
     esp_gmf_port_handle_t in_port = NEW_ESP_GMF_PORT_IN_BYTE(wn_acquire_read, wn_release_read, NULL, NULL, 1024, 100);
     esp_gmf_port_handle_t out_port = NEW_ESP_GMF_PORT_OUT_BYTE(wn_acquire_write, wn_release_write, NULL, NULL, 1024, 100);
 
-    srmodel_list_t *models = esp_srmodel_init("sr_module");
+    srmodel_list_t *models = esp_srmodel_init("model");
     const char *ch_format = "M";
     esp_gmf_wn_cfg_t wn_cfg = {
         .input_format = (char *)ch_format,
@@ -268,7 +268,7 @@ void test(void)
     esp_gmf_port_handle_t out_port = NEW_ESP_GMF_PORT_OUT_BYTE(afe_acquire_write, afe_release_write, NULL, NULL, 1024, 100);
 
     esp_gmf_afe_manager_handle_t afe_manager = NULL;
-    srmodel_list_t *models = esp_srmodel_init("sr_module");
+    srmodel_list_t *models = esp_srmodel_init("model");
     const char *ch_format = "M";
     afe_config_t *afe_cfg = afe_config_init(ch_format, models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
     afe_cfg->vad_init = true;

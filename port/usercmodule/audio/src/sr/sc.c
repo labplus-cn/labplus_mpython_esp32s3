@@ -227,7 +227,7 @@ void sc_init(const char *word, uint16_t t, bool f)
     enable_flag = f;
 
     bsp_codec_dev_open(16000, 1, 16);
-    models = esp_srmodel_init("sr_module");
+    models = esp_srmodel_init("model");
 
     afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
 //    afe_config_print(afe_config);

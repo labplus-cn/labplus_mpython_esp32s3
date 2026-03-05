@@ -242,7 +242,7 @@ void sr_init(const char *word, uint16_t t, bool f)
     timeout = t;
 
     // bsp_codec_dev_open(16000, 1, 16, CODEC_INPUT);
-    models = esp_srmodel_init("sr_module");
+    models = esp_srmodel_init("model");
 
     afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
     // afe_config->pcm_config.total_ch_num = 2; 
