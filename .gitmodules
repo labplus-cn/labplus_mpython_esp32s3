@@ -1,6 +1,3 @@
-[submodule "mpython-docs"]
-	path = mpython-docs
-	url = https://github.com/labplus-cn/mpython-docs.git
 [submodule "esp-idf"]
 	path = esp-idf
 	url = https://github.com/espressif/esp-idf.git
@@ -16,3 +13,6 @@
 [submodule "port/usercmodule/lv_binding_micropython"]
 	path = port/usercmodule/lv_binding_micropython
 	url = https://github.com/labplus-cn/lv_binding_micropython.git
+[submodule "mpython-esp32s3-doc"]
+	path = mpython-esp32s3-doc
+	url = https://github.com/labplus-cn/mpython-esp32s3-doc.git
