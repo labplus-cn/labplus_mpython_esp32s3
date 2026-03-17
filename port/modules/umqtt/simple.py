@@ -70,7 +70,7 @@ class MQTTClient:
             self.lw_msg = None
             self.lw_qos = 0
             self.lw_retain = False
-            print('no aesparam mode!!!')
+            # print('no aesparam mode!!!')
             # print('aes_mode:{}\n'.format(self.aes_mode))
         self.DELAY_500_MS = 500
 
