@@ -110,7 +110,11 @@ const static dev_display_lcd_config_t esp_bmgr_display_lcd_cfg = {
             .spi = {
                     .spi_name = "spi_display",
                     .panel_config = {
+#if CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD
                             .reset_gpio_num = -1,
+#else
+                            .reset_gpio_num = 47,
+#endif
                             .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
                             .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
                             .bits_per_pixel = 16,
@@ -120,7 +124,11 @@ const static dev_display_lcd_config_t esp_bmgr_display_lcd_cfg = {
                             .vendor_config = NULL,
                         },
                     .io_spi_config = {
+#if CONFIG_MPYTHON_V3_BOARD || CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD
                             .cs_gpio_num = 34,
+#elif CONFIG_LABPLUS_LEDONG_V2_BOARD || CONFIG_LABPLUS_XUNFEI_JS_PRIMARY_BOARD
+                            .cs_gpio_num = -1,
+#endif
                             .dc_gpio_num = 35,
                             .spi_mode = 0,
                             .pclk_hz = 60000000,
