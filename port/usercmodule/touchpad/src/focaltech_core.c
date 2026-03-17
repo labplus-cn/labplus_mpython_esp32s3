@@ -34,11 +34,14 @@
 #include "driver/i2c.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/i2c_master.h"
+#include "esp_board_manager.h"
+#include "esp_board_periph.h"
 /*****************************************************************************
  * Private constant and macro definitions using #define
  *****************************************************************************/
 static QueueHandle_t gpio_evt_queue = NULL;
-
+static i2c_master_dev_handle_t touchpad_dev_handle = NULL;
 
 /*****************************************************************************
  * Private variables/functions
@@ -63,14 +66,12 @@ void fts_msleep(unsigned long msec)
 
 static int platform_i2c_write(uint8_t *wbuf, uint16_t wlen)
 {
-    return i2c_master_write_to_device(I2C_MASTER_NUM, I2C_PEER_ADDR, wbuf, wlen, 100 * (1 + wlen) / portTICK_PERIOD_MS);
-
+   return i2c_master_transmit(touchpad_dev_handle, wbuf, wlen, 100 * (1 + wlen) / portTICK_PERIOD_MS);
 }
 
 static int platform_i2c_read(uint8_t addr, uint8_t *rbuf, uint16_t rlen)
 {
-    return i2c_master_write_read_device(I2C_MASTER_NUM, I2C_PEER_ADDR, &addr, 1, rbuf, rlen, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-  
+    return i2c_master_transmit_receive(touchpad_dev_handle, &addr, 1, rbuf, rlen, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
 /*****************************************************************************
@@ -767,3 +768,23 @@ int fts_ts_resume(void)
 //     gpio_task_example(NULL);
 //     return ret;
 // }
+
+int fts_ts_init(void)
+{
+    static i2c_master_bus_handle_t bus_handle = NULL;
+    esp_err_t err = esp_board_manager_get_periph_handle(ESP_BOARD_PERIPH_NAME_I2C_MASTER, (void **)&bus_handle);
+    if (err != ESP_OK) {
+        FTS_ERROR("Failed to get I2C bus handle");
+        return -1;
+    }
+
+    i2c_device_config_t touchpad_dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = I2C_PEER_ADDR,
+        .scl_speed_hz = 200000,
+    };
+    
+    i2c_master_bus_add_device(bus_handle, &touchpad_dev_cfg, &touchpad_dev_handle);
+
+    return 0;
+}

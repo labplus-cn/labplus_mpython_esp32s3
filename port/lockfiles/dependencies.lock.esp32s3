@@ -1,10 +1,30 @@
 dependencies:
+  esp32-camera:
+    dependencies: []
+    source:
+      path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/port/usercmodule/esp-who/esp-who/components/esp32-camera
+      type: local
+    version: 2.0.15
   esp_lcd_jd9853:
     dependencies: []
     source:
       path: /home/jiang/share/labplus_mpython/labplus_mpython_esp32s3/port/components/esp_lcd_jd9853
       type: local
     version: 2.0.2
+  espressif/button:
+    component_hash: 30a3f495c3862d505ce6e41adbbd218b2750e9723ab2151feff00e9fe685b326
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: idf
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 3.5.0
   espressif/cmake_utilities:
     component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
     dependencies:
@@ -53,20 +73,30 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 2.1.5
-  espressif/esp32-camera:
-    component_hash: ac4228c825b891378bc0806869170d4ebc5d45ba8ebc519b4f8886a56ad2d123
+  espressif/esp32_s3_eye_noglib:
+    component_hash: 5d5feae65316856500d90f264abc7bbd3b1e31a1621f89e459adb5314baae523
     dependencies:
-    - name: espressif/esp_jpeg
-      registry_url: https://components.espressif.com
-      require: public
-      version: ^1.3.1
     - name: idf
       require: private
-      version: '>=5.1'
+      version: '>=4.4.5'
+    - name: espressif/button
+      registry_url: https://components.espressif.com
+      require: public
+      version: '>=2.5,<4.0'
+    - name: espressif/esp32-camera
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^2.0.2
+    - name: espressif/esp_codec_dev
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^1
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 2.1.5
+    targets:
+    - esp32s3
+    version: 3.0.4
   espressif/esp_audio_codec:
     component_hash: 04c2f0d5eca207cdfabd3aafc50ef4bca53532115ddf7689e5cfabd00eb88b02
     dependencies:
@@ -166,16 +196,6 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.0.1
-  espressif/esp_jpeg:
-    component_hash: defb83669293cbf86d0fa86b475ba5517aceed04ed70db435388c151ab37b5d7
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
-    source:
-      registry_url: https://components.espressif.com
-      type: service
-    version: 1.3.1
   espressif/esp_muxer:
     component_hash: 0e3f27c1ec96035c846b9ccc262190045e93b721defe13060d0e4ab712d98852
     dependencies:
@@ -361,7 +381,7 @@ dependencies:
     - esp32h4
     version: e4c0ec3caab3d9c25374de7047653b9ced8f14ff
   espressif/usb_host_uvc:
-    component_hash: 197eae0d1dd5ddec773704653e0ff70e81126b8ccdb62e034ed239f755adb48c
+    component_hash: f20c4e4dea50536e2e29daaf589b5f5984402284c155867daef27d6b64869f78
     dependencies:
     - name: idf
       require: private
@@ -382,7 +402,7 @@ dependencies:
     - esp32p4
     - esp32h4
     - linux
-    version: 2.4.1
+    version: 2.4.2
   idf:
     source:
       type: idf
@@ -402,6 +422,7 @@ direct_dependencies:
 - espressif/cmake_utilities
 - espressif/esp-sr
 - espressif/esp32-camera
+- espressif/esp32_s3_eye_noglib
 - espressif/esp_audio_codec
 - espressif/esp_audio_effects
 - espressif/esp_audio_render
@@ -426,6 +447,6 @@ direct_dependencies:
 - espressif/tinyusb
 - idf
 - joltwallet/littlefs
-manifest_hash: 70cb0ca1394dbe6ce3a5df0320d5b53c3989f36b689d6b350e44ff10656100bb
+manifest_hash: a8634380bb8cc26fab875f23d988c55a3b74737e9fa8445f4fb4ddb18b979de8
 target: esp32s3
 version: 2.0.0

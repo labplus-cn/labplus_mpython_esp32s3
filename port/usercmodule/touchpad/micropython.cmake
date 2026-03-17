@@ -7,8 +7,9 @@ target_sources(usermod_touchpad INTERFACE
 )
 
 target_include_directories(usermod_touchpad INTERFACE
-        ${IDF_PATH}/components/driver/gpio/include
+        ${IDF_PATH}/components/esp_driver_gpio/include
         ${CMAKE_CURRENT_LIST_DIR}/src
+        ${MPY_PORT_DIR}/../esp-gmf/packages/esp_board_manager/include
 
 )
 
