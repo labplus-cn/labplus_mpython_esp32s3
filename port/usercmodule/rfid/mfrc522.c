@@ -31,21 +31,23 @@
  * 包含文件
  ******************************************************************************/
 #include "mfrc522.h"
-
+#include "esp_board_periph.h"
+#include "freertos/FreeRTOS.h"
 /******************************************************************************
  * 用户 API
  ******************************************************************************/
-
+static int writeReg(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg_addr, uint8_t val);
+static uint8_t readReg(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg_addr);
 /******************************************************************************
  * 函 数 名：init
  * 功能描述：初始化RC522
  * 输入参数：无
  * 返 回 值：无
  ******************************************************************************/
-void RFID_init(uint8_t i2c_addr)
+void RFID_init(i2c_master_dev_handle_t _rfid_dev_handle)
 {    
-  RFID_reset(i2c_addr);
-  RFID_antennaOn(i2c_addr);    //打开天线
+  RFID_reset(_rfid_dev_handle);
+  RFID_antennaOn(_rfid_dev_handle);    //打开天线
 }
 
 /******************************************************************************
@@ -54,23 +56,23 @@ void RFID_init(uint8_t i2c_addr)
  * 输入参数：无
  * 返 回 值：无
  ******************************************************************************/
-void RFID_reset(uint8_t i2c_addr)
+void RFID_reset(i2c_master_dev_handle_t _rfid_dev_handle)
 {
   // HAL_GPIO_WritePin(MF_RST_GPIO_Port, MF_RST_Pin, GPIO_PIN_RESET);
   // HAL_Delay(1);
   // HAL_GPIO_WritePin(MF_RST_GPIO_Port, MF_RST_Pin, GPIO_PIN_SET);
   // HAL_Delay(1);
   
-  writeReg(i2c_addr, CommandReg, PCD_RESETPHASE);
+  writeReg(_rfid_dev_handle, CommandReg, PCD_RESETPHASE);
   // HAL_Delay(1);
   
   /* imer: TPrescaler*TreloadVal/6.78MHz = 24ms */
-  writeReg(i2c_addr, TModeReg, 0x8D);   //Tauto=1; f(Timer) = 6.78MHz/TPreScaler
-  writeReg(i2c_addr, TPrescalerReg, 0x3E);  //TModeReg[3..0] + TPrescalerReg
-  writeReg(i2c_addr, TReloadRegL, 30);
-  writeReg(i2c_addr, TReloadRegH, 0);
-  writeReg(i2c_addr, TxAutoReg, 0x40);    //100%ASK 必须要
-  writeReg(i2c_addr, ModeReg, 0x3D);    // CRC valor inicial de 0x6363
+  writeReg(_rfid_dev_handle, TModeReg, 0x8D);   //Tauto=1; f(Timer) = 6.78MHz/TPreScaler
+  writeReg(_rfid_dev_handle, TPrescalerReg, 0x3E);  //TModeReg[3..0] + TPrescalerReg
+  writeReg(_rfid_dev_handle, TReloadRegL, 30);
+  writeReg(_rfid_dev_handle, TReloadRegH, 0);
+  writeReg(_rfid_dev_handle, TxAutoReg, 0x40);    //100%ASK 必须要
+  writeReg(_rfid_dev_handle, ModeReg, 0x3D);    // CRC valor inicial de 0x6363
 
   //ClearBitMask(Status2Reg, 0x08); //MFCrypto1On=0
   //writeReg(RxSelReg, 0x86);   //RxWait = RxSelReg[5..0]
@@ -83,14 +85,14 @@ void RFID_reset(uint8_t i2c_addr)
 * 输入参数：无
 * 返 回 值：无
 ******************************************************************************/
-void RFID_antennaOn(uint8_t i2c_addr)
+void RFID_antennaOn(i2c_master_dev_handle_t _rfid_dev_handle)
 {
   uint8_t temp;
 
-  temp = readReg(i2c_addr, TxControlReg);
+  temp = readReg(_rfid_dev_handle, TxControlReg);
   if (!(temp & 0x03))
   {
-    RFID_setBitMask(i2c_addr, TxControlReg, 0x03);
+    RFID_setBitMask(_rfid_dev_handle, TxControlReg, 0x03);
   }
 //	temp = readReg(TxControlReg);
 //	temp = readReg(TxControlReg);
@@ -102,14 +104,14 @@ void RFID_antennaOn(uint8_t i2c_addr)
 * 输入参数：无
 * 返 回 值：无
 ******************************************************************************/
-void RFID_antennaOff(uint8_t i2c_addr)
+void RFID_antennaOff(i2c_master_dev_handle_t _rfid_dev_handle)
 {
   uint8_t temp;
 
-  temp = readReg(i2c_addr, TxControlReg);
+  temp = readReg(_rfid_dev_handle, TxControlReg);
   if (!(temp & 0x03))
   {
-      RFID_clearBitMask(i2c_addr, TxControlReg, 0x03);
+      RFID_clearBitMask(_rfid_dev_handle, TxControlReg, 0x03);
   }
 }
 
@@ -119,7 +121,7 @@ void RFID_antennaOff(uint8_t i2c_addr)
 * 输入参数：serNum--传入卡序列号
 * 返 回 值：成功返回卡容量
 ******************************************************************************/
-uint8_t RFID_selectTag(uint8_t i2c_addr, uint8_t *serNum)
+uint8_t RFID_selectTag(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t *serNum)
 {
   uint8_t i;
   uint8_t status;
@@ -135,9 +137,9 @@ uint8_t RFID_selectTag(uint8_t i2c_addr, uint8_t *serNum)
   for (i = 0; i<5; i++)
     buffer[i + 2] = *(serNum + i);
 
-  RFID_calculateCRC(i2c_addr, buffer, 7, &buffer[7]);
+  RFID_calculateCRC(_rfid_dev_handle, buffer, 7, &buffer[7]);
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buffer, 9, buffer, &recvBits);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buffer, 9, buffer, &recvBits);
   if ((status == MI_OK) && (recvBits == 0x18))
     size = buffer[i];
   else
@@ -151,7 +153,7 @@ uint8_t RFID_selectTag(uint8_t i2c_addr, uint8_t *serNum)
 * 输入参数：blockAddr--块地址;recvData--读出的块数据
 * 返 回 值：成功返回MI_OK
 ******************************************************************************/
-uint8_t RFID_readBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *recvData)
+uint8_t RFID_readBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t blockAddr, uint8_t *recvData)
 {
   uint8_t status;
   unsigned int unLen;
@@ -159,8 +161,8 @@ uint8_t RFID_readBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *recvData)
 
   tempBuff[0] = PICC_READ;
   tempBuff[1] = blockAddr;
-  RFID_calculateCRC(i2c_addr, tempBuff, 2, &tempBuff[2]);
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, tempBuff, 4, recvData, &unLen);
+  RFID_calculateCRC(_rfid_dev_handle, tempBuff, 2, &tempBuff[2]);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, tempBuff, 4, recvData, &unLen);
 
   if ((status != MI_OK) || (unLen != 0x90)) {
     status = MI_ERR;
@@ -175,7 +177,7 @@ uint8_t RFID_readBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *recvData)
 * 输入参数：blockAddr--块地址;writeData--向块写16字节数据
 * 返 回 值：成功返回MI_OK
 ******************************************************************************/
-uint8_t RFID_writeBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *writeData)
+uint8_t RFID_writeBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t blockAddr, uint8_t *writeData)
 {
   uint8_t status;
   unsigned int recvBits;
@@ -184,8 +186,8 @@ uint8_t RFID_writeBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *writeData)
 
   buff[0] = PICC_WRITE;
   buff[1] = blockAddr;
-  RFID_calculateCRC(i2c_addr, buff, 2, &buff[2]);
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 4, buff, &recvBits);
+  RFID_calculateCRC(_rfid_dev_handle, buff, 2, &buff[2]);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 4, buff, &recvBits);
 
   if ((status != MI_OK) || (recvBits != 4) || ((buff[0] & 0x0F) != 0x0A))
     status = MI_ERR;
@@ -195,8 +197,8 @@ uint8_t RFID_writeBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *writeData)
     for (i = 0; i<16; i++)    //?FIFO?16Byte?? Datos a la FIFO 16Byte escribir
       buff[i] = *(writeData + i);
 
-    RFID_calculateCRC(i2c_addr, buff, 16, &buff[16]);
-    status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 18, buff, &recvBits);
+    RFID_calculateCRC(_rfid_dev_handle, buff, 16, &buff[16]);
+    status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 18, buff, &recvBits);
 
     if ((status != MI_OK) || (recvBits != 4) || ((buff[0] & 0x0F) != 0x0A))
       status = MI_ERR;
@@ -213,7 +215,7 @@ uint8_t RFID_writeBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *writeData)
 *          *pValue： 增减值大小
 * 返 回 值：
 ******************************************************************************/
-uint8_t RFID_IncDecCardBlock(uint8_t i2c_addr, uint8_t dd_mode, uint8_t blockAddr, int32_t pValue)
+uint8_t RFID_IncDecCardBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t dd_mode, uint8_t blockAddr, int32_t pValue)
 {
   char status;
   unsigned int  unLen;
@@ -221,9 +223,9 @@ uint8_t RFID_IncDecCardBlock(uint8_t i2c_addr, uint8_t dd_mode, uint8_t blockAdd
 
   buff[0] = dd_mode;
   buff[1] = blockAddr;
-  RFID_calculateCRC(i2c_addr, buff, 2, &buff[2]);
+  RFID_calculateCRC(_rfid_dev_handle, buff, 2, &buff[2]);
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
 
   if ((status != MI_OK) || (unLen != 4) || ((buff[0] & 0x0F) != 0x0A))
   {
@@ -241,9 +243,9 @@ uint8_t RFID_IncDecCardBlock(uint8_t i2c_addr, uint8_t dd_mode, uint8_t blockAdd
     buff[1] = (uint8_t)((pValue >> 8) & 0xff);
     buff[2] = (uint8_t)((pValue >> 16) & 0xff);
     buff[3] = (uint8_t)((pValue >> 24) & 0xff);
-    RFID_calculateCRC(i2c_addr, buff, 4, &buff[4]);
+    RFID_calculateCRC(_rfid_dev_handle, buff, 4, &buff[4]);
     unLen = 0;
-    status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 6, buff, &unLen);
+    status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 6, buff, &unLen);
     if (status != MI_ERR)
     {
       status = MI_OK;
@@ -254,9 +256,9 @@ uint8_t RFID_IncDecCardBlock(uint8_t i2c_addr, uint8_t dd_mode, uint8_t blockAdd
   {
     buff[0] = PICC_TRANSFER;
     buff[1] = blockAddr;
-    RFID_calculateCRC(i2c_addr, buff, 2, &buff[2]);
+    RFID_calculateCRC(_rfid_dev_handle, buff, 2, &buff[2]);
 
-    status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
+    status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
 
     if ((status != MI_OK) || (unLen != 4) || ((buff[0] & 0x0F) != 0x0A))
     {
@@ -273,7 +275,7 @@ uint8_t RFID_IncDecCardBlock(uint8_t i2c_addr, uint8_t dd_mode, uint8_t blockAdd
 *          goaladdr--目标地址
 * 返 回 值：
 ******************************************************************************/
-uint8_t RFID_backupCardBlock(uint8_t i2c_addr, uint8_t sourceaddr, uint8_t goaladdr)
+uint8_t RFID_backupCardBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t sourceaddr, uint8_t goaladdr)
 {
   char status;
   unsigned int  unLen;
@@ -281,9 +283,9 @@ uint8_t RFID_backupCardBlock(uint8_t i2c_addr, uint8_t sourceaddr, uint8_t goala
 
   buff[0] = PICC_RESTORE;
   buff[1] = sourceaddr;
-  RFID_calculateCRC(i2c_addr, buff, 2, &buff[2]);
+  RFID_calculateCRC(_rfid_dev_handle, buff, 2, &buff[2]);
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
 
   if ((status != MI_OK) || (unLen != 4) || ((buff[0] & 0x0F) != 0x0A))
   {
@@ -296,9 +298,9 @@ uint8_t RFID_backupCardBlock(uint8_t i2c_addr, uint8_t sourceaddr, uint8_t goala
     buff[1] = 0;
     buff[2] = 0;
     buff[3] = 0;
-    RFID_calculateCRC(i2c_addr, buff, 4, &buff[4]);
+    RFID_calculateCRC(_rfid_dev_handle, buff, 4, &buff[4]);
 
-    status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 6, buff, &unLen);
+    status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 6, buff, &unLen);
     if (status != MI_ERR)
     {
       status = MI_OK;
@@ -313,9 +315,9 @@ uint8_t RFID_backupCardBlock(uint8_t i2c_addr, uint8_t sourceaddr, uint8_t goala
   buff[0] = PICC_TRANSFER;
   buff[1] = goaladdr;
 
-  RFID_calculateCRC(i2c_addr, buff, 2, &buff[2]);
+  RFID_calculateCRC(_rfid_dev_handle, buff, 2, &buff[2]);
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
 
   if ((status != MI_OK) || (unLen != 4) || ((buff[0] & 0x0F) != 0x0A))
   {
@@ -331,7 +333,7 @@ uint8_t RFID_backupCardBlock(uint8_t i2c_addr, uint8_t sourceaddr, uint8_t goala
 * 输入参数：无
 * 返 回 值：无
 ******************************************************************************/
-uint8_t RFID_halt(uint8_t i2c_addr)
+uint8_t RFID_halt(i2c_master_dev_handle_t _rfid_dev_handle)
 {
   uint8_t status;
   unsigned int unLen;
@@ -339,9 +341,9 @@ uint8_t RFID_halt(uint8_t i2c_addr)
 
   buff[0] = PICC_HALT;
   buff[1] = 0;
-  RFID_calculateCRC(i2c_addr, buff, 2, &buff[2]);
+  RFID_calculateCRC(_rfid_dev_handle, buff, 2, &buff[2]);
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, buff, 4, buff, &unLen);
   return status;
 }
 
@@ -351,11 +353,11 @@ uint8_t RFID_halt(uint8_t i2c_addr)
  * 输入参数：reg--寄存器地址;mask--置位值
  * 返 回 值：无
  ******************************************************************************/
-void RFID_setBitMask(uint8_t i2c_addr, uint8_t reg, uint8_t mask)
+void RFID_setBitMask(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg, uint8_t mask)
 {
   uint8_t tmp;
-  tmp = readReg(i2c_addr, reg);
-  writeReg(i2c_addr, reg, tmp | mask);  // set bit mask
+  tmp = readReg(_rfid_dev_handle, reg);
+  writeReg(_rfid_dev_handle, reg, tmp | mask);  // set bit mask
 }
 
 /******************************************************************************
@@ -364,11 +366,11 @@ void RFID_setBitMask(uint8_t i2c_addr, uint8_t reg, uint8_t mask)
  * 输入参数：reg--寄存器地址;mask--清位值
  * 返 回 值：无
  ******************************************************************************/
-void RFID_clearBitMask(uint8_t i2c_addr, uint8_t reg, uint8_t mask)
+void RFID_clearBitMask(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg, uint8_t mask)
 {
   uint8_t tmp;
-  tmp = readReg(i2c_addr, reg);
-  writeReg(i2c_addr, reg, tmp & (~mask));  // clear bit mask
+  tmp = readReg(_rfid_dev_handle, reg);
+  writeReg(_rfid_dev_handle, reg, tmp & (~mask));  // clear bit mask
 }
 
 /******************************************************************************
@@ -383,15 +385,15 @@ void RFID_clearBitMask(uint8_t i2c_addr, uint8_t reg, uint8_t mask)
 *                    0x4403 = Mifare_DESFire
 * 返 回 值：成功返回MI_OK
 ******************************************************************************/
-uint8_t RFID_findCard(uint8_t i2c_addr, uint8_t reqMode, uint8_t *TagType)
+uint8_t RFID_findCard(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reqMode, uint8_t *TagType)
 {
   uint8_t status;
   unsigned int backBits;      //接收到的数据位数
 
-  writeReg(i2c_addr, BitFramingReg, 0x07);    //TxLastBists = BitFramingReg[2..0] ???
+  writeReg(_rfid_dev_handle, BitFramingReg, 0x07);    //TxLastBists = BitFramingReg[2..0] ???
 
   TagType[0] = reqMode;
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, TagType, 1, TagType, &backBits);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, TagType, 1, TagType, &backBits);
 
   if ((status != MI_OK) || (backBits != 0x10))
   {
@@ -407,21 +409,21 @@ uint8_t RFID_findCard(uint8_t i2c_addr, uint8_t reqMode, uint8_t *TagType)
 * 输入参数：serNum--返回4字节卡序列号,第5字节为校验字节
 * 返 回 值：成功返回MI_OK
 ******************************************************************************/
-uint8_t RFID_anticoll(uint8_t i2c_addr, uint8_t *serNum)
+uint8_t RFID_anticoll(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t *serNum)
 {
   uint8_t status;
   uint8_t i;
   uint8_t serNumCheck = 0;
   unsigned int unLen;
 
-  RFID_clearBitMask(i2c_addr, Status2Reg, 0x08);   //TempSensclear
-  RFID_clearBitMask(i2c_addr, CollReg, 0x80);     //ValuesAfterColl
-  writeReg(i2c_addr, BitFramingReg, 0x00);    //TxLastBists = BitFramingReg[2..0]
+  RFID_clearBitMask(_rfid_dev_handle, Status2Reg, 0x08);   //TempSensclear
+  RFID_clearBitMask(_rfid_dev_handle, CollReg, 0x80);     //ValuesAfterColl
+  writeReg(_rfid_dev_handle, BitFramingReg, 0x00);    //TxLastBists = BitFramingReg[2..0]
 
   serNum[0] = PICC_ANTICOLL;
   serNum[1] = 0x20;
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_TRANSCEIVE, serNum, 2, serNum, &unLen);
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_TRANSCEIVE, serNum, 2, serNum, &unLen);
 
   if (status == MI_OK)
   {
@@ -435,7 +437,7 @@ uint8_t RFID_anticoll(uint8_t i2c_addr, uint8_t *serNum)
     }
   }
 
-  RFID_setBitMask(i2c_addr, CollReg, 0x80);    //ValuesAfterColl=1
+  RFID_setBitMask(_rfid_dev_handle, CollReg, 0x80);    //ValuesAfterColl=1
 
   return status;
 }
@@ -446,31 +448,31 @@ uint8_t RFID_anticoll(uint8_t i2c_addr, uint8_t *serNum)
  * 输入参数：pIndata--要读数CRC的数据，len--数据长度，pOutData--计算的CRC结果
  * 返 回 值：无
  ******************************************************************************/
-void RFID_calculateCRC(uint8_t i2c_addr, uint8_t *pIndata, uint8_t len, uint8_t *pOutData)
+void RFID_calculateCRC(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t *pIndata, uint8_t len, uint8_t *pOutData)
 {
   uint8_t i, n;
 
-  RFID_clearBitMask(i2c_addr, DivIrqReg, 0x04);      //CRCIrq = 0
-  RFID_setBitMask(i2c_addr, FIFOLevelReg, 0x80);     //清FIFO指针
+  RFID_clearBitMask(_rfid_dev_handle, DivIrqReg, 0x04);      //CRCIrq = 0
+  RFID_setBitMask(_rfid_dev_handle, FIFOLevelReg, 0x80);     //清FIFO指针
   //Write_MFRC522(CommandReg, PCD_IDLE);
 
   //向FIFO中写入数据
   for (i=0; i<len; i++)
-    writeReg(i2c_addr, FIFODataReg, *(pIndata+i));
-  writeReg(i2c_addr, CommandReg, PCD_CALCCRC);
+    writeReg(_rfid_dev_handle, FIFODataReg, *(pIndata+i));
+  writeReg(_rfid_dev_handle, CommandReg, PCD_CALCCRC);
 
   //等待CRC计算完成
   i = 0xFF;
   do
   {
-    n = readReg(i2c_addr, DivIrqReg);
+    n = readReg(_rfid_dev_handle, DivIrqReg);
     i--;
   }
   while ((i!=0) && !(n&0x04));      //CRCIrq = 1
 
   //读取CRC计算结果
-  pOutData[0] = readReg(i2c_addr, CRCResultRegL);
-  pOutData[1] = readReg(i2c_addr, CRCResultRegM);
+  pOutData[0] = readReg(_rfid_dev_handle, CRCResultRegL);
+  pOutData[1] = readReg(_rfid_dev_handle, CRCResultRegM);
 }
 
 /******************************************************************************
@@ -483,7 +485,7 @@ void RFID_calculateCRC(uint8_t i2c_addr, uint8_t *pIndata, uint8_t len, uint8_t 
  *                     backLen--返回数据的位长度
  * 返 回 值：成功返回MI_OK
  ******************************************************************************/
-uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData, uint8_t sendLen, uint8_t *backData, unsigned int *backLen)
+uint8_t RFID_MFRC522ToCard(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t command, uint8_t *sendData, uint8_t sendLen, uint8_t *backData, unsigned int *backLen)
 {
   uint8_t status = MI_ERR;
   uint8_t irqEn = 0x00;
@@ -510,20 +512,20 @@ uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData,
       break;
   }
 
-  writeReg(i2c_addr, CommIEnReg, irqEn|0x80); //允许中断请求
-  RFID_clearBitMask(i2c_addr, CommIrqReg, 0x80);       //清除所有中断请求位
-  RFID_setBitMask(i2c_addr, FIFOLevelReg, 0x80);       //FlushBuffer=1, FIFO初始化
+  writeReg(_rfid_dev_handle, CommIEnReg, irqEn|0x80); //允许中断请求
+  RFID_clearBitMask(_rfid_dev_handle, CommIrqReg, 0x80);       //清除所有中断请求位
+  RFID_setBitMask(_rfid_dev_handle, FIFOLevelReg, 0x80);       //FlushBuffer=1, FIFO初始化
 
-  writeReg(i2c_addr, CommandReg, PCD_IDLE);   //无动作，取消当前命令
+  writeReg(_rfid_dev_handle, CommandReg, PCD_IDLE);   //无动作，取消当前命令
 
   //向FIFO中写入数据
   for (i=0; i<sendLen; i++)
-    writeReg(i2c_addr, FIFODataReg, sendData[i]);
+    writeReg(_rfid_dev_handle, FIFODataReg, sendData[i]);
 
   //执行命令
-  writeReg(i2c_addr, CommandReg, command);
+  writeReg(_rfid_dev_handle, CommandReg, command);
   if (command == PCD_TRANSCEIVE)
-    RFID_setBitMask(i2c_addr, BitFramingReg, 0x80);    //StartSend=1,transmission of data starts
+    RFID_setBitMask(_rfid_dev_handle, BitFramingReg, 0x80);    //StartSend=1,transmission of data starts
 
   //等待接收数据完成
   i = 2000; //i根据时钟频率调整，操作M1卡最大等待时间25ms
@@ -531,16 +533,16 @@ uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData,
   {
     //CommIrqReg[7..0]
     //Set1 TxIRq RxIRq IdleIRq HiAlerIRq LoAlertIRq ErrIRq TimerIRq
-    n = readReg(i2c_addr, CommIrqReg);
+    n = readReg(_rfid_dev_handle, CommIrqReg);
     i--;
   }
   while ((i!=0) && !(n&0x01) && !(n&waitIRq));
 
-  RFID_clearBitMask(i2c_addr, BitFramingReg, 0x80);      //StartSend=0
+  RFID_clearBitMask(_rfid_dev_handle, BitFramingReg, 0x80);      //StartSend=0
 
   if (i != 0)
   {
-    if(!(readReg(i2c_addr, ErrorReg) & 0x1B)) //BufferOvfl Collerr CRCErr ProtecolErr
+    if(!(readReg(_rfid_dev_handle, ErrorReg) & 0x1B)) //BufferOvfl Collerr CRCErr ProtecolErr
     {
       status = MI_OK;
       if (n & irqEn & 0x01)
@@ -548,8 +550,8 @@ uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData,
 
       if (command == PCD_TRANSCEIVE)
       {
-        n = readReg(i2c_addr, FIFOLevelReg);
-        lastBits = readReg(i2c_addr, ControlReg) & 0x07;
+        n = readReg(_rfid_dev_handle, FIFOLevelReg);
+        lastBits = readReg(_rfid_dev_handle, ControlReg) & 0x07;
         if (lastBits)
           *backLen = (n-1)*8 + lastBits;
         else
@@ -562,7 +564,7 @@ uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData,
 
         //读取FIFO中接收到的数据
         for (i=0; i<n; i++)
-          backData[i] = readReg(i2c_addr, FIFODataReg);
+          backData[i] = readReg(_rfid_dev_handle, FIFODataReg);
       }
     }
     else
@@ -586,7 +588,7 @@ uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData,
  *           serNum--卡片序列号，4字节
  * 返 回 值：成功返回MI_OK
  ******************************************************************************/
-uint8_t RFID_auth(uint8_t i2c_addr, uint8_t authMode, uint8_t BlockAddr, uint8_t *Sectorkey, uint8_t *serNum)
+uint8_t RFID_auth(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t authMode, uint8_t BlockAddr, uint8_t *Sectorkey, uint8_t *serNum)
 {
   uint8_t status;
   unsigned int recvBits;
@@ -602,11 +604,28 @@ uint8_t RFID_auth(uint8_t i2c_addr, uint8_t authMode, uint8_t BlockAddr, uint8_t
   for (i = 0; i<4; i++)
 	  buff[i + 8] = *(serNum + i);
 
-  status = RFID_MFRC522ToCard(i2c_addr, PCD_AUTHENT, buff, 12, buff, &recvBits);
-  if ((status != MI_OK) || (!(readReg(i2c_addr, Status2Reg) & 0x08)))
+  status = RFID_MFRC522ToCard(_rfid_dev_handle, PCD_AUTHENT, buff, 12, buff, &recvBits);
+  if ((status != MI_OK) || (!(readReg(_rfid_dev_handle, Status2Reg) & 0x08)))
   {
 	  status = MI_ERR;
   }
 
   return status;
+}
+
+static int writeReg(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg_addr, uint8_t val)
+{
+  uint8_t wbuf[2];
+  wbuf[0] = reg_addr;
+  wbuf[1] = val;
+ return i2c_master_transmit(_rfid_dev_handle, wbuf, 2, 1000 / portTICK_PERIOD_MS);
+}
+
+static uint8_t readReg(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg_addr)
+{
+	uint8_t buff; 
+
+  i2c_master_transmit_receive(_rfid_dev_handle, &reg_addr, 1, &buff, 1, 1000 / portTICK_PERIOD_MS);
+
+  return(buff);
 }

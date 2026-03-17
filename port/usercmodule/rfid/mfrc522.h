@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include "driver/i2c_master.h"
 
 //MF522命令字
 #define PCD_IDLE              0x00               //无动作，取消当前命令
@@ -111,27 +112,24 @@
 #define     Reserved34            0x3F
 //-----------------------------------------------
 
-void RFID_init(uint8_t i2c_addr);
-void RFID_reset(uint8_t i2c_addr);
-void RFID_antennaOn(uint8_t i2c_addr);     //天线开
-void RFID_antennaOff(uint8_t i2c_addr);
+void RFID_init(i2c_master_dev_handle_t _rfid_dev_handle);
+void RFID_reset(i2c_master_dev_handle_t _rfid_dev_handle);
+void RFID_antennaOn(i2c_master_dev_handle_t _rfid_dev_handle);     //天线开
+void RFID_antennaOff(i2c_master_dev_handle_t _rfid_dev_handle);
                                                
-uint8_t RFID_findCard(uint8_t i2c_addr, uint8_t reqMode, uint8_t *TagType);    //寻卡
-uint8_t RFID_anticoll(uint8_t i2c_addr, uint8_t *serNum);                            //防冲突
-uint8_t RFID_selectTag(uint8_t i2c_addr, uint8_t *serNum);                           //选卡锁定
-uint8_t RFID_auth(uint8_t i2c_addr, uint8_t authMode, uint8_t BlockAddr, uint8_t *Sectorkey, uint8_t *serNum); //卡认证
-uint8_t RFID_readBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *recvData);                              //读卡块
-uint8_t RFID_writeBlock(uint8_t i2c_addr, uint8_t blockAddr, uint8_t *writeData);                            //写卡块
-uint8_t RFID_IncDecCardBlock(uint8_t i2c_addr, uint8_t dd_mode, uint8_t blockAddr, int32_t pValue);  //卡块增减值（电子钱包充值、扣款）
-uint8_t RFID_backupCardBlock(uint8_t i2c_addr, uint8_t sourceaddr, uint8_t goaladdr);                       //块备份
-uint8_t RFID_halt(uint8_t i2c_addr);                                                                                           //卡进入halt状态
+uint8_t RFID_findCard(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reqMode, uint8_t *TagType);    //寻卡
+uint8_t RFID_anticoll(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t *serNum);                            //防冲突
+uint8_t RFID_selectTag(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t *serNum);                           //选卡锁定
+uint8_t RFID_auth(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t authMode, uint8_t BlockAddr, uint8_t *Sectorkey, uint8_t *serNum); //卡认证
+uint8_t RFID_readBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t blockAddr, uint8_t *recvData);                              //读卡块
+uint8_t RFID_writeBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t blockAddr, uint8_t *writeData);                            //写卡块
+uint8_t RFID_IncDecCardBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t dd_mode, uint8_t blockAddr, int32_t pValue);  //卡块增减值（电子钱包充值、扣款）
+uint8_t RFID_backupCardBlock(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t sourceaddr, uint8_t goaladdr);                       //块备份
+uint8_t RFID_halt(i2c_master_dev_handle_t _rfid_dev_handle);                                                                                           //卡进入halt状态
 
-void RFID_calculateCRC(uint8_t i2c_addr, uint8_t *pIndata, uint8_t len, uint8_t *pOutData);
-void RFID_setBitMask(uint8_t i2c_addr, uint8_t reg, uint8_t mask);
-void RFID_clearBitMask(uint8_t i2c_addr, uint8_t reg, uint8_t mask);
-uint8_t RFID_MFRC522ToCard(uint8_t i2c_addr, uint8_t command, uint8_t *sendData, uint8_t sendLen, uint8_t *backData, unsigned int *backLen);
-
-void writeReg(uint8_t i2c_addr, uint8_t reg_addr, uint8_t val);
-uint8_t readReg(uint8_t i2c_addr, uint8_t reg_addr);
+void RFID_calculateCRC(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t *pIndata, uint8_t len, uint8_t *pOutData);
+void RFID_setBitMask(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg, uint8_t mask);
+void RFID_clearBitMask(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t reg, uint8_t mask);
+uint8_t RFID_MFRC522ToCard(i2c_master_dev_handle_t _rfid_dev_handle, uint8_t command, uint8_t *sendData, uint8_t sendLen, uint8_t *backData, unsigned int *backLen);
 
 #endif
