@@ -4,7 +4,9 @@
 #include "img_converters.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include "who_lcd.h"
+// #include "who_lcd.h"
+#include "esp_board_manager.h"
+#include "dev_display_lcd.h"
 
 camera_fb_t *frame = NULL;
 
@@ -31,7 +33,10 @@ static MP_DEFINE_CONST_FUN_OBJ_0(get_frame_height_obj, get_frame_height);
 static mp_obj_t snapshot(void)
 {
     frame = esp_camera_fb_get();
-    lcd_draw_image(0, 0, frame->width, frame->height, (void *)(frame->buf));
+    dev_display_lcd_handles_t *disp_handle;
+    esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);
+
+    lcd_draw_image(disp_handle, 0, 0, frame->width, frame->height, (void *)(frame->buf));
     // ESP_LOGI("tag", "frame addr: %p", &(frame));
 
     // mp_obj_t items[] = {MP_OBJ_NEW_SMALL_INT(frame->width), 
