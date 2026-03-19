@@ -797,6 +797,8 @@ class Magnetic(object):
 # Magnetic
 if 48 in i2c.scan():
     magnetic = Magnetic()
+else:
+    print("Magnetic sensor not found.")
 
 class PinMode(object):
     IN = 1
@@ -885,21 +887,6 @@ class MPythonPin():
         self.pwm.freq(freq)
         self.pwm.duty(duty)
 
-'''
-# to be test
-class LightSensor(ADC):
-    
-    def __init__(self):
-        super().__init__(Pin(pins_remap_esp32[4]))
-        # super().atten(ADC.ATTN_11DB)
-    
-    def value(self):
-        # lux * k * Rc = N * 3.9/ 4096
-        # k = 0.0011mA/Lux
-        # lux = N * 3.9/ 4096 / Rc / k
-        return super().read() * 1.1 / 4095 / 6.81 / 0.011
-    
-'''
 
 
 # 3 rgb leds
@@ -909,6 +896,8 @@ rgb.write()
 # light sensor LTR-308ALS 
 if 83 in i2c.scan():    
     light = LTR_308ALS(i2c)
+else:
+    print("light sensor not found!")
 
 # sound sensor
 sound = ADC(Pin(6))

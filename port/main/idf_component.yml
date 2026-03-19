@@ -20,7 +20,7 @@ dependencies:
     # matches:
     #   - if: "$CONFIG{ESP_BOARD_DEV_CAMERA_SUPPORT} == True"
   espressif/esp_codec_dev:
-    version: ~1.5
+    version: ==1.5.4
     # matches:
     #   - if: "$CONFIG{ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT} == True"
   # espressif/esp_lvgl_port: "2.7.0"
