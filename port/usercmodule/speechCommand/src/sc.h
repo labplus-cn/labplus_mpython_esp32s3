@@ -11,6 +11,7 @@ extern volatile int sc_stop_flag;
 int get_latest_command_id(void);
 
 int get_wakeup_flag(void);
+void set_wakeup_flag(void);
 
 // 重置最新命令 id（例如置为 -1）
 void reset_latest_command_id(void);

@@ -104,6 +104,13 @@ static mp_obj_t mp_sc_start_vad_record(void) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_sc_start_vad_record_obj, mp_sc_start_vad_record);
 
+// 触发唤醒
+static mp_obj_t mp_sr_trigger_wakeup(void) {
+    set_wakeup_flag();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_trigger_wakeup_obj, mp_sr_trigger_wakeup);
+
 // 模块定义
 static const mp_rom_map_elem_t sc_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sc) },
@@ -114,6 +121,7 @@ static const mp_rom_map_elem_t sc_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_set_callback),     MP_ROM_PTR(&mp_sc_set_callback_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_latest_id),    MP_ROM_PTR(&mp_sc_get_latest_command_id_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_wakeup_flag),    MP_ROM_PTR(&mp_sc_get_wakeup_flag_obj) },
+    { MP_ROM_QSTR(MP_QSTR_trigger_wakeup),    MP_ROM_PTR(&mp_sr_trigger_wakeup_obj) },
     { MP_ROM_QSTR(MP_QSTR_start_vad_record),    MP_ROM_PTR(&mp_sc_start_vad_record_obj) },
 };
 static MP_DEFINE_CONST_DICT(sc_module_globals, sc_module_globals_table);

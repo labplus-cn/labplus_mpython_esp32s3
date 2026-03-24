@@ -261,6 +261,18 @@ int get_wakeup_flag(void) {
     return wakeup_flag;
 }
 
+void set_wakeup_flag(void) {
+    if(wakeup_flag == 0){
+        if(wakeup_word[0] != '\0'){
+            if(!get_tts_init_flag()){
+                model_init();
+            }
+            text_to_speech(wakeup_word);
+        }
+        wakeup_flag = 1;
+    }
+}
+
 void reset_latest_command_id(void) {
     latest_command_id = 0;
 }
