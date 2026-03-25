@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "freertos/idf_additions.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_tts.h"
@@ -25,14 +26,6 @@ static esp_tts_handle_t *g_tts_handle = NULL;
 volatile bool is_tts_initialized = false;
 SemaphoreHandle_t tts_semaphore;
 
-extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
-                                             const char * const pcName,
-                                             const uint32_t usStackDepth,
-                                             void * const pvParameters,
-                                             UBaseType_t uxPriority,
-                                             TaskHandle_t * const pxCreatedTask,
-                                             const BaseType_t xCoreID );
-
 void model_init(void)
 {
     if(!is_tts_initialized){
@@ -52,14 +45,14 @@ void model_init(void)
 
         esp_tts_voice_t *voice = esp_tts_voice_set_init(&esp_tts_voice_template, (int16_t *)voicedata);
         if (voice == NULL) {
-            ESP_LOGE(TAG, "TTS voice init failed!\n");
+            ESP_LOGE(TAG, "TTS voice init failed!");
             return;
         }
         g_tts_handle = esp_tts_create(voice);
         tts_semaphore = xSemaphoreCreateBinary();
         assert(tts_semaphore != NULL);
         xSemaphoreGive(tts_semaphore);
-        is_tts_initialized=1;
+        is_tts_initialized = true;
     }
 }
 
@@ -110,6 +103,10 @@ end:
 
 void text_to_speech(const char *text)
 {
-    xTaskCreatePinnedToCore(text_to_speech_task, "tts_task", 4*1024, (void *)text, 5, NULL, 0);
+    if(is_tts_initialized){
+        xTaskCreatePinnedToCore(text_to_speech_task, "tts_task", 4*1024, (void *)text, 5, NULL, 0);
+    }else{
+        ESP_LOGW(TAG, "Please init tts module first.");
+    }
 }
 

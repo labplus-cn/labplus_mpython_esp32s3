@@ -1,445 +1,297 @@
-/*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO., LTD
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-#include "unity.h"
-#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-
-#include "esp_err.h"
-#include "esp_log.h"
-#include "soc/soc_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/event_groups.h"
-
-#include "esp_gmf_io.h"
-#include "esp_gmf_pipeline.h"
-#include "esp_gmf_pool.h"
-#include "esp_gmf_app_setup_peripheral.h"
-
-#include "esp_gmf_io_codec_dev.h"
-#include "esp_gmf_app_cli.h"
-#include "gmf_loader_setup_defaults.h"
-#include "esp_gmf_afe.h"
-#include "sr.h"
+#include "freertos/semphr.h"
+#include "freertos/idf_additions.h"
+#include "esp_process_sdkconfig.h"
+#include "esp_wn_iface.h"
+#include "esp_wn_models.h"
+#include "esp_afe_sr_iface.h"
+#include "esp_afe_sr_models.h"
+#include "esp_mn_iface.h"
+#include "esp_mn_models.h"
+#include "model_path.h"
+#include "esp_afe_config.h"
+#include "esp_mn_speech_commands.h"
+// #include "sr_module.h"
 #include "tts.h"
-#include "audio_data.c"
-#include "esp_gmf_cap.h"
-#include "esp_gmf_caps_def.h"
-#include "esp_gmf_ch_cvt.h"
-#define VOICE2FILE     (false)
+#include "unity.h"
 
-#ifdef CONFIG_GMF_AI_AUDIO_WAKEUP_ENABLE
-#define WAKENET_ENABLE (true)
-#else
-#define WAKENET_ENABLE (false)
-#endif /* CONFIG_GMF_AI_AUDIO_WAKEUP_ENABLE */
-#ifdef CONFIG_GMF_AI_AUDIO_VOICE_COMMAND_ENABLE
-#define VCMD_ENABLE (true)
-#else
-#define VCMD_ENABLE (false)
-#endif /* CONFIG_GMF_AI_AUDIO_VOICE_COMMAND_ENABLE */
-#define EV_QUIT (BIT0)
-#define EV_TTS         (BIT1)
+#include "esp_codec_dev.h"
+#include "esp_gmf_app_setup_peripheral.h"
+#include "esp_ae_ch_cvt.h"
+#include "esp_log.h"
+#include "esp_timer.h"
 
-static const char *TAG = "AI_AUDIO_WWE";
+static const char *TAG = "SPEECH";
 
-static bool speeching = false;
-static bool wakeup    = false;
-static EventGroupHandle_t g_event_group = NULL;
-static esp_gmf_element_handle_t g_afe   = NULL;
+int wakeup_flag = 0;
+static esp_afe_sr_iface_t *afe_handle = NULL;
+//static esp_afe_sr_data_t *afe_data = NULL;
+static volatile int task_flag = 0;
 volatile int latest_command_id = 0;
+srmodel_list_t *models = NULL;
 static char wakeup_word[64] = "";
+static uint16_t timeout  = 6000;
+static bool vad_record_flag = false;
+static volatile bool multinet_ready = false;  // detect_Task完成multinet初始化后置true
+// const char *file_path = "vad_record.pcm";
+SemaphoreHandle_t recording_done_semaphore = NULL;
+afe_fetch_result_t *afe_result = NULL;
 
-extern BaseType_t xTaskCreatePinnedToCore( TaskFunction_t pxTaskCode,
-                                             const char * const pcName,
-                                             const uint32_t usStackDepth,
-                                             void * const pvParameters,
-                                             UBaseType_t uxPriority,
-                                             TaskHandle_t * const pxCreatedTask,
-                                             const BaseType_t xCoreID );
-
-static esp_err_t _pipeline_event(esp_gmf_event_pkt_t *event, void *ctx)
+void vad_record()
 {
-    ESP_LOGI(TAG, "CB: RECV Pipeline EVT: el:%s-%p, type:%d, sub:%s, payload:%p, size:%d,%p",
-             OBJ_GET_TAG(event->from), event->from, event->type, esp_gmf_event_get_state_str(event->sub),
-             event->payload, event->payload_size, ctx);
-    return 0;
+    // if (afe_result->vad_state == VAD_SPEECH) {
+    //     if (!recording) {
+    //         silence_counter = 0;
+    //         // 第一次检测到语音，开始录音
+    //         wav_codec = (wav_codec_t*) heap_caps_malloc(sizeof(wav_codec_t), MALLOC_CAP_SPIRAM);
+    //         wav_codec->lfs2_file = vfs_lfs2_file_open(file_path, LFS2_O_WRONLY | LFS2_O_CREAT | LFS2_O_TRUNC);
+    //         recording = true;
+    //         printf("检测到语音，开始录音\n");
+    //     }
+    // }else {  // VAD_SILENCE
+    //     if (recording) {
+    //         silence_counter++;
+    //         if (silence_counter >= SILENCE_THRESHOLD) {
+    //             recording = false;
+    //             vad_record_flag=false;
+    //             silence_counter = 0;
+    //             if (wav_codec) {
+    //                 vfs_lfs2_file_close(wav_codec->lfs2_file);
+    //                 if(wav_codec){
+    //                     heap_caps_free(wav_codec);
+    //                     wav_codec=NULL;
+    //                 }
+    //             }
+    //             printf("检测到静音，停止录音\n");
+    //             // 录音结束，释放信号量
+    //             xSemaphoreGive(recording_done_semaphore);
+    //         }
+    //     }
+    // }
+    // if (recording && wav_codec) {
+    //     if (afe_result->vad_cache_size > 0) {
+    //         printf("写入 vad cache: %d 字节\n",afe_result->vad_cache_size);
+    //         lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
+    //                         &wav_codec->lfs2_file->file,
+    //                         afe_result->vad_cache,
+    //                         afe_result->vad_cache_size);
+    //     }
+    //     if (afe_result->vad_state == 1) {
+    //         lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
+    //                         &wav_codec->lfs2_file->file,
+    //                         afe_result->data,
+    //                         afe_result->data_size);
+    //     }
+    // }
 }
 
-void esp_gmf_afe_event_cb(esp_gmf_obj_handle_t obj, esp_gmf_afe_evt_t *event, void *user_data)
+//AFE支持两路MIC或一路mic输入，但单路数据少，处理更快，所以用通道转换，把两路mic输入转一路送AFE
+//如果使用双mic送AFE,注释掉所有通道转换相关代码。这种方式，似乎配置成"MM"有问题，需要配置成"M",然后
+//能完配置afe_config->pcm_config相关参数为双通道才行。
+//sr-bak2.c使用esp-gmf pipe实现，但命令词识别响应较慢，找不到原因，暂时用本代码实现。
+void feed_Task(void *arg)
 {
-    switch (event->type) {
-        case ESP_GMF_AFE_EVT_WAKEUP_START: {
-            wakeup = true;
-#if WAKENET_ENABLE == true && VCMD_ENABLE == true
-            esp_gmf_afe_vcmd_detection_cancel(obj);
-            esp_gmf_afe_vcmd_detection_begin(obj);
-#endif  /* WAKENET_ENABLE == true && VCMD_ENABLE == true */
-            if (event->event_data) {
-                esp_gmf_afe_wakeup_info_t *info = event->event_data;
-                ESP_LOGI(TAG, "WAKEUP_START [%d : %d]", info->wake_word_index, info->wakenet_model_index);
-                
-                xEventGroupSetBits(g_event_group, EV_TTS);
-            } else {
-                ESP_LOGI(TAG, "WAKEUP_START");
+    esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
+    assert(codec_dev != NULL);
+    esp_afe_sr_data_t *afe_data = arg;
+    int audio_chunksize = afe_handle->get_feed_chunksize(afe_data); //返回每通道采样点数
+    int nch = afe_handle->get_feed_channel_num(afe_data);
+    int i2s_buff_len = audio_chunksize * sizeof(int16_t) * nch * 2; //使用通道转换，因为两路mic输入，数据量增大一倍，再乘2
+    // int i2s_buff_len = audio_chunksize * sizeof(int16_t) * nch; 
+    ESP_LOGI("TAG", "buff len: %d", i2s_buff_len);
+    int16_t *i2s_buff = heap_caps_malloc(i2s_buff_len,MALLOC_CAP_SPIRAM);
+    assert(i2s_buff != NULL);
+    int16_t *afe_buff = heap_caps_malloc(i2s_buff_len/2,MALLOC_CAP_SPIRAM);
+    assert(afe_buff != NULL);
+
+    esp_ae_ch_cvt_cfg_t config;
+    float w_data[2] = {1.0, 1.0};
+    config.sample_rate = 16000;
+    config.src_ch = 2;
+    config.dest_ch = 1;
+    config.weight = w_data;
+    config.weight_len = 2;
+    config.bits_per_sample = 16;
+    void *c_handle = NULL;
+    int ret = esp_ae_ch_cvt_open(&config, &c_handle);
+    TEST_ASSERT_NOT_EQUAL(c_handle, NULL);
+
+    while (task_flag) {
+        // int64_t us = esp_timer_get_time();
+        esp_codec_dev_read(codec_dev, (void *)i2s_buff, i2s_buff_len);
+        // ESP_LOGE("TAG", "time: %lld", esp_timer_get_time() - us);
+        esp_ae_ch_cvt_process(c_handle, audio_chunksize, (esp_ae_sample_t)i2s_buff, (esp_ae_sample_t)afe_buff);
+        // afe_handle->feed(afe_data, i2s_buff);
+        afe_handle->feed(afe_data, afe_buff);
+    }
+
+    heap_caps_free(i2s_buff);
+    heap_caps_free(afe_buff);
+    esp_ae_ch_cvt_close(c_handle);
+    vTaskDelete(NULL);
+}
+
+void detect_Task(void *arg)
+{
+    esp_afe_sr_data_t *afe_data = arg;
+    int afe_chunksize = afe_handle->get_fetch_chunksize(afe_data);
+    char *mn_name = esp_srmodel_filter(models, ESP_MN_PREFIX, ESP_MN_CHINESE);
+    // ESP_LOGI(TAG, "multinet:%s", mn_name);
+    esp_mn_iface_t *multinet = esp_mn_handle_from_name(mn_name);
+    // ESP_LOGI(TAG, "RAM left %lu", esp_get_free_heap_size());
+    model_iface_data_t *model_data = multinet->create(mn_name, timeout); //这一步为加载模型数据，psram <= 2mb会不够用
+    // esp_mn_commands_update_from_sdkconfig(multinet, model_data); // 不从sdkconfig加载，由Python通过sr.add()+sr.update()设置
+    int mu_chunksize = multinet->get_samp_chunksize(model_data);
+    assert(mu_chunksize == afe_chunksize);
+    multinet_ready = true;  // 通知sr.update()可以安全调用esp_mn_commands_update()
+
+    // esp_mn_commands_clear();
+    // esp_mn_commands_update();
+    //print active speech commands
+//    multinet->print_active_speech_commands(model_data);
+
+    // ESP_LOGI(TAG, "------------detect start------------");
+
+    while (task_flag) {
+        afe_result = afe_handle->fetch(afe_data);
+        if (!afe_result || afe_result->ret_value == ESP_FAIL) {
+            ESP_LOGE(TAG, "fetch error!");
+            break;
+        }
+
+        if (vad_record_flag){
+            vad_record();
+            continue;
+        }
+
+        if (afe_result->wakeup_state == WAKENET_DETECTED) {
+            ESP_LOGI(TAG, "WAKEWORD DETECTED");
+	        multinet->clean(model_data);
+
+	        if(wakeup_word[0] != '\0'){
+	            text_to_speech(wakeup_word);
+	        }
+
+        }
+
+        if (afe_result->raw_data_channels == 1 && afe_result->wakeup_state == WAKENET_DETECTED) {
+            wakeup_flag = 1;
+        } else if (afe_result->raw_data_channels > 1 && afe_result->wakeup_state == WAKENET_CHANNEL_VERIFIED) {
+            // For a multi-channel AFE, it is necessary to wait for the channel to be verified.
+            ESP_LOGI(TAG, "AFE_FETCH_CHANNEL_VERIFIED, channel index: %d", afe_result->trigger_channel_id);
+            wakeup_flag = 1;
+        }
+
+        if (wakeup_flag == 1) {
+            esp_mn_state_t mn_state = multinet->detect(model_data, afe_result->data);
+
+            if (mn_state == ESP_MN_STATE_DETECTING) {
+                continue;
             }
-            break;
-        }
-        case ESP_GMF_AFE_EVT_WAKEUP_END: {
-            wakeup = false;
-#if WAKENET_ENABLE == true && VCMD_ENABLE == true
-            esp_gmf_afe_vcmd_detection_cancel(obj);
-#endif  /* WAKENET_ENABLE == true && VCMD_ENABLE == true */
-            ESP_LOGI(TAG, "WAKEUP_END");
-            break;
-        }
-        case ESP_GMF_AFE_EVT_VAD_START: {
-#if WAKENET_ENABLE != true && VCMD_ENABLE == true
-            esp_gmf_afe_vcmd_detection_cancel(obj);
-            esp_gmf_afe_vcmd_detection_begin(obj);
-#endif  /* WAKENET_ENABLE != true && VCMD_ENABLE == true */
-            speeching = true;
-            ESP_LOGI(TAG, "VAD_START");
-            break;
-        }
-        case ESP_GMF_AFE_EVT_VAD_END: {
-#if WAKENET_ENABLE != true && VCMD_ENABLE == true
-            esp_gmf_afe_vcmd_detection_cancel(obj);
-#endif  /* WAKENET_ENABLE != true && VCMD_ENABLE == true */
-            speeching = false;
-            ESP_LOGI(TAG, "VAD_END");
-            break;
-        }
-        case ESP_GMF_AFE_EVT_VCMD_DECT_TIMEOUT: {
-            ESP_LOGI(TAG, "VCMD_DECT_TIMEOUT");
-            break;
-        }
-        default: {
-            esp_gmf_afe_vcmd_detection_cancel(obj);
-            esp_gmf_afe_vcmd_info_t *info = event->event_data;
-            ESP_LOGI(TAG, "Command %d, phrase_id %d, prob %f, str: %s",
-                     event->type, info->phrase_id, info->prob, info->str);
-            latest_command_id = event->type;
-            break;
-        }
-    }
-}
 
-static void voice_2_file(uint8_t *buffer, int len)
-{
-#if VOICE2FILE == true
-#define MAX_FNAME_LEN (50)
+            if (mn_state == ESP_MN_STATE_DETECTED) {
+                esp_mn_results_t *mn_result = multinet->get_results(model_data);
+                for (int i = 0; i < mn_result->num; i++) {
+                    ESP_LOGI(TAG, "TOP %d, command_id: %d, phrase_id: %d, string:%s prob: %f",
+                    i+1, mn_result->command_id[i], mn_result->phrase_id[i], mn_result->string, mn_result->prob[i]);
+                }
+                if (mn_result->num > 0) {
+                    latest_command_id = mn_result->command_id[0];
+                    afe_handle->enable_wakenet(afe_data);
+                    wakeup_flag=0;
+                    ESP_LOGI(TAG, "-----------awaits to be waken up-----------");
+                    continue;
+                }
+//                ESP_LOGI(TAG, "-----------listening-----------");
+            }
 
-    static FILE *fp = NULL;
-    static int fcnt = 0;
-
-    if (speeching) {
-        if (!fp) {
-            char fname[MAX_FNAME_LEN] = {0};
-            snprintf(fname, MAX_FNAME_LEN - 1, "/sdcard/16k_16bit_1ch_%d.pcm", fcnt++);
-            fp = fopen(fname, "wb");
-            if (!fp) {
-                ESP_LOGE(TAG, "File open failed");
-                return;
+            if (mn_state == ESP_MN_STATE_TIMEOUT) {
+                esp_mn_results_t *mn_result = multinet->get_results(model_data);
+                ESP_LOGI(TAG, "timeout, string:%s\n", mn_result->string);
+                afe_handle->enable_wakenet(afe_data);
+                wakeup_flag = 0;
+                ESP_LOGI(TAG, "-----------awaits to be waken up-----------");
+                continue;
             }
         }
-        if (len) {
-            fwrite(buffer, len, 1, fp);
-        }
-    } else {
-        if (fp) {
-            ESP_LOGI(TAG, "File closed");
-            fclose(fp);
-            fp = NULL;
-        }
     }
-#endif  /* VOICE2FILE == true && WITH_AFE == true */
-}
-
-static esp_gmf_err_io_t outport_acquire_write(void *handle, esp_gmf_payload_t *load, int wanted_size, int block_ticks)
-{
-    ESP_LOGD(TAG, "Acquire write");
-    return ESP_GMF_IO_OK;
-}
-
-static esp_gmf_err_io_t outport_release_write(void *handle, esp_gmf_payload_t *load, int block_ticks)
-{
-    ESP_LOGD(TAG, "Release write");
-    voice_2_file(load->buf, load->valid_size);
-    return ESP_GMF_IO_OK;
-}
-
-static esp_gmf_err_io_t afe_acquire_read(void *handle, esp_gmf_payload_t *load, int wanted_size, int block_ticks)
-{
-    static int offset = 0;
-    int total_size = 59600;
-    if (offset < total_size) {
-        if (offset + wanted_size > total_size) {
-            wanted_size = total_size - offset;
-        }
-        ESP_LOGD(TAG, "afe_acquire_read wanted:%d offset:%d", wanted_size, offset);
-        memcpy(load->buf, &audio_data[offset], wanted_size);
-        offset += wanted_size;
-        load->valid_size = wanted_size;
-        ESP_LOGD(TAG, "afe_acquire_read loaded:%d new_offset:%d", load->valid_size, offset);
-        if (offset == total_size) {
-            /* loop audio instead of marking done so AFE receives continuous stream */
-            offset = 0;
-            /* do not set load->is_done to allow continuous feeding */
-            vTaskDelay(pdMS_TO_TICKS(10000));
-        }
-    } else {
-        load->valid_size = 0;
-        /* keep streaming: do not mark done */
-        vTaskDelay(pdMS_TO_TICKS(10000));
+    if (model_data) {
+        multinet->destroy(model_data);
+        model_data = NULL;
     }
-    vTaskDelay(pdMS_TO_TICKS(10));
-    return ESP_GMF_IO_OK;
+    ESP_LOGI(TAG, "detect exit.");
+    vTaskDelete(NULL);
 }
 
-static esp_gmf_err_io_t afe_release_read(void *handle, esp_gmf_payload_t *load, int block_ticks)
+void sr_init(const char *word, uint16_t t, bool f)
 {
-    load->valid_size = 0;
-    return ESP_GMF_IO_OK;
-}
-
-static int keep_awake(bool en)
-{
-    if (g_afe) {
-        esp_gmf_afe_keep_awake(g_afe, en);
-    } else {
-        ESP_LOGE(TAG, "AFE not found");
+    if (word && word[0] != '\0') {
+        strncpy(wakeup_word, word, sizeof(wakeup_word) - 1);
+        wakeup_word[sizeof(wakeup_word) - 1] = '\0';  // 确保字符串以 '\0' 结尾
     }
-    return ESP_OK;
-}
+    timeout = t;
 
-static int trigger(bool en)
-{
-    if (g_afe) {
-        if (en) {
-            esp_gmf_afe_trigger_wakeup(g_afe);
-        } else {
-            esp_gmf_afe_trigger_sleep(g_afe);
-        }
-    }
-    return 0;
-}
+    // bsp_codec_dev_open(16000, 1, 16, CODEC_INPUT);
+    models = esp_srmodel_init("model");
 
-static int quit(void)
-{
-    xEventGroupSetBits(g_event_group, EV_QUIT);
-    return 0;
-}
+    afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
+    // afe_config->pcm_config.total_ch_num = 2;
+    // afe_config->pcm_config.mic_num = 2;
+    // afe_config->pcm_config.ref_num = 0;
+    // afe_config->pcm_config.sample_rate = 16000;
+    // afe_config_print(afe_config);
+    afe_config->afe_ringbuf_size = 50;  // 增大ring buffer，避免multinet推理慢导致feed buffer溢出
+    afe_handle = esp_afe_handle_from_config(afe_config);
 
-static void sr_task(void *arg)
-{
-    // esp_log_level_set("AFE_MANAGER", ESP_LOG_DEBUG);
-    esp_log_level_set("AFE", ESP_LOG_DEBUG);
-    g_event_group = xEventGroupCreate();
+    esp_afe_sr_data_t *afe_data = afe_handle->create_from_config(afe_config);
+//    afe_handle->disable_vad(afe_data);
+    afe_handle->disable_aec(afe_data);
+    afe_config_free(afe_config);
 
-    esp_gmf_pool_handle_t pool = NULL;
-    esp_gmf_pool_init(&pool);
-    // gmf_loader_setup_all_defaults(pool);
-
-    esp_gmf_err_t ret = ESP_GMF_ERR_OK;
-    esp_gmf_io_handle_t dev = NULL;
-    codec_dev_io_cfg_t rx_codec_dev_cfg = ESP_GMF_IO_CODEC_DEV_CFG_DEFAULT();
-    rx_codec_dev_cfg.dir = ESP_GMF_IO_DIR_READER;
-    rx_codec_dev_cfg.dev = NULL;
-    ret = esp_gmf_io_codec_dev_init(&rx_codec_dev_cfg, &dev);
-    ESP_GMF_RET_ON_ERROR(TAG, ret, {}, "Failed to init codec dev io");
-    ret = esp_gmf_pool_register_io(pool, dev, NULL);
-    ESP_GMF_RET_ON_ERROR(TAG, ret, {esp_gmf_io_deinit(dev); {};}, "Failed to register codec dev io");
-
-    // esp_gmf_io_handle_t dev1 = NULL;
-    // codec_dev_io_cfg_t tx_codec_dev_cfg = ESP_GMF_IO_CODEC_DEV_CFG_DEFAULT();
-    // tx_codec_dev_cfg.dir = ESP_GMF_IO_DIR_WRITER;
-    // tx_codec_dev_cfg.dev = NULL;
-    // ret = esp_gmf_io_codec_dev_init(&tx_codec_dev_cfg, &dev1);
-    // ESP_GMF_RET_ON_ERROR(TAG, ret, {}, "Failed to init codec dev io");
-    // ret = esp_gmf_pool_register_io(pool, dev1, NULL);
-    // ESP_GMF_RET_ON_ERROR(TAG, ret, {esp_gmf_io_deinit(dev1); {};}, "Failed to register codec dev io");
-
-    esp_gmf_element_handle_t ch_cvt = NULL;
-    esp_ae_ch_cvt_cfg_t es_ch_cvt_cfg = DEFAULT_ESP_GMF_CH_CVT_CONFIG();
-    es_ch_cvt_cfg.sample_rate = 16000;
-    es_ch_cvt_cfg.bits_per_sample = 16;
-    es_ch_cvt_cfg.src_ch = 2;
-    es_ch_cvt_cfg.dest_ch = 1;
-    ret = esp_gmf_ch_cvt_init(&es_ch_cvt_cfg, &ch_cvt);
-    ESP_GMF_RET_ON_ERROR(TAG, ret, {}, "Failed to init audio ch cvt");
-    ret = esp_gmf_pool_register_element(pool, ch_cvt, NULL);
-    ESP_GMF_RET_ON_ERROR(TAG, ret, {esp_gmf_element_deinit(ch_cvt); {};}, "Failed to register element in pool");
-
-    // gmf_loader_setup_ai_audio_default(pool);
-    esp_gmf_afe_manager_handle_t afe_manager = NULL;
-    srmodel_list_t *models = esp_srmodel_init("model");
-    const char *ch_format = "M";
-    afe_config_t *afe_cfg = afe_config_init(ch_format, models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
-    // afe_cfg->vad_init = true;
-    // afe_cfg->vad_mode = VAD_MODE_2;
-    // afe_cfg->vad_min_speech_ms = 64;
-    // afe_cfg->vad_min_noise_ms = 100;
-    // afe_cfg->wakenet_init = true;
-    afe_cfg->aec_init = false;
-    afe_cfg->afe_ringbuf_size = 50;
-    afe_cfg->pcm_config.total_ch_num = 2; 
-    afe_cfg->pcm_config.mic_num = 2; 
-    afe_cfg->pcm_config.ref_num = 0;      
-    afe_cfg->pcm_config.sample_rate = 16000;
-    esp_gmf_afe_manager_cfg_t afe_manager_cfg = DEFAULT_GMF_AFE_MANAGER_CFG(afe_cfg, NULL, NULL, NULL, NULL);
-    /* prioritize fetch task to reduce latency of result processing */
-    afe_manager_cfg.fetch_task_setting.prio = 10;
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_afe_manager_create(&afe_manager_cfg, &afe_manager));
-    esp_gmf_afe_cfg_t gmf_afe_cfg = DEFAULT_GMF_AFE_CFG(afe_manager, esp_gmf_afe_event_cb, NULL, models);
-    gmf_afe_cfg.vcmd_detect_en = true;
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_afe_init(&gmf_afe_cfg, &g_afe));
-    esp_gmf_cap_t *caps = NULL;
-    esp_gmf_cap_t *out_caps = {0};
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_element_get_caps(g_afe, (const esp_gmf_cap_t **)&caps));
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_AEC, &out_caps));
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_NS, &out_caps));
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_AGC, &out_caps));
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_VAD, &out_caps));
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_WWE, &out_caps));
-    TEST_ASSERT_EQUAL(ESP_GMF_ERR_OK, esp_gmf_cap_fetch_node(caps, ESP_GMF_CAPS_AUDIO_VCMD, &out_caps));
-    esp_gmf_err_t ret1 = esp_gmf_pool_register_element(pool, g_afe, NULL);
-    ESP_GMF_RET_ON_ERROR(TAG, ret1, {esp_gmf_element_deinit(g_afe); {};}, "Failed to register element in pool");
-
-    esp_gmf_pipeline_handle_t pipe = NULL;
-    // const char *name[] = {"aud_ch_cvt", "ai_afe"};
-    const char *name[] = {"ai_afe"};
-    esp_gmf_pool_new_pipeline(pool, "io_codec_dev", name, sizeof(name) / sizeof(char *), NULL, &pipe);
-    if (pipe == NULL) {
-        ESP_LOGE(TAG, "There is no pipeline");
-        goto __quit;
-    }
-    esp_gmf_io_codec_dev_set_dev(ESP_GMF_PIPELINE_GET_IN_INSTANCE(pipe), esp_gmf_app_get_record_handle());
-    // esp_gmf_io_codec_dev_set_dev(ESP_GMF_PIPELINE_GET_OUT_INSTANCE(pipe), esp_gmf_app_get_playback_handle());
-
-    esp_gmf_pipeline_get_el_by_name(pipe, "ai_afe", &g_afe);
-    esp_gmf_afe_set_event_cb(g_afe, esp_gmf_afe_event_cb, NULL);
-
-    // esp_gmf_port_handle_t inport = NEW_ESP_GMF_PORT_IN_BYTE(afe_acquire_read, afe_release_read, NULL, NULL, 2048, 100);
-    // esp_gmf_pipeline_reg_el_port(pipe, name[0], ESP_GMF_IO_DIR_READER, inport);
-    esp_gmf_port_handle_t outport = NEW_ESP_GMF_PORT_OUT_BYTE(outport_acquire_write, outport_release_write, NULL, NULL, 2048, 100);
-    esp_gmf_pipeline_reg_el_port(pipe, name[0], ESP_GMF_IO_DIR_WRITER, outport);
-
-    esp_gmf_info_sound_t info = {
-        .sample_rates = 16000,
-        .channels = 2,
-        .bits = 16,
-    };
-    // 这个函数用于向 GMF 管道的第一个元素报告音频/视频信息
-    // 信息传递机制：将媒体信息（如音频采样率、通道数、位深等）从管道外部传入到管道的第一个元素
-    // 触发级联处理：当管道中的某些元素（如采样率转换、通道转换等）需要这些信息来初始化或配置时，通过此函数报告这些信息
-    // 支持多种信息类型：
-    // ESP_GMF_INFO_SOUND：音频信息（采样率、通道、位深等）
-    // ESP_GMF_INFO_VIDEO：视频信息
-    esp_gmf_pipeline_report_info(pipe, ESP_GMF_INFO_SOUND, &info, sizeof(info));
-
-    esp_gmf_task_cfg_t cfg = DEFAULT_ESP_GMF_TASK_CONFIG();
-    cfg.ctx = NULL;
-    cfg.cb = NULL;
-    cfg.thread.core = 0;
-    cfg.thread.prio = 5;
-    cfg.thread.stack = 5120;
-    esp_gmf_task_handle_t task = NULL;
-    esp_gmf_task_init(&cfg, &task);
-    esp_gmf_pipeline_bind_task(pipe, task);
-    esp_gmf_pipeline_loading_jobs(pipe);
-    esp_gmf_pipeline_set_event(pipe, _pipeline_event, NULL);
-    esp_gmf_pipeline_run(pipe);
-
-    while (1) {
-        EventBits_t bits = xEventGroupWaitBits(g_event_group, EV_QUIT|EV_TTS, pdTRUE, pdFALSE, portMAX_DELAY);
-        if (bits & EV_QUIT) {
-            ESP_LOGI(TAG, "Quit command found, stopping pipeline");
-            break;
-        }else if(bits & EV_TTS){
-            model_init();
-            text_to_speech(wakeup_word);
-        }
+    if (word && word[0] != '\0') {
+        model_init();  // 提前初始化TTS，避免首次唤醒时阻塞detect_Task导致AFE ring buffer溢出
     }
 
-__quit:
-    esp_gmf_pipeline_stop(pipe);
-    esp_gmf_task_deinit(task);
-    esp_gmf_pipeline_destroy(pipe);
-    gmf_loader_teardown_all_defaults(pool);
-    esp_gmf_pool_deinit(pool);
-    vEventGroupDelete(g_event_group);
-    ESP_LOGW(TAG, "Wake word engine demo finished");
-}
+    task_flag = 1;
 
+    xTaskCreatePinnedToCore(detect_Task, "detect", 4 * 1024, (void*)afe_data, 10, NULL, 1);
+    xTaskCreatePinnedToCore(feed_Task, "feed", 4 * 1024, (void*)afe_data, 5, NULL, 0);
+}
 int get_latest_command_id(void) {
     return latest_command_id;
 }
-
 int get_wakeup_flag(void) {
-    return 0;
+    return wakeup_flag;
+}
+
+void set_wakeup_flag(void) {
+    if(wakeup_flag == 0){
+        if(wakeup_word[0] != '\0'){
+            text_to_speech(wakeup_word);
+        }
+        wakeup_flag = 1;
+    }
+}
+
+void wait_for_multinet_ready(void) {
+    while (!multinet_ready) {
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }
 
 void reset_latest_command_id(void) {
     latest_command_id = 0;
 }
 
-void sr_trigger_wakeup(void)
-{
-    if (g_afe) {
-        xEventGroupSetBits(g_event_group, EV_TTS);
-        esp_gmf_afe_trigger_wakeup(g_afe);
-    } else {
-        ESP_LOGE(TAG, "AFE not found");
-    }
-}
+// void start_vad_record(void) {
+//     recording_done_semaphore = xSemaphoreCreateBinary();
+//     // 调用函数后，将录音标志置为 true
+//     vad_record_flag = true;
 
-void sr_trigger_sleep(void)
-{
-    if (g_afe) {
-        esp_gmf_afe_trigger_sleep(g_afe);
-    } else {
-        ESP_LOGE(TAG, "AFE not found");
-    }
-}
-
-void sr_keep_awake(bool enable)
-{
-    if (g_afe) {
-        esp_gmf_afe_keep_awake(g_afe, enable);
-    } else {
-        ESP_LOGE(TAG, "AFE not found");
-    }
-}
-
-void sr_start_vcmd_detection(void)
-{
-    if (g_afe) {
-        esp_gmf_afe_vcmd_detection_begin(g_afe);
-    } else {
-        ESP_LOGE(TAG, "AFE not found");
-    }
-}
-
-void sr_cancel_vcmd_detection(void)
-{
-    if (g_afe) {
-        esp_gmf_afe_vcmd_detection_cancel(g_afe);
-    } else {
-        ESP_LOGE(TAG, "AFE not found");
-    }
-}
-
-void sr_init(const char *word, uint16_t timeout_ms)
-{
-    if (word && word[0] != '\0') {
-        strncpy(wakeup_word, word, sizeof(wakeup_word) - 1);
-        wakeup_word[sizeof(wakeup_word) - 1] = '\0';  // 确保字符串以 '\0' 结尾
-    }
-
-    xTaskCreatePinnedToCore(sr_task, "sr_task", 4*1024, NULL, 5, NULL, 0);
-}
+//     xSemaphoreTake(recording_done_semaphore, portMAX_DELAY);
+//     vSemaphoreDelete(recording_done_semaphore);
+// }
