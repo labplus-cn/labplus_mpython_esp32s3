@@ -95,6 +95,42 @@ static mp_obj_t mp_sr_get_wakeup_flag(void) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_get_wakeup_flag_obj, mp_sr_get_wakeup_flag);
 
+// 触发唤醒
+static mp_obj_t mp_sr_trigger_wakeup(void) {
+    sr_trigger_wakeup();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_trigger_wakeup_obj, mp_sr_trigger_wakeup);
+
+// 触发睡眠
+static mp_obj_t mp_sr_trigger_sleep(void) {
+    sr_trigger_sleep();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_trigger_sleep_obj, mp_sr_trigger_sleep);
+
+// 设置保持唤醒状态
+static mp_obj_t mp_sr_keep_awake(mp_obj_t enable_obj) {
+    bool enable = mp_obj_is_true(enable_obj);
+    sr_keep_awake(enable);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mp_sr_keep_awake_obj, mp_sr_keep_awake);
+
+// 开始语音命令检测
+static mp_obj_t mp_sr_start_vcmd_detection(void) {
+    sr_start_vcmd_detection();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_start_vcmd_detection_obj, mp_sr_start_vcmd_detection);
+
+// 取消语音命令检测
+static mp_obj_t mp_sr_cancel_vcmd_detection(void) {
+    sr_cancel_vcmd_detection();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_cancel_vcmd_detection_obj, mp_sr_cancel_vcmd_detection);
+
 // static mp_obj_t mp_sr_start_vad_record(void) {
 //     start_vad_record();
 //     return mp_const_none;
@@ -110,6 +146,11 @@ static const mp_rom_map_elem_t sr_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_set_callback),     MP_ROM_PTR(&mp_sr_set_callback_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_latest_id),    MP_ROM_PTR(&mp_sr_get_latest_command_id_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_wakeup_flag),    MP_ROM_PTR(&mp_sr_get_wakeup_flag_obj) },
+    { MP_ROM_QSTR(MP_QSTR_trigger_wakeup),    MP_ROM_PTR(&mp_sr_trigger_wakeup_obj) },
+    { MP_ROM_QSTR(MP_QSTR_trigger_sleep),    MP_ROM_PTR(&mp_sr_trigger_sleep_obj) },
+    { MP_ROM_QSTR(MP_QSTR_keep_awake),    MP_ROM_PTR(&mp_sr_keep_awake_obj) },
+    { MP_ROM_QSTR(MP_QSTR_start_vcmd_detection),    MP_ROM_PTR(&mp_sr_start_vcmd_detection_obj) },
+    { MP_ROM_QSTR(MP_QSTR_cancel_vcmd_detection),    MP_ROM_PTR(&mp_sr_cancel_vcmd_detection_obj) },
     // { MP_ROM_QSTR(MP_QSTR_start_vad_record),    MP_ROM_PTR(&mp_sr_start_vad_record_obj) },
 };
 static MP_DEFINE_CONST_DICT(sr_module_globals, sr_module_globals_table);

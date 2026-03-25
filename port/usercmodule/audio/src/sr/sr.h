@@ -12,6 +12,16 @@ int get_latest_command_id(void);
 int get_wakeup_flag(void);
 // 重置最新命令 id（例如置为 -1）
 void reset_latest_command_id(void);
+// 触发唤醒
+void sr_trigger_wakeup(void);
+// 触发睡眠
+void sr_trigger_sleep(void);
+// 设置保持唤醒状态
+void sr_keep_awake(bool enable);
+// 开始语音命令检测
+void sr_start_vcmd_detection(void);
+// 取消语音命令检测
+void sr_cancel_vcmd_detection(void);
 // void start_vad_record(void);
 void test(void);
 #ifdef __cplusplus

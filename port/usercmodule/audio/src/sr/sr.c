@@ -286,7 +286,7 @@ static void sr_task(void *arg)
     // afe_cfg->vad_min_noise_ms = 100;
     // afe_cfg->wakenet_init = true;
     afe_cfg->aec_init = false;
-    // afe_cfg->afe_ringbuf_size = 200;
+    afe_cfg->afe_ringbuf_size = 50;
     afe_cfg->pcm_config.total_ch_num = 2; 
     afe_cfg->pcm_config.mic_num = 2; 
     afe_cfg->pcm_config.ref_num = 0;      
@@ -386,6 +386,52 @@ int get_wakeup_flag(void) {
 
 void reset_latest_command_id(void) {
     latest_command_id = 0;
+}
+
+void sr_trigger_wakeup(void)
+{
+    if (g_afe) {
+        xEventGroupSetBits(g_event_group, EV_TTS);
+        esp_gmf_afe_trigger_wakeup(g_afe);
+    } else {
+        ESP_LOGE(TAG, "AFE not found");
+    }
+}
+
+void sr_trigger_sleep(void)
+{
+    if (g_afe) {
+        esp_gmf_afe_trigger_sleep(g_afe);
+    } else {
+        ESP_LOGE(TAG, "AFE not found");
+    }
+}
+
+void sr_keep_awake(bool enable)
+{
+    if (g_afe) {
+        esp_gmf_afe_keep_awake(g_afe, enable);
+    } else {
+        ESP_LOGE(TAG, "AFE not found");
+    }
+}
+
+void sr_start_vcmd_detection(void)
+{
+    if (g_afe) {
+        esp_gmf_afe_vcmd_detection_begin(g_afe);
+    } else {
+        ESP_LOGE(TAG, "AFE not found");
+    }
+}
+
+void sr_cancel_vcmd_detection(void)
+{
+    if (g_afe) {
+        esp_gmf_afe_vcmd_detection_cancel(g_afe);
+    } else {
+        ESP_LOGE(TAG, "AFE not found");
+    }
 }
 
 void sr_init(const char *word, uint16_t timeout_ms)
