@@ -19,6 +19,7 @@ endif()
 set(MICROPY_SOURCE_BOARD
     ${MPY_PORT_DIR}/lib/decode_png/LP_lodepng.c
     ${MPY_PORT_DIR}/builtins/main.c
+    ${MPY_PORT_DIR}/builtins/machine_timer.c
     ${MPY_PORT_DIR}/builtins/modmusictunes.c
     ${MPY_PORT_DIR}/builtins/modmusic.c
     ${MPY_PORT_DIR}/builtins/esp32_nvs.c
