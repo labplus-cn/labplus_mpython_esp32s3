@@ -5,6 +5,7 @@ from flashbdev import bdev
 from neopixel import NeoPixel
 import ubinascii
 import machine
+import os
 from machine import Pin
 
 Pin(21, Pin.OUT, value=0)
@@ -22,6 +23,14 @@ except OSError:
 for count in range(3):
     print("=$%#=")
     time.sleep_ms(50)
+
+
+# 板子型号判断  
+try:
+    print(os.uname()[-1].split(" ")[0])
+except:
+    print("Unknown machine")
+    
 
 # mac地址
 # mac地址

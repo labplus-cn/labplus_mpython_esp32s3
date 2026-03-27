@@ -1,12 +1,14 @@
 import time
 import gc
 import uos
-from flashbdev import bdev
-from neopixel import NeoPixel
+import os
 import ubinascii
 import machine
 from machine import Pin
+from flashbdev import bdev
+from neopixel import NeoPixel
 
+# 
 Pin(21, Pin.OUT, value=0)
 
 print("boot...")
@@ -23,9 +25,19 @@ for count in range(3):
     print("=$%#=")
     time.sleep_ms(50)
 
+# 板子型号判断  
+try:
+    print(os.uname()[-1].split(" ")[0])
+except:
+    print("Unknown machine")
+    
+
 # mac地址
-mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
-print(mac)
+try:
+    mac = '$#mac:{}#$'.format(ubinascii.hexlify(machine.unique_id()).decode().upper())
+    print(mac)
+except:
+    print('$#mac:{}#$'.format('Unknown mac'))
 
 # import lcd
 # lcd.draw_logo()
