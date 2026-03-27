@@ -14,7 +14,7 @@
 ##
 
 ## record_to_file 录音测试功能（默认开启；关闭后 xiaozhi.record_to_file 不可用）
-option(XIAOZHI_ENABLE_REC_TO_FILE "Include record-to-file test feature" ON)
+# option(XIAOZHI_ENABLE_REC_TO_FILE "Include record-to-file test feature" OFF)
 
 add_library(xiaozhi_module INTERFACE)
 
@@ -25,14 +25,14 @@ target_sources(xiaozhi_module INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/modxiaozhi.c
 )
 
-if(XIAOZHI_ENABLE_REC_TO_FILE)
-    target_sources(xiaozhi_module INTERFACE
-        ${CMAKE_CURRENT_LIST_DIR}/src/rec_to_file.c
-        # vfs_lfs2: mpython_v3 板级 cmake 未编译此文件，在此补充
-        ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
-    )
-    target_compile_definitions(xiaozhi_module INTERFACE XIAOZHI_ENABLE_REC_TO_FILE=1)
-endif()
+# if(XIAOZHI_ENABLE_REC_TO_FILE)
+#     target_sources(xiaozhi_module INTERFACE
+#         ${CMAKE_CURRENT_LIST_DIR}/src/rec_to_file.c
+#         # vfs_lfs2: mpython_v3 板级 cmake 未编译此文件，在此补充
+#         ${MPY_PORT_DIR}/drivers/audio/vfs_lfs2.c
+#     )
+#     target_compile_definitions(xiaozhi_module INTERFACE XIAOZHI_ENABLE_REC_TO_FILE=1)
+# endif()
 
 target_include_directories(xiaozhi_module INTERFACE
     # 本模块头文件
@@ -73,9 +73,6 @@ target_include_directories(xiaozhi_module INTERFACE
 
     # ESP Codec Device (音频硬件 I/O)
     ${MPY_PORT_DIR}/managed_components/espressif__esp_codec_dev/include
-
-    # Audio drivers (vfs_lfs2.h - LittleFS 文件 I/O 辅助)
-    ${MPY_PORT_DIR}/drivers/audio/include
 )
 
 target_link_libraries(usermod INTERFACE xiaozhi_module)

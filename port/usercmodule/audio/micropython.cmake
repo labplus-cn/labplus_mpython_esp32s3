@@ -6,6 +6,8 @@ target_sources(audio_module INTERFACE
     # ${CMAKE_CURRENT_LIST_DIR}/src/sr/sr_test.c
     ${CMAKE_CURRENT_LIST_DIR}/src/audio_tts.c
     ${CMAKE_CURRENT_LIST_DIR}/src/audio_sr.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/wav_writer.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/opus_writer.c
     ${CMAKE_CURRENT_LIST_DIR}/modaudio.c
 )
 
@@ -19,7 +21,7 @@ target_include_directories(audio_module INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/tts
     ${CMAKE_CURRENT_LIST_DIR}/src/sr
     ${CMAKE_CURRENT_LIST_DIR}/include
-    ${MPY_PORT_DIR}/../esp-gmf/packages/gmf_app_utils/include
+    ${MPY_PORT_DIR}/managed_components/joltwallet__littlefs/include
 )
 
 target_link_libraries(usermod INTERFACE audio_module)
