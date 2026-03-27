@@ -31,7 +31,6 @@ set(MICROPY_SOURCE_BOARD
 
 set(MICROPY_SOURCE_BOARD_DIR
     ${MPY_PORT_DIR}/drivers
-    ${MPY_PORT_DIR}/drivers/audio/include
     ${MPY_PORT_DIR}/lib/decode_png
     ${MPY_PORT_DIR}/builtins
     ${MPY_PORT_DIR}/boards
