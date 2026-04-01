@@ -693,33 +693,33 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_poll_obj, mp_xiaozhi_poll);
  *   count = xiaozhi.record_to_file("/rec.opus", 10000, use_afe=True)
  *   print("Wakeup count:", count)
  */
-static mp_obj_t mp_xiaozhi_record_to_file(size_t n_args, const mp_obj_t *pos_args,
-                                           mp_map_t *kw_args)
-{
-    enum { ARG_path, ARG_duration_ms, ARG_use_afe };
-    static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_path,        MP_ARG_REQUIRED | MP_ARG_OBJ,  {.u_obj  = mp_const_none} },
-        { MP_QSTR_duration_ms, MP_ARG_REQUIRED | MP_ARG_INT,  {.u_int  = 0}             },
-        { MP_QSTR_use_afe,     MP_ARG_KW_ONLY  | MP_ARG_BOOL, {.u_bool = false}         },
-    };
-    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all(n_args, pos_args, kw_args,
-                     MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+// static mp_obj_t mp_xiaozhi_record_to_file(size_t n_args, const mp_obj_t *pos_args,
+//                                            mp_map_t *kw_args)
+// {
+//     enum { ARG_path, ARG_duration_ms, ARG_use_afe };
+//     static const mp_arg_t allowed_args[] = {
+//         { MP_QSTR_path,        MP_ARG_REQUIRED | MP_ARG_OBJ,  {.u_obj  = mp_const_none} },
+//         { MP_QSTR_duration_ms, MP_ARG_REQUIRED | MP_ARG_INT,  {.u_int  = 0}             },
+//         { MP_QSTR_use_afe,     MP_ARG_KW_ONLY  | MP_ARG_BOOL, {.u_bool = false}         },
+//     };
+//     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+//     mp_arg_parse_all(n_args, pos_args, kw_args,
+//                      MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-    const char *path        = mp_obj_str_get_str(args[ARG_path].u_obj);
-    uint32_t    duration_ms = (uint32_t)args[ARG_duration_ms].u_int;
-    bool        use_afe     = args[ARG_use_afe].u_bool;
+//     const char *path        = mp_obj_str_get_str(args[ARG_path].u_obj);
+//     uint32_t    duration_ms = (uint32_t)args[ARG_duration_ms].u_int;
+//     bool        use_afe     = args[ARG_use_afe].u_bool;
 
-    int wakeup_count = 0;
-    esp_err_t err = rec_to_file(path, duration_ms, use_afe, &wakeup_count);
-    if (err != ESP_OK) {
-        mp_raise_msg_varg(&mp_type_RuntimeError,
-                          MP_ERROR_TEXT("record_to_file failed: %d"), err);
-    }
-    return MP_OBJ_NEW_SMALL_INT(wakeup_count);
-}
-static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_record_to_file_obj, 2,
-                                   mp_xiaozhi_record_to_file);
+//     int wakeup_count = 0;
+//     esp_err_t err = rec_to_file(path, duration_ms, use_afe, &wakeup_count);
+//     if (err != ESP_OK) {
+//         mp_raise_msg_varg(&mp_type_RuntimeError,
+//                           MP_ERROR_TEXT("record_to_file failed: %d"), err);
+//     }
+//     return MP_OBJ_NEW_SMALL_INT(wakeup_count);
+// }
+// static MP_DEFINE_CONST_FUN_OBJ_KW(mp_xiaozhi_record_to_file_obj, 2,
+//                                    mp_xiaozhi_record_to_file);
 
 /* ====================================================
  * 激活相关功能
@@ -882,7 +882,7 @@ static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_load_config),      MP_ROM_PTR(&mp_xiaozhi_load_config_obj)     },
 
     /* 测试工具 */
-    { MP_ROM_QSTR(MP_QSTR_record_to_file),   MP_ROM_PTR(&mp_xiaozhi_record_to_file_obj)  },
+    // { MP_ROM_QSTR(MP_QSTR_record_to_file),   MP_ROM_PTR(&mp_xiaozhi_record_to_file_obj)  },
 
     /* 回调注册 */
     { MP_ROM_QSTR(MP_QSTR_on_state),   MP_ROM_PTR(&mp_xiaozhi_on_state_obj)  },

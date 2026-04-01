@@ -6,24 +6,26 @@
 '''
 
 from mpython import *
-import network
 
 my_wifi = wifi()
-my_wifi.connectWiFi("labplus_dev", "helloworld")
+my_wifi.connectWiFi("office", "wearemaker")
+# my_wifi.connectWiFi("labplus_dev", "helloworld")
 
 import audio
 
 # import gc;gc.collect()
-audio.player_init(i2c)
+audio.player_init()
 audio.set_volume(50)
 audio.play('http://cdn.makeymonkey.com/test/32_%E6%8B%94%E8%90%9D%E5%8D%9C.mp3')
-time.sleep(5)
-audio.stop()
-time.sleep_ms(50) # 需要一定时时间释放播放资源
-print("record start........")
-audio.recorder_init(i2c)
-audio.record("temp.wav", 5)
-print('record end.....')
-audio.recorder_deinit()
-audio.set_volume(100)
-audio.play('temp.wav')
+# time.sleep(5)
+# audio.stop()
+# time.sleep_ms(50) # 需要一定时时间释放播放资源
+# print("record start........")
+# audio.recorder_init()
+# audio.record("file://littlefs/1.opus", 5)
+# print('record end.....')
+# audio.recorder_deinit()
+
+# audio.player_init()
+# audio.set_volume(100)
+# audio.play('file://littlefs/1.opus')
