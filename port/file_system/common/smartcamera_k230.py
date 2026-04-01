@@ -168,7 +168,7 @@ class SmartCameraK230:
         self.mode = cur_state
     
     def switcher_mode(self, mode):
-        self.model_init(mode) # mode 0默认 1人脸检测 2目标识别 3手势检测 4手势分类 5车牌识别 6人体检测 7跌倒检测 8二维码识别 9条码识别 10人脸识别 36道路自动驾驶系统
+        self.model_init(mode) # mode-0默认 1人脸检测 2目标识别 3手势检测 4手势分类 5车牌识别 6人体检测 7跌倒检测 8二维码识别 9条码识别 10人脸识别 36道路自动驾驶系统
 
     def color_obj_count_init(self,cur_mode):
         self.color_obj_count = ColorCount(self.uart, cur_mode=cur_mode)
@@ -229,15 +229,22 @@ class SmartCameraK230:
                                 self.yolo_detect.category_name = self.yolo_detect.category_list[self.yolo_detect.id]
                 elif(self.mode==FACE_DETECTION_MODE and self.face_detect!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==FACE_DETECTION_MODE and CMD[4]==0x01):
+                        if(CMD[2]==0x01 and CMD[3]==FACE_DETECTION_MODE and CMD[4]==0x01):
                             if(CMD[5]==0xff):
                                 self.face_detect.lock = True
                                 self.face_detect.face_num = None
                             else:
+                                self.face_detect.lock = True
                                 self.face_detect.face_num = CMD[5]
+                        elif(CMD[2]==0x02 and CMD[3]==FACE_DETECTION_MODE and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.face_detect.lock = True
+                            self.face_detect.face_num = data.get('num',None)
+                            self.face_detect.coord_list = data.get('coord_list',[])
                 elif(self.mode==HAND_DETECTION and self.hand_detect!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==HAND_DETECTION and CMD[4]==0x01):
+                        if(CMD[2]==0x01 and CMD[3]==HAND_DETECTION and CMD[4]==0x01):
                             if(CMD[5]==0xff):
                                 self.hand_detect.lock = True
                                 self.hand_detect.flag = False
@@ -246,6 +253,14 @@ class SmartCameraK230:
                                 self.hand_detect.lock = True
                                 self.hand_detect.flag = True
                                 self.hand_detect.hand_num = CMD[6]
+                        elif(CMD[2]==0x02 and CMD[3]==HAND_DETECTION and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.hand_detect.lock = True
+                            self.hand_detect.flag = True
+                            self.hand_detect.hand_num = data.get('num',None)
+                            self.hand_detect.coord_list = data.get('coord_list',[])
+                        
                 elif(self.mode==HAND_KEYPOINT_CLASS and self.hand_keypoint_class!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==HAND_KEYPOINT_CLASS and CMD[4]==0x01):
@@ -267,7 +282,7 @@ class SmartCameraK230:
                                 self.dynamic_gesture.gesture_str = DYNAMIC_GESTURE_STR[CMD[5]]
                 elif(self.mode==PERSON_DETECTION and self.person_detect!=None):
                     if(len(CMD)>0):
-                        if(CMD[3]==PERSON_DETECTION and CMD[4]==0x01):
+                        if(CMD[2]==0x01 and CMD[3]==PERSON_DETECTION and CMD[4]==0x01):
                             if(CMD[5]==0xff):
                                 self.person_detect.lock = True
                                 self.person_detect.flag = False
@@ -276,6 +291,14 @@ class SmartCameraK230:
                                 self.person_detect.lock = True
                                 self.person_detect.flag = True
                                 self.person_detect.person_num = CMD[6]
+                        elif(CMD[2]==0x02 and CMD[3]==PERSON_DETECTION and CMD[4]==0x01):
+                            b = bytes(CMD[22:-1])  
+                            data = json.loads(b.decode('UTF-8','ignore'))
+                            self.person_detect.lock = True
+                            self.person_detect.person_num = data.get('num',None)
+                            self.person_detect.coord_list = data.get('coord_list',[])
+                            if (self.person_detect.person_num > 0):
+                                self.person_detect.flag = True
                 elif(self.mode==PERSON_KEYPOINT_DETECT and self.person_keypoint_detect!=None):
                     if(len(CMD)>0):
                         if(CMD[2]==0x01 and CMD[3]==PERSON_KEYPOINT_DETECT and CMD[4]==0x01):

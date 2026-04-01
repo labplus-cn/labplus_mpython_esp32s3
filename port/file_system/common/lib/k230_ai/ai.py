@@ -26,6 +26,7 @@ class FACE_DETECT(object):
     def __init__(self, uart):
         self.uart = uart
         self.face_num = None
+        self.coord_list = []
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['FACE_DETECTION_MODE'][0], cmd_type=AI['FACE_DETECTION_MODE'][1])
         time.sleep(0.5)
@@ -139,6 +140,7 @@ class HandDetect(object):
     def __init__(self, uart):
         self.uart = uart
         self.hand_num = 0
+        self.coord_list = []
         self.flag = False
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['HAND_DETECTION'][0], cmd_type=AI['HAND_DETECTION'][1])
@@ -193,6 +195,7 @@ class PersonDetect(object):
         self.uart = uart
         self.flag = False
         self.person_num = 0
+        self.coord_list = []
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=AI['PERSON_DETECTION'][0], cmd_type=AI['PERSON_DETECTION'][1])
         time.sleep(1)
