@@ -46,6 +46,7 @@
 
 static const char *TAG = "AUDIO_MOD";
 static bool lfs_isRegist = false;
+static int8_t *stream_buff = NULL;
 
 /* Detect format from filename extension */
 static const char *detect_format_from_filename(const char *filename)
@@ -194,12 +195,6 @@ static esp_err_t setup_capture(capture_ctx_t *ctx, const char *format,
     return ESP_OK;
 }
 
-/* codec固定配置：audio_init()以16kHz/2ch/16bit打开codec */
-#define CODEC_SAMPLE_RATE      16000
-#define CODEC_CHANNELS         2
-#define CODEC_BITS_PER_SAMPLE  16
-#define RECORD_CHUNK_SAMPLES   512   /* 每次从codec读取的每通道采样点数 */
-
 /* ------------------- 播放器 ------------------- */
 esp_asp_handle_t  player_handle = NULL;
 
@@ -294,18 +289,76 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(audio_player_init_obj, 0, 1, audio_pl
 
 static mp_obj_t audio_player_deinit(void)
 {
-    esp_gmf_err_t err = esp_audio_simple_player_stop(player_handle);
-    TEST_ASSERT_EQUAL(ESP_OK, err);
-    err = esp_audio_simple_player_destroy(player_handle);
-    TEST_ASSERT_EQUAL(ESP_OK, err);
+    if (player_handle == NULL) {
+        return mp_const_none;
+    }
+
+    // Get player state
+    esp_asp_state_t state;
+    esp_gmf_err_t err = esp_audio_simple_player_get_state(player_handle, &state);
+    if (err != ESP_OK) {
+        player_handle = NULL;
+        return mp_const_none;
+    }
+
+    // Only destroy in safe states (STOPPED, FINISHED, ERROR, NONE)
+    // Don't destroy if RUNNING or PAUSED
+    if (state == ESP_ASP_STATE_RUNNING || state == ESP_ASP_STATE_PAUSED) {
+        return mp_const_none;
+    }
+
+    // Safe to destroy
+    esp_audio_simple_player_destroy(player_handle);
+    player_handle = NULL;
+
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(audio_player_deinit_obj, audio_player_deinit);
 
 static mp_obj_t audio_play(mp_obj_t uri)
 {
+    if (player_handle == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Player not initialized"));
+    }
+
     const char *_uri = mp_obj_str_get_str(uri);
-    esp_gmf_err_t err = esp_audio_simple_player_run(player_handle, _uri, NULL);
+    
+    // If HTTP URL, pass directly to player
+    if (strncmp(_uri, "http", 4) == 0) {
+        esp_gmf_err_t err = esp_audio_simple_player_run(player_handle, _uri, NULL);
+        TEST_ASSERT_EQUAL(ESP_OK, err);
+        return mp_const_none;
+    }
+
+    // Allocate buffers dynamically
+    char *file_path = malloc(256);
+    char *full_uri = malloc(272);
+    if (!file_path || !full_uri) {
+        free(file_path);
+        free(full_uri);
+        mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("Out of memory"));
+    }
+
+    // Prepend /littlefs/ to uri
+    snprintf(file_path, 256, "/littlefs/%s", _uri);
+
+    // Test if file can be opened
+    FILE *f = fopen(file_path, "rb");
+    if (!f) {
+        free(file_path);
+        free(full_uri);
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("File not found"));
+    }
+    fclose(f);
+
+    // Prepend file:/ for player API
+    snprintf(full_uri, 272, "file:/%s", file_path);
+
+    esp_gmf_err_t err = esp_audio_simple_player_run(player_handle, full_uri, NULL);
+
+    free(file_path);
+    free(full_uri);
+
     TEST_ASSERT_EQUAL(ESP_OK, err);
 
     return mp_const_none;
@@ -314,11 +367,19 @@ static MP_DEFINE_CONST_FUN_OBJ_1(audio_play_obj, audio_play);
 
 static mp_obj_t audio_pause(void)
 {
-    assert(player_handle != NULL);
+    if (player_handle == NULL) {
+        return mp_const_none;
+    }
+
     esp_asp_state_t state;
     esp_gmf_err_t err = esp_audio_simple_player_get_state(player_handle, &state);
     TEST_ASSERT_EQUAL(ESP_OK, err);
-    TEST_ASSERT_EQUAL(ESP_ASP_STATE_RUNNING, state);
+
+    // Only pause if currently running
+    if (state != ESP_ASP_STATE_RUNNING) {
+        return mp_const_none;
+    }
+
     err = esp_audio_simple_player_pause(player_handle);
     TEST_ASSERT_EQUAL(ESP_OK, err);
 
@@ -328,11 +389,19 @@ static MP_DEFINE_CONST_FUN_OBJ_0(audio_pause_obj, audio_pause);
 
 static mp_obj_t audio_resume(void)
 {
-    assert(player_handle != NULL);
+    if (player_handle == NULL) {
+        return mp_const_none;
+    }
+
     esp_asp_state_t state;
     esp_gmf_err_t err = esp_audio_simple_player_get_state(player_handle, &state);
     TEST_ASSERT_EQUAL(ESP_OK, err);
-    TEST_ASSERT_EQUAL(ESP_ASP_STATE_PAUSED, state);
+
+    // Only resume if currently paused
+    if (state != ESP_ASP_STATE_PAUSED) {
+        return mp_const_none;
+    }
+
     err = esp_audio_simple_player_resume(player_handle);
     TEST_ASSERT_EQUAL(ESP_OK, err);
 
@@ -342,8 +411,11 @@ static MP_DEFINE_CONST_FUN_OBJ_0(audio_resume_obj, audio_resume);
 
 static mp_obj_t audio_stop(void)
 {
+    if (player_handle == NULL) {
+        return mp_const_none;
+    }
+
     vTaskDelay(pdMS_TO_TICKS(500));
-    assert(player_handle != NULL);
     esp_gmf_err_t err = esp_audio_simple_player_stop(player_handle);
     TEST_ASSERT_EQUAL(ESP_OK, err);
 
@@ -365,6 +437,10 @@ static MP_DEFINE_CONST_FUN_OBJ_1(audio_volume_obj, audio_volume);
 
 static mp_obj_t audio_get_status(void)
 {
+    if (player_handle == NULL) {
+        return MP_OBJ_NEW_SMALL_INT(0);
+    }
+
     esp_asp_state_t state;
     esp_gmf_err_t err = esp_audio_simple_player_get_state(player_handle, &state);
     TEST_ASSERT_EQUAL(ESP_OK, err);
@@ -374,31 +450,6 @@ static mp_obj_t audio_get_status(void)
 static MP_DEFINE_CONST_FUN_OBJ_0(audio_get_status_obj, audio_get_status);
 
 /* ------------------- 录音 ------------------- */
-
-/* loudness后台任务 */
-static volatile uint16_t  g_loudness        = 0;
-static volatile bool      g_loudness_run    = false;
-
-static void loudness_task(void *arg)
-{
-    esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
-    int buf_bytes = RECORD_CHUNK_SAMPLES * CODEC_CHANNELS * (CODEC_BITS_PER_SAMPLE / 8);
-    int16_t *buf = heap_caps_malloc(buf_bytes, MALLOC_CAP_SPIRAM);
-    while (g_loudness_run) {
-        esp_codec_dev_read(codec_dev, buf, buf_bytes);
-        int max_amp = 0;
-        int total = RECORD_CHUNK_SAMPLES * CODEC_CHANNELS;
-        for (int i = 0; i < total; i++) {
-            int v = buf[i] < 0 ? -buf[i] : buf[i];
-            if (v > max_amp) max_amp = v;
-        }
-        /* 归一化到 0~100 */
-        g_loudness = (uint16_t)(max_amp * 100 / 32768);
-    }
-    heap_caps_free(buf);
-    vTaskDelete(NULL);
-}
-
 static mp_obj_t audio_recorder_init(size_t n_args, const mp_obj_t *args)
 {
     esp_codec_dev_set_in_gain((esp_codec_dev_handle_t)esp_gmf_app_get_record_handle(), 35.0);
@@ -415,20 +466,31 @@ static MP_DEFINE_CONST_FUN_OBJ_0(audio_recorder_deinit_obj, audio_recorder_deini
 
 static mp_obj_t audio_loudness(void)
 {
-    if (!g_loudness_run) {
-        g_loudness_run = true;
-        g_loudness = 0;
-        xTaskCreatePinnedToCore(loudness_task, "loudness", 4096, NULL, 5, NULL, 0);
+    double loudness = 0.0;
+
+    if(!stream_buff){
+        stream_buff = calloc(100, sizeof(int8_t));
     }
+
+    esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
+    esp_codec_dev_read(codec_dev, stream_buff, 100);
+    
+    for(int i = 0; i < 50; i++){
+        // loudness += *((int16_t *)stream_buff + i) < 0 ? -*((int16_t *)stream_buff + i) : *((int16_t *)stream_buff + i);
+        loudness += (double)(pow(*((int16_t *)stream_buff + i), 2));
+    }
+    uint16_t g_loudness = (uint16_t)(20 * log10(sqrt(loudness / 50) * 5)); //+ 1e-9)); // 5 is the gain of the microphone,校正倍数
+
     return MP_OBJ_NEW_SMALL_INT(g_loudness);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(audio_loudness_obj, audio_loudness);
 
 static mp_obj_t audio_loudness_stop(void)
 {
-    g_loudness_run = false;
-    vTaskDelay(pdMS_TO_TICKS(100));
-    g_loudness = 0;
+    if(stream_buff){
+        free(stream_buff);
+        stream_buff = NULL;
+    }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(audio_loudness_stop_obj, audio_loudness_stop);
@@ -462,13 +524,9 @@ static mp_obj_t audio_record(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
     int target_ch           = args[ARG_channels].u_int;
     int target_rate         = args[ARG_sampleRate].u_int;
 
-    // Check if file_name starts with "file://littlefs/"
-    const char *prefix = "file://littlefs/";
-    if (strncmp(file_name, prefix, strlen(prefix)) != 0) {
-        mp_raise_msg(&mp_type_ValueError, MP_ERROR_TEXT("file_name must start with 'file://littlefs/'"));
-    }
-    // Strip "file:/" prefix for fopen
-    const char *actual_path = file_name + 6;  // Skip "file:/"
+    // Prepend /littlefs/ to file_name
+    char actual_path[256];
+    snprintf(actual_path, sizeof(actual_path), "/littlefs/%s", file_name);
 
     // Auto-detect format from filename
     const char *format = detect_format_from_filename(file_name);
