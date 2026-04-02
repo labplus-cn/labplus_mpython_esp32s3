@@ -738,9 +738,6 @@ class GUI_Widget(LV_GUI):
         self.charts[key]['chart'].set_range(lv.chart.AXIS.PRIMARY_Y, min, max)
 
     def chart_add_poit(self, serie, value, key):
-        self.chart_add_point(serie, value, key)
-
-    def chart_add_point(self, serie, value, key):
         if (key not in self.charts):
             print('Chart not initialized')
             return

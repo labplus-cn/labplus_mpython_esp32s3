@@ -65,7 +65,8 @@ def draw_clock(canvas=None, layer=None):
         dsc = lv.draw_label_dsc_t()
         dsc.init()
         dsc.color = lv.color_hex(color)
-        dsc.font = lv.font_montserrat_16
+        # dsc.font = lv.font_montserrat_16
+        dsc.font = lv.font_siyuan_heiti_medium_24
         dsc.opa = lv.OPA.COVER
         dsc.flag = lv.TEXT_FLAG.FIT
         dsc.align = lv.TEXT_ALIGN.CENTER
@@ -75,6 +76,7 @@ def draw_clock(canvas=None, layer=None):
         coords.y1 = new_y - 8
         coords.x2 = new_x + 10
         coords.y2 = new_y + 2
+        if (i % 3): continue
         lv.draw_label(layer, dsc, coords)
     
     # 绘制指针
