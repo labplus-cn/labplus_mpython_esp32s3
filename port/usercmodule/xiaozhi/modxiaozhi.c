@@ -5,7 +5,7 @@
  *
  * ── 首次使用：激活设备 ────────────────────────────────────────
  *
- *   import xiaozhi
+ *   import xiaozhiAI
  *   from mpython import wifi
  *
  *   # 连接 WiFi
@@ -16,13 +16,13 @@
  *   def show_code(code, msg):
  *       print("验证码:", code)
  *
- *   xiaozhi.activate("https://api.tenclass.net/xiaozhi/ota/",
- *                    on_code=show_code)
+ *   xiaozhiAI.activate("https://api.tenclass.net/xiaozhi/ota/",
+ *                      on_code=show_code)
  *   # 激活成功后 url/token 自动写入 NVS，后续无需重复激活
  *
  * ── 日常使用：语音会话 ────────────────────────────────────────
  *
- *   import audio, xiaozhi
+ *   import audio, xiaozhiAI
  *   from mpython import wifi
  *
  *   w = wifi()
@@ -46,38 +46,38 @@
  *       print("唤醒词检测到！")
  *
  *   # 初始化（url/token 自动从 NVS 读取）
- *   xiaozhi.init()            # 可选: xiaozhi.init(volume=70)
- *   xiaozhi.on_state(on_state)
- *   xiaozhi.on_stt(on_stt)
- *   xiaozhi.on_tts(on_tts)
- *   xiaozhi.on_wakeup(on_wakeup)
+ *   xiaozhiAI.init()            # 可选: xiaozhiAI.init(volume=70)
+ *   xiaozhiAI.on_state(on_state)
+ *   xiaozhiAI.on_stt(on_stt)
+ *   xiaozhiAI.on_tts(on_tts)
+ *   xiaozhiAI.on_wakeup(on_wakeup)
  *
  *   # 启动会话（阻塞直到握手完成，然后进入 LISTENING 空闲状态）
- *   xiaozhi.start()
+ *   xiaozhiAI.start()
  *
  *   # 主循环：派发回调 + 手动触发录音（按键模式示例）
  *   while True:
- *       xiaozhi.poll()
+ *       xiaozhiAI.poll()
  *       if button_a.value() == 0:           # 按下 A 键开始说话
- *           xiaozhi.listen_start()
+ *           xiaozhiAI.listen_start()
  *       elif button_b.value() == 0:         # 按下 B 键停止
- *           xiaozhi.listen_stop()
+ *           xiaozhiAI.listen_stop()
  *       time.sleep_ms(20)
  *
  *   # 中断 TTS 播放（切回空闲）
- *   # xiaozhi.abort()
+ *   # xiaozhiAI.abort()
  *
  *   # 结束会话
- *   # xiaozhi.stop()
- *   # xiaozhi.deinit()
+ *   # xiaozhiAI.stop()
+ *   # xiaozhiAI.deinit()
  *
  * ── 状态常量 ──────────────────────────────────────────────────
- *   xiaozhi.STATE_IDLE       = 0  无连接
- *   xiaozhi.STATE_CONNECTING = 1  TCP 连接中
- *   xiaozhi.STATE_CONNECTED  = 2  握手阶段（等待服务器 hello）
- *   xiaozhi.STATE_LISTENING  = 3  空闲待机（唤醒/listen_start 后上传音频）
- *   xiaozhi.STATE_SPEAKING   = 4  播放 TTS
- *   xiaozhi.STATE_ERROR      = 5  错误
+ *   xiaozhiAI.STATE_IDLE       = 0  无连接
+ *   xiaozhiAI.STATE_CONNECTING = 1  TCP 连接中
+ *   xiaozhiAI.STATE_CONNECTED  = 2  握手阶段（等待服务器 hello）
+ *   xiaozhiAI.STATE_LISTENING  = 3  空闲待机（唤醒/listen_start 后上传音频）
+ *   xiaozhiAI.STATE_SPEAKING   = 4  播放 TTS
+ *   xiaozhiAI.STATE_ERROR      = 5  错误
  */
 
 #include <stdio.h>
@@ -280,7 +280,7 @@ static mp_obj_t mp_xiaozhi_init(size_t n_args, const mp_obj_t *pos_args,
     }
     if (url[0] == '\0' || token[0] == '\0') {
         mp_raise_msg(&mp_type_RuntimeError,
-                     MP_ERROR_TEXT("Not activated. Call xiaozhi.activate() first."));
+                     MP_ERROR_TEXT("Not activated. Call xiaozhiAI.activate() first."));
     }
 
     int volume = args[ARG_volume].u_int;
@@ -863,7 +863,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mp_xiaozhi_load_config_obj, mp_xiaozhi_load_con
 
 /* 模块全局字典 */
 static const mp_rom_map_elem_t xiaozhi_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__),   MP_ROM_QSTR(MP_QSTR_xiaozhi) },
+    { MP_ROM_QSTR(MP_QSTR___name__),   MP_ROM_QSTR(MP_QSTR_xiaozhiAI) },
 
     /* 功能函数 */
     { MP_ROM_QSTR(MP_QSTR_init),         MP_ROM_PTR(&mp_xiaozhi_init_obj)        },
@@ -910,4 +910,4 @@ const mp_obj_module_t xiaozhi_module = {
     .globals = (mp_obj_dict_t *)&xiaozhi_module_globals,
 };
 
-MP_REGISTER_MODULE(MP_QSTR_xiaozhi, xiaozhi_module);
+MP_REGISTER_MODULE(MP_QSTR_xiaozhiAI, xiaozhi_module);

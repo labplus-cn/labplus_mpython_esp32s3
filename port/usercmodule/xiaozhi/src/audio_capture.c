@@ -77,6 +77,10 @@ struct record_pipe_s {
     /* 唤醒词回调 */
     record_pipe_wakeup_cb_t     wakeup_cb;
     void                        *wakeup_ctx;
+
+    /* VAD 回调 */
+    record_pipe_vad_cb_t        vad_cb;
+    void                        *vad_ctx;
 };
 
 /* ====================================================
@@ -88,11 +92,27 @@ static void afe_event_cb(esp_gmf_element_handle_t el,
                          void *user_data)
 {
     struct record_pipe_s *rp = (struct record_pipe_s *)user_data;
-    if (event->type == ESP_GMF_AFE_EVT_WAKEUP_START) {
+    switch (event->type) {
+    case ESP_GMF_AFE_EVT_WAKEUP_START:
         ESP_LOGI(TAG, "Wake word detected!");
         if (rp->wakeup_cb) {
             rp->wakeup_cb(rp->wakeup_ctx);
         }
+        break;
+    case ESP_GMF_AFE_EVT_VAD_START:
+        ESP_LOGD(TAG, "VAD: speech start");
+        if (rp->vad_cb) {
+            rp->vad_cb(RECORD_PIPE_VAD_START, rp->vad_ctx);
+        }
+        break;
+    case ESP_GMF_AFE_EVT_VAD_END:
+        ESP_LOGD(TAG, "VAD: speech stop");
+        if (rp->vad_cb) {
+            rp->vad_cb(RECORD_PIPE_VAD_STOP, rp->vad_ctx);
+        }
+        break;
+    default:
+        break;
     }
 }
 
@@ -160,6 +180,7 @@ static esp_capture_err_t pipeline_event_cb(esp_capture_event_t event, void *ctx)
 
 esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
                             record_pipe_wakeup_cb_t wakeup_cb, void *wakeup_ctx,
+                            record_pipe_vad_cb_t vad_cb, void *vad_ctx,
                             record_pipe_handle_t *out_rp)
 {
     if (!rec_dev || !out_rp) return ESP_ERR_INVALID_ARG;
@@ -175,6 +196,8 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     rp->wakeup_cb  = wakeup_cb;
     rp->wakeup_ctx = wakeup_ctx;
+    rp->vad_cb     = vad_cb;
+    rp->vad_ctx    = vad_ctx;
 
     /* 音频设备源 */
     esp_capture_audio_dev_src_cfg_t src_cfg = {
@@ -223,7 +246,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
 
     if (rp->models) {
         /* AFE 配置：SR 模式（唤醒词检测），输入格式 "MM"（双声道麦克风，无参考信号） */
-        rp->afe_cfg = afe_config_init("M", rp->models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
+        rp->afe_cfg = afe_config_init("M", rp->models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF); //AFE_MODE_HIGH_PERF); AFE_MODE_LOW_COST
         if (!rp->afe_cfg) {
             ESP_LOGW(TAG, "afe_config_init failed - wakeup detection disabled");
             esp_srmodel_deinit(rp->models);
@@ -235,7 +258,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
         /* AFE Manager（read_cb/result_cb 由 esp_gmf_afe 元素在 open 时自动设置） */
         rp->afe_cfg->aec_init = false;
         rp->afe_cfg->pcm_config.total_ch_num = 2;
-        rp->afe_cfg->pcm_config.mic_num = 1;  /* 单麦模式：关闭 SE(BSS)，降低 FETCH 算力，缓解 FEED is full */
+        rp->afe_cfg->pcm_config.mic_num = 2;  /* 单麦模式：关闭 SE(BSS)，降低 FETCH 算力，缓解 FEED is full */
         rp->afe_cfg->pcm_config.ref_num = 0;
         rp->afe_cfg->pcm_config.sample_rate = 16000;
         rp->afe_cfg->afe_ringbuf_size = 50;  /* 增大 ring buffer，缓解下游处理不及时时的 FEED is full 警告 */

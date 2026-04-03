@@ -38,20 +38,40 @@ typedef struct record_pipe_s *record_pipe_handle_t;
 typedef void (*record_pipe_wakeup_cb_t)(void *ctx);
 
 /**
+ * VAD（语音活动检测）事件类型。
+ */
+typedef enum {
+    RECORD_PIPE_VAD_START = 0,  /*!< 检测到语音开始 */
+    RECORD_PIPE_VAD_STOP  = 1,  /*!< 检测到语音结束（静音） */
+} record_pipe_vad_event_t;
+
+/**
+ * VAD 事件回调类型。
+ * 仅在 AFE 模式下有效（有 SR 模型时）；回退模式下不会调用。
+ *
+ * @param event  VAD_START 或 VAD_STOP
+ * @param ctx    用户自定义上下文（传入 record_pipe_open 的 vad_ctx）
+ */
+typedef void (*record_pipe_vad_cb_t)(record_pipe_vad_event_t event, void *ctx);
+
+/**
  * 创建并初始化录音 pipeline。
  *
  * 若 flash 分区 "model" 中存在 WakeNet 模型且 wakeup_cb 非 NULL，
- * pipeline 将集成 AFE 唤醒词检测：麦克风 → [ai_afe] → [aud_enc]
- * 否则回退到简单模式：麦克风 → [aud_ch_cvt] → [aud_enc]
+ * pipeline 将集成 AFE 唤醒词检测 + VAD：麦克风 → [ai_afe] → [aud_enc]
+ * 否则回退到简单模式：麦克风 → [aud_ch_cvt] → [aud_enc]（VAD 不可用）
  *
  * @param rec_dev     录音 codec 设备句柄（必须已完成初始化）
  * @param wakeup_cb   唤醒词检测回调（可为 NULL，表示不使用 AFE 唤醒）
- * @param wakeup_ctx  传递给回调的用户上下文
+ * @param wakeup_ctx  传递给唤醒回调的用户上下文
+ * @param vad_cb      VAD 事件回调（可为 NULL，表示不使用 VAD 门控）
+ * @param vad_ctx     传递给 VAD 回调的用户上下文
  * @param out_rp      输出句柄
  * @return ESP_OK 成功
  */
 esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
                             record_pipe_wakeup_cb_t wakeup_cb, void *wakeup_ctx,
+                            record_pipe_vad_cb_t vad_cb, void *vad_ctx,
                             record_pipe_handle_t *out_rp);
 
 /**

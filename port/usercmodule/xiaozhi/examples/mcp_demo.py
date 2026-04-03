@@ -1,4 +1,4 @@
-import xiaozhi
+import xiaozhiAI as xiaozhi
 import json
 import time
 from mpython import *
