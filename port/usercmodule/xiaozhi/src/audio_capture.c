@@ -258,7 +258,7 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
         /* AFE Manager（read_cb/result_cb 由 esp_gmf_afe 元素在 open 时自动设置） */
         rp->afe_cfg->aec_init = false;
         rp->afe_cfg->pcm_config.total_ch_num = 2;
-        rp->afe_cfg->pcm_config.mic_num = 2;  /* 单麦模式：关闭 SE(BSS)，降低 FETCH 算力，缓解 FEED is full */
+        rp->afe_cfg->pcm_config.mic_num = 1;  /* 单麦模式：关闭 SE(BSS)，降低 FETCH 算力，缓解 FEED is full */
         rp->afe_cfg->pcm_config.ref_num = 0;
         rp->afe_cfg->pcm_config.sample_rate = 16000;
         rp->afe_cfg->afe_ringbuf_size = 50;  /* 增大 ring buffer，缓解下游处理不及时时的 FEED is full 警告 */
