@@ -78,9 +78,9 @@ struct record_pipe_s {
     record_pipe_wakeup_cb_t     wakeup_cb;
     void                        *wakeup_ctx;
 
-    /* VAD 回调 */
-    record_pipe_vad_cb_t        vad_cb;
-    void                        *vad_ctx;
+    /* 唤醒词结束回调 */
+    record_pipe_wakeup_end_cb_t wakeup_end_cb;
+    void                        *wakeup_end_ctx;
 };
 
 /* ====================================================
@@ -99,17 +99,17 @@ static void afe_event_cb(esp_gmf_element_handle_t el,
             rp->wakeup_cb(rp->wakeup_ctx);
         }
         break;
+    case ESP_GMF_AFE_EVT_WAKEUP_END:
+        ESP_LOGI(TAG, "Wakeup end (timeout, no speech)");
+        if (rp->wakeup_end_cb) {
+            rp->wakeup_end_cb(rp->wakeup_end_ctx);
+        }
+        break;
     case ESP_GMF_AFE_EVT_VAD_START:
         ESP_LOGD(TAG, "VAD: speech start");
-        if (rp->vad_cb) {
-            rp->vad_cb(RECORD_PIPE_VAD_START, rp->vad_ctx);
-        }
         break;
     case ESP_GMF_AFE_EVT_VAD_END:
         ESP_LOGD(TAG, "VAD: speech stop");
-        if (rp->vad_cb) {
-            rp->vad_cb(RECORD_PIPE_VAD_STOP, rp->vad_ctx);
-        }
         break;
     default:
         break;
@@ -180,7 +180,7 @@ static esp_capture_err_t pipeline_event_cb(esp_capture_event_t event, void *ctx)
 
 esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
                             record_pipe_wakeup_cb_t wakeup_cb, void *wakeup_ctx,
-                            record_pipe_vad_cb_t vad_cb, void *vad_ctx,
+                            record_pipe_wakeup_end_cb_t wakeup_end_cb, void *wakeup_end_ctx,
                             record_pipe_handle_t *out_rp)
 {
     if (!rec_dev || !out_rp) return ESP_ERR_INVALID_ARG;
@@ -194,10 +194,10 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
     struct record_pipe_s *rp = calloc(1, sizeof(struct record_pipe_s));
     if (!rp) return ESP_ERR_NO_MEM;
 
-    rp->wakeup_cb  = wakeup_cb;
-    rp->wakeup_ctx = wakeup_ctx;
-    rp->vad_cb     = vad_cb;
-    rp->vad_ctx    = vad_ctx;
+    rp->wakeup_cb      = wakeup_cb;
+    rp->wakeup_ctx     = wakeup_ctx;
+    rp->wakeup_end_cb  = wakeup_end_cb;
+    rp->wakeup_end_ctx = wakeup_end_ctx;
 
     /* 音频设备源 */
     esp_capture_audio_dev_src_cfg_t src_cfg = {
@@ -262,11 +262,13 @@ esp_err_t record_pipe_open(esp_codec_dev_handle_t rec_dev,
         rp->afe_cfg->pcm_config.ref_num = 0;
         rp->afe_cfg->pcm_config.sample_rate = 16000;
         rp->afe_cfg->afe_ringbuf_size = 50;  /* 增大 ring buffer，缓解下游处理不及时时的 FEED is full 警告 */
+        rp->afe_cfg->vad_init = true;         /* 启用 VAD，使 AFE 内部唤醒/VAD 状态机生效：
+                                               * 待机时 VAD OFF → 唤醒词后自动开 VAD → 语音结束后自动关 VAD */
         esp_gmf_afe_manager_cfg_t mgr_cfg = DEFAULT_GMF_AFE_MANAGER_CFG(
             rp->afe_cfg, NULL, NULL, NULL, NULL);
         mgr_cfg.feed_task_setting.stack_size  = AFE_FEED_TASK_STACK;
         mgr_cfg.fetch_task_setting.stack_size = AFE_FETCH_TASK_STACK;
-        mgr_cfg.fetch_task_setting.prio = 10;
+        mgr_cfg.fetch_task_setting.prio = 15;
         if (esp_gmf_afe_manager_create(&mgr_cfg, &rp->afe_manager) != ESP_GMF_ERR_OK) {
             ESP_LOGW(TAG, "afe_manager_create failed - wakeup detection disabled");
             free(rp->afe_cfg);

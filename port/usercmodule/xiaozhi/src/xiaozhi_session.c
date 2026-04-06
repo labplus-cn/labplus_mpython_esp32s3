@@ -92,8 +92,8 @@ typedef struct {
     /* 状态 */
     volatile xiaozhi_state_t state;
     volatile bool recording_active;  /* true=已触发录音（listen_start），capture_task 可发帧 */
-    volatile bool vad_active;        /* true=允许发帧（唤醒词模式下由 VAD 动态控制；手动模式下恒为 true） */
-    volatile bool manual_listen;     /* true=用户手动触发录音，VAD 不干预 vad_active */
+    volatile bool manual_listen;     /* true=用户手动触发（listen_start() 路径），不受 VAD 控制
+                                      * false=唤醒词路径 */
     char session_id[64];
     bool hello_received;
 
@@ -140,7 +140,7 @@ static void handle_json_message(const char *json_str);
 static void capture_task_fn(void *arg);
 static void get_mac_str(char *buf, size_t len);
 static void session_wakeup_cb(void *ctx);
-static void session_vad_cb(record_pipe_vad_event_t event, void *ctx);
+static void session_wakeup_end_cb(void *ctx);
 static esp_err_t xiaozhi_connect(void);
 
 /* ====================================================
@@ -234,7 +234,7 @@ static esp_err_t send_listen_start(void)
     cJSON_Delete(root);
     if (!str) return ESP_ERR_NO_MEM;
 
-    ESP_LOGD(TAG, "→ listen start");
+    ESP_LOGI(TAG, "→ listen start");
     esp_err_t err = xiaozhi_ws_send_text(s_ctx->ws, str);
     free(str);
     return err;
@@ -425,8 +425,6 @@ static void on_ws_disconnected(void *ctx)
     // Reset session state
     s_ctx->hello_received   = false;
     s_ctx->recording_active = false;
-    s_ctx->vad_active       = false;
-    s_ctx->manual_listen    = false;
     s_ctx->manual_listen    = false;
     memset(s_ctx->session_id, 0, sizeof(s_ctx->session_id));
     
@@ -472,11 +470,10 @@ static void on_player_drained(void *ctx)
         case XIAOZHI_LISTEN_MODE_AUTO:
         case XIAOZHI_LISTEN_MODE_REALTIME:
         default:
-            /* TTS 播完自动续听：VAD 模式，等 VAD 事件触发发帧 */
-            ESP_LOGI(TAG, "Auto/Realtime: resume listening (VAD mode)");
+            /* TTS 播完自动续听：直接开启录音上传 */
+            ESP_LOGI(TAG, "Auto/Realtime: resume listening");
             set_state(XIAOZHI_STATE_LISTENING);
             s_ctx->manual_listen    = false;
-            s_ctx->vad_active       = false;  /* 等 VAD_START 再发帧 */
             s_ctx->recording_active = true;
             send_listen_start();
             break;
@@ -484,7 +481,6 @@ static void on_player_drained(void *ctx)
             /* 手动模式：回到 IDLE，等待用户主动触发 */
             ESP_LOGI(TAG, "Manual mode: return to idle");
             s_ctx->manual_listen    = false;
-            s_ctx->vad_active       = false;
             s_ctx->recording_active = false;
             set_state(XIAOZHI_STATE_IDLE);
             break;
@@ -501,31 +497,30 @@ static void session_wakeup_cb(void *ctx)
     xiaozhi_trigger_wakeup();
 }
 
-static void session_vad_cb(record_pipe_vad_event_t event, void *ctx)
+static void session_wakeup_end_cb(void *ctx)
 {
     (void)ctx;
     if (!s_ctx) return;
-    /* 手动触发录音时，不受 VAD 控制，持续发帧直到用户调用 listen_stop() */
-    if (s_ctx->manual_listen) return;
-    if (event == RECORD_PIPE_VAD_START) {
-        ESP_LOGD(TAG, "VAD: speech start → upload");
-        s_ctx->vad_active = true;
-    } else {
-        ESP_LOGD(TAG, "VAD: speech stop → pause upload");
-        s_ctx->vad_active = false;
+    /* WAKEUP_END：唤醒后超时未说话，AFE 重回待机。
+     * 若当前正在播放（SPEAKING），不打断；否则停止录音上传并断开 WS 回到 IDLE。 */
+    if (s_ctx->state == XIAOZHI_STATE_SPEAKING) {
+        ESP_LOGI(TAG, "Wakeup end: in SPEAKING, ignore");
+        return;
     }
+    ESP_LOGI(TAG, "Wakeup end: no speech detected, stop and return to IDLE");
+    s_ctx->recording_active = false;
+    s_ctx->manual_listen    = false;
+    xiaozhi_stop();
 }
 
 static void capture_task_fn(void *arg)
 {
-    /* 发帧条件：recording_active=true && vad_active=true && 非 SPEAKING
-     *   唤醒词路径：recording_active=true，vad_active 由 session_vad_cb 动态控制
-     *   手动路径  ：recording_active=true，vad_active 恒为 true（manual_listen=true 时 VAD 不干预）
-     *   TTS 播放中：state==SPEAKING，阻止发帧 */
+    /* 发帧条件：recording_active=true && state != SPEAKING
+     * 录音上传由唤醒词（session_wakeup_cb）或用户（listen_start）触发。 */
 
     if (record_pipe_open(s_ctx->rec_dev,
                          session_wakeup_cb, NULL,
-                         session_vad_cb, NULL,
+                         session_wakeup_end_cb, NULL,
                          &s_ctx->rec_pipe) != ESP_OK) {
         ESP_LOGE(TAG, "capture_task: record_pipe_open failed");
         set_state(XIAOZHI_STATE_IDLE);
@@ -564,10 +559,9 @@ static void capture_task_fn(void *arg)
             }
             record_pipe_release_frame(s_ctx->rec_pipe);
 
-            /* recording_active=true 且 VAD 检测到语音 且非 SPEAKING 时，发送 Opus 帧 */
+            /* recording_active=true 且非 SPEAKING 时发送 Opus 帧 */
             if (send_size > 0 &&
                 cur_recording &&
-                s_ctx->vad_active &&
                 s_ctx->state != XIAOZHI_STATE_SPEAKING) {
                 xiaozhi_ws_send_binary(s_ctx->ws, frame_buf, send_size);
             }
@@ -814,7 +808,6 @@ static esp_err_t xiaozhi_connect(void)
     xEventGroupClearBits(s_ctx->event_group, EVT_CONNECTED | EVT_DISCONNECTED);
     s_ctx->hello_received   = false;
     s_ctx->recording_active = false;
-    s_ctx->vad_active       = false;
     s_ctx->manual_listen    = false;
     memset(s_ctx->session_id, 0, sizeof(s_ctx->session_id));
 
@@ -849,7 +842,6 @@ esp_err_t xiaozhi_stop(void)
 
     /* 停止录音上传 */
     s_ctx->recording_active = false;
-    s_ctx->vad_active       = false;
     s_ctx->manual_listen    = false;
 
     /* 发送 listen stop，告知服务器 */
@@ -881,7 +873,6 @@ esp_err_t xiaozhi_abort(void)
     xiaozhi_player_flush(s_ctx->player);
     send_abort_msg();
     s_ctx->recording_active = false;
-    s_ctx->vad_active       = false;
     s_ctx->manual_listen    = false;
     set_state(XIAOZHI_STATE_LISTENING);
     return ESP_OK;
@@ -911,28 +902,25 @@ void xiaozhi_trigger_wakeup(void)
     switch (s_ctx->state) {
         case XIAOZHI_STATE_LISTENING:
             if (!s_ctx->recording_active) {
-                ESP_LOGI(TAG, "Wakeup: starting listen (VAD mode)");
-                s_ctx->manual_listen   = false;  /* 唤醒词模式：VAD 控制发帧 */
-                s_ctx->vad_active      = false;  /* 等 VAD_START 事件再开始发帧 */
+                ESP_LOGI(TAG, "Wakeup: starting listen");
+                s_ctx->manual_listen    = false;
                 s_ctx->recording_active = true;
                 send_listen_start();
             }
             break;
         case XIAOZHI_STATE_SPEAKING:
-            ESP_LOGI(TAG, "Wakeup: abort TTS, starting listen (VAD mode)");
+            ESP_LOGI(TAG, "Wakeup: abort TTS, starting listen");
             xiaozhi_player_flush(s_ctx->player);
             send_abort_msg();
             set_state(XIAOZHI_STATE_LISTENING);
-            s_ctx->manual_listen   = false;
-            s_ctx->vad_active      = false;
+            s_ctx->manual_listen    = false;
             s_ctx->recording_active = true;
             send_listen_start();
             break;
         case XIAOZHI_STATE_IDLE:
-            ESP_LOGI(TAG, "Wakeup: connecting then listen (VAD mode)");
+            ESP_LOGI(TAG, "Wakeup: connecting then listen");
             if (xiaozhi_connect() == ESP_OK) {
-                s_ctx->manual_listen   = false;
-                s_ctx->vad_active      = false;
+                s_ctx->manual_listen    = false;
                 s_ctx->recording_active = true;
                 send_listen_start();
             }
@@ -965,9 +953,8 @@ esp_err_t xiaozhi_listen_start(void)
             return ESP_ERR_INVALID_STATE;
     }
 
-    /* 手动触发：VAD 不干预，持续发帧直到 listen_stop() */
+    /* 手动触发：持续发帧直到 listen_stop() */
     s_ctx->manual_listen    = true;
-    s_ctx->vad_active       = true;
     s_ctx->recording_active = true;
     return send_listen_start();
 }
@@ -984,7 +971,6 @@ esp_err_t xiaozhi_listen_stop(void)
     
     // 停止录音并发送停止消息
     s_ctx->recording_active = false;
-    s_ctx->vad_active       = false;
     s_ctx->manual_listen    = false;
     return send_listen_stop();
 }
