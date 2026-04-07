@@ -158,13 +158,9 @@ try:
     xiaozhi.on_stt(on_stt)
     xiaozhi.on_mcp(handle_mcp_request)
     
-    # 4. 启动会话
-    print("Starting Xiaozhi session...")
-    xiaozhi.start()
-    
     print("MCP Demo running. AI can now call your tools!")
     
-    # 5. 主循环：持续派发回调
+    # 6. 主循环：持续派发回调
     while True:
         xiaozhi.poll()
         # 处理按键触发录音（可选）
@@ -176,5 +172,4 @@ try:
 
 except Exception as e:
     print(f"Session Error: {e}")
-    xiaozhi.stop()
     xiaozhi.deinit()

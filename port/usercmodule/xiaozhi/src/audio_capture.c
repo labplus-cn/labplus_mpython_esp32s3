@@ -101,9 +101,10 @@ static void afe_event_cb(esp_gmf_element_handle_t el,
         break;
     case ESP_GMF_AFE_EVT_WAKEUP_END:
         ESP_LOGI(TAG, "Wakeup end (timeout, no speech)");
-        if (rp->wakeup_end_cb) {
-            rp->wakeup_end_cb(rp->wakeup_end_ctx);
-        }
+        // 唤醒词结束回调（可选）,先注释掉，不然会导致唤醒超时又要唤醒
+        // if (rp->wakeup_end_cb) {
+        //     rp->wakeup_end_cb(rp->wakeup_end_ctx);
+        // }
         break;
     case ESP_GMF_AFE_EVT_VAD_START:
         ESP_LOGD(TAG, "VAD: speech start");
