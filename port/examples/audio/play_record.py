@@ -6,26 +6,29 @@
 '''
 
 from mpython import *
-
-my_wifi = wifi()
-my_wifi.connectWiFi("office", "wearemaker")
-# my_wifi.connectWiFi("labplus_dev", "helloworld")
-
 import audio
 
+# my_wifi = wifi()
+# my_wifi.connectWiFi("office", "wearemaker")
+# my_wifi.connectWiFi("labplus_dev", "helloworld")
+
 # import gc;gc.collect()
-audio.player_init()
-audio.set_volume(50)
-audio.play('http://cdn.makeymonkey.com/test/32_%E6%8B%94%E8%90%9D%E5%8D%9C.mp3')
+# audio.player_init()
+# audio.set_volume(50)
+# audio.play('http://cdn.makeymonkey.com/test/32_%E6%8B%94%E8%90%9D%E5%8D%9C.mp3')
 # time.sleep(5)
 # audio.stop()
 # time.sleep_ms(50) # 需要一定时时间释放播放资源
-# print("record start........")
-# audio.recorder_init()
-# audio.record("file://littlefs/1.opus", 5)
-# print('record end.....')
-# audio.recorder_deinit()
 
-# audio.player_init()
-# audio.set_volume(100)
-# audio.play('file://littlefs/1.opus')
+from mpython import *
+import audio
+print("record start........")
+audio.recorder_init()
+audio.record("1.wav", 5)
+audio.record("1.wav", 5, 16, 2, 16000)
+print('record end.....')
+audio.recorder_deinit()
+
+audio.player_init()
+audio.set_volume(100)
+audio.play('1.wav')

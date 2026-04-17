@@ -124,13 +124,7 @@ static uint8_t *create_transfer_buffer(size_t n, mp_machine_i2c_buf_t *bufs, siz
 
 int machine_hw_i2c_transfer(mp_obj_base_t *self_in, uint16_t addr, size_t n, mp_machine_i2c_buf_t *bufs, unsigned int flags) {
     machine_hw_i2c_obj_t *self = MP_OBJ_TO_PTR(self_in);
-
-    // Probe the address to see if any device responds.
-    // This test uses a fixed scl freq of 100_000.
-    esp_err_t err = i2c_master_probe(self->bus_handle, addr, self->timeout_us / 1000);
-    if (err != ESP_OK) {
-        return -MP_ENODEV;   // No device at address, return immediately
-    }
+    esp_err_t err = ESP_OK;
 
     #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 5, 0)
     // Using ".device_address = I2C_DEVICE_ADDRESS_NOT_USED," below
