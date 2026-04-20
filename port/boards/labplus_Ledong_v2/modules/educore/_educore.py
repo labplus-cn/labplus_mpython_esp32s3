@@ -382,7 +382,7 @@ class WiFi(wifi):
         super().__init__()
 
     def connect(self, ssid, psd, timeout=10000):
-        self.connectWiFi(ssid, psd, int(timeout/1000))
+        self.connectWiFi(ssid, psd, int(timeout))
     
     def status(self):
         return self.sta.isconnected()
