@@ -21,9 +21,15 @@
 extern "C" {
 #endif
 
-/* ====================
- * 状态枚举
- * ==================== */
+/* ==================== * 监听模式枚举 * ==================== */
+
+typedef enum {
+    XIAOZHI_LISTEN_MODE_AUTO,    /*!< 自动模式：TTS结束后自动回到监听状态 */
+    XIAOZHI_LISTEN_MODE_MANUAL,  /*!< 手动模式：需要手动触发监听 */
+    XIAOZHI_LISTEN_MODE_REALTIME /*!< 实时模式：持续监听 */
+} xiaozhi_listen_mode_t;
+
+/* ==================== * 状态枚举 * ==================== */
 
 typedef enum {
     XIAOZHI_STATE_IDLE       = 0,  /*!< 空闲，无连接 */
@@ -31,7 +37,6 @@ typedef enum {
     XIAOZHI_STATE_CONNECTED  = 2,  /*!< WS 已连接，握手中（等待服务器 hello） */
     XIAOZHI_STATE_LISTENING  = 3,  /*!< 握手完成，空闲待机；唤醒/listen_start 后开始上传音频 */
     XIAOZHI_STATE_SPEAKING   = 4,  /*!< 正在播放服务器返回的语音 */
-    XIAOZHI_STATE_ERROR      = 5,  /*!< 连接或运行出错 */
 } xiaozhi_state_t;
 
 /* ====================
@@ -90,6 +95,7 @@ typedef struct {
     int         frame_duration_ms;/*!< 音频帧时长（ms），0 = 使用默认值 60ms */
     int         output_volume;    /*!< 扬声器音量 0-100，0 = 使用默认值 80 */
     float       input_gain_db;    /*!< 麦克风增益（dB），0.0 = 使用默认值 35.0 */
+    xiaozhi_listen_mode_t listen_mode; /*!< 监听模式，默认 XIAOZHI_LISTEN_MODE_AUTO */
 } xiaozhi_config_t;
 
 /* ====================
@@ -115,17 +121,6 @@ esp_err_t xiaozhi_init(const xiaozhi_config_t *config);
  * @return  ESP_OK 成功
  */
 esp_err_t xiaozhi_deinit(void);
-
-/**
- * 启动语音会话
- *
- * 连接 WebSocket 服务器，握手阶段处于 CONNECTED 状态，
- * 握手完成后自动进入 LISTENING 状态。
- * 可在 IDLE 或 ERROR 状态时调用。
- *
- * @return  ESP_OK 成功
- */
-esp_err_t xiaozhi_start(void);
 
 /**
  * 停止语音会话

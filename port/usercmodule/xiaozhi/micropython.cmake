@@ -20,6 +20,8 @@ add_library(xiaozhi_module INTERFACE)
 
 target_sources(xiaozhi_module INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/xiaozhi_session.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/xiaozhi_player.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/xiaozhi_ws.c
     ${CMAKE_CURRENT_LIST_DIR}/src/audio_capture.c
     ${CMAKE_CURRENT_LIST_DIR}/src/activate.c
     ${CMAKE_CURRENT_LIST_DIR}/modxiaozhi.c
