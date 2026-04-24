@@ -457,10 +457,10 @@ static mp_obj_t audio_record(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
         if(esp_codec_dev_read(codec_dev, buffer, READ_BUFF_SIZE) == ESP_CODEC_DEV_OK){
             if(target_ch == 1){
                 // esp_ae_ch_cvt_process(c_handle, READ_BUFF_SIZE, (void *)buffer, pcm_buff);
-                for(int i = 0; i < READ_BUFF_SIZE / 2; i++){
-                    // *((uint16_t*)buffer + (i<<2)) <<= 3;
-                    *((uint16_t*)pcm_buff + 1) = *((uint16_t*)buffer + (i<<2));
-                } 
+                for(int i = 0; i < READ_BUFF_SIZE / 4; i++){
+                    *((uint16_t*)pcm_buff + i) = *((uint16_t*)buffer + (i<<1));
+                    *((uint16_t*)pcm_buff + i) <<= 3;
+                }
                 writer_ops->write((format_writer_handle_t)writer_buf, (void *)pcm_buff, READ_BUFF_SIZE/2); 
             }else{
                 for(int i = 0; i < READ_BUFF_SIZE / 2; i++){
@@ -473,10 +473,10 @@ static mp_obj_t audio_record(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
 
     /* Finalize format writer */
     writer_ops->close((format_writer_handle_t)writer_buf);
-    // if(target_ch == 1){
-    //     free(pcm_buff);
-    //     esp_ae_ch_cvt_close(c_handle);
-    // }
+    if(target_ch == 1){
+        free(pcm_buff);
+        // esp_ae_ch_cvt_close(c_handle);
+    }
     free(buffer);
     /* Cleanup */
     fclose(f);
