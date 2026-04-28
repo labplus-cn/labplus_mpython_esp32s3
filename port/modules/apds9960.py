@@ -204,9 +204,9 @@ class _APDS9960:
             self.in_threshold = 0
             self.out_threshold = 0
 
-    def __init__(self, bus=i2c, address=APDS9960_I2C_ADDR, valid_id=APDS9960_DEV_ID):
+    def __init__(self, i2c=i2c, address=APDS9960_I2C_ADDR, valid_id=APDS9960_DEV_ID):
         self.address = address
-        self.bus = bus
+        self.bus = i2c
 
         # 用于手势检测的实例变量
         self.gesture_ud_delta_ = 0

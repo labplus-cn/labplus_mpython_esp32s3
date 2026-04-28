@@ -118,7 +118,7 @@ initRegisterArray=( [0xEF,0x00],[0x32,0x29],[0x33,0x01],[0x34,0x00],[0x35,0x01],
 class PAJ7620(object):
 	"""initialize the sensor"""
 	Gesture = [" ","Forward-前","Backward-后","Right-右","Left-左","Up-上","Down-下","Clockwise-顺","anti-clockwise-逆","Wave-波浪"]
-	def __init__(self):
+	def __init__(self, i2c=i2c):
 		self.i2c = i2c
 		self.address = PAJ7620_ID
 		time.sleep(0.001)

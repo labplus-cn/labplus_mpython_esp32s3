@@ -11,7 +11,7 @@ REG_VERSION = 0x10   # 新增固件版本寄存器
 
 
 class Forece():
-    def __init__(self):
+    def __init__(self, i2c=i2c):
         self.i2c = i2c
         i2c_addr = self.i2c.scan()
         if DEVICE_ADDR not in i2c_addr:

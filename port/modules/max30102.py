@@ -38,7 +38,7 @@ REG_PART_ID = 0xFF
 
 class MAX30102():
     #默认使用引脚X1作为中断引脚，连接模块的INT引脚
-    def __init__(self):
+    def __init__(self, i2c=i2c):
         self.ir_D = None
         self.red_D = None
         self.i2c = i2c

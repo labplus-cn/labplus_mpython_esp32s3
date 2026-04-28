@@ -952,8 +952,9 @@ from mfrc import Rfid
 class Scan_Rfid():
     """扫描Rfid卡类.
     """
-    def __init__(self, i2c=i2c, i2c_addr=47):
-        self.rf = Rfid(i2c, i2c_addr)
+    def __init__(self, i2c=i2c):
+        self.i2c_addr = 47
+        self.rf = Rfid(i2c, self.i2c_addr)
         
     def scanning(self):
         if self.rf != None:
@@ -963,10 +964,13 @@ class Scan_Rfid():
 class Scan_Rfid_Edu():
     """扫描Rfid卡类.
     """
-    def __init__(self, i2c=i2c, i2c_addr=47):
-        self.rf = Rfid(i2c, i2c_addr)
+    def __init__(self, i2c=i2c):
+        self.i2c_addr = 47
+        self.rf = Rfid(i2c, self.i2c_addr)
         
     def scanning(self):
+        if self.rf != None:
+            print("find card: {}" .format(self.rf.serial_number()))
         return self.rf
 
 class GasSensor():
@@ -1104,8 +1108,9 @@ i2c_scan = i2c.scan()
 _speed_buf = {}
 
 class EncoderMotor(object):
-    def __init__(self):
+    def __init__(self, i2c=i2c):
         self.batch = -1 
+        self.i2c = i2c
         if 18 in i2c_scan:
             # 编码电机(新)
             self.i2c_addr = 18
@@ -1120,7 +1125,7 @@ class EncoderMotor(object):
             attempts=0
             while True:
                 try:
-                    i2c.writeto(self.i2c_addr, bytearray([1]))
+                    self.i2c.writeto(self.i2c_addr, bytearray([1]))
                 except Exception as e:
                     attempts = attempts + 1
                     if attempts > 2:
@@ -1152,7 +1157,7 @@ class EncoderMotor(object):
             attempts=0
             while True:
                 try:
-                    i2c.writeto(self.i2c_addr, bytearray([2, speed_l, speed_r]))
+                    self.i2c.writeto(self.i2c_addr, bytearray([2, speed_l, speed_r]))
                 except Exception as e:
                     attempts = attempts + 1
                     if attempts > 2:
@@ -1181,7 +1186,7 @@ class EncoderMotor(object):
             attempts=0
             while True:
                 try:
-                    i2c.writeto(self.i2c_addr, bytearray([dir, speed, tmp[0], tmp[1]]))
+                    self.i2c.writeto(self.i2c_addr, bytearray([dir, speed, tmp[0], tmp[1]]))
                 except Exception as e:
                     attempts = attempts + 1
                     if attempts > 2:
@@ -1210,7 +1215,7 @@ class EncoderMotor(object):
             attempts=0
             while True:
                 try:
-                    i2c.writeto(self.i2c_addr, bytearray([5, speed, tmp[0], tmp[1]]))
+                    self.i2c.writeto(self.i2c_addr, bytearray([5, speed, tmp[0], tmp[1]]))
                 except Exception as e:
                     attempts = attempts + 1
                     if attempts > 2:
@@ -1234,7 +1239,7 @@ class EncoderMotor(object):
             attempts=0
             while True:
                 try:
-                    i2c.writeto(self.i2c_addr, bytearray([6, correct]))
+                    self.i2c.writeto(self.i2c_addr, bytearray([6, correct]))
                 except Exception as e:
                     attempts = attempts + 1
                     if attempts > 2:
@@ -1249,17 +1254,17 @@ class EncoderMotor(object):
         """"
         单个编码电机驱动num:电机编号 M1:1 M2:2 speed:转速量程 -100-100
         """
-        i2c.writeto(self.i2c_addr,bytearray([8, num, speed]))
+        self.i2c.writeto(self.i2c_addr,bytearray([8, num, speed]))
     
     def setvater_pump(self,speed):
         """
         水泵开关 speed:转速量程:-100-180
         """
-        i2c.writeto(self.i2c_addr,bytearray([7, speed]))
+        self.i2c.writeto(self.i2c_addr,bytearray([7, speed]))
 
     def motor_info(self,num,off):
         """ 串口获取速度值输出 num:电机编号 M1:1 M2:2 off:开关 1:开  0:关"""
-        i2c.writeto(self.i2c_addr,bytearray([9, num, off]))
+        self.i2c.writeto(self.i2c_addr,bytearray([9, num, off]))
         
 
 
