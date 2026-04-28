@@ -141,7 +141,7 @@ list(APPEND MICROPY_SOURCE_PORT
     network_common.c
     network_lan.c
     network_ppp.c
-    network_wlan.c
+    # network_wlan.c
     mpnimbleport.c
     modsocket.c
     lwip_patch.c
@@ -162,6 +162,7 @@ list(TRANSFORM MICROPY_SOURCE_PORT PREPEND ${MICROPYTHON_PORT_DIR}/)
 list(APPEND MICROPY_SOURCE_PORT ${CMAKE_BINARY_DIR}/pins.c)
 
 list(REMOVE_ITEM MICROPY_SOURCE_EXTMOD ${MICROPY_EXTMOD_DIR}/modframebuf.c)
+list(REMOVE_ITEM MICROPY_SOURCE_EXTMOD ${MICROPY_EXTMOD_DIR}/machine_i2c.c)
 # MESSAGE( STATUS "MICROPY_SOURCE_EXTMOD = ${MICROPY_SOURCE_EXTMOD}")
  
 list(APPEND MICROPY_SOURCE_QSTR
