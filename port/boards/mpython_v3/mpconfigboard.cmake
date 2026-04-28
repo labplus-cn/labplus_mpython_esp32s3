@@ -27,6 +27,8 @@ set(MICROPY_SOURCE_BOARD
     ${MPY_PORT_DIR}/builtins/machine_touchpad.c
     ${MPY_PORT_DIR}/builtins/modframebuf.c
     ${MPY_PORT_DIR}/builtins/machine_i2c.c
+    ${MPY_PORT_DIR}/builtins/machine_i2c_extmod.c
+    ${MPY_PORT_DIR}/builtins/network_wlan.c
 )
 
 set(MICROPY_SOURCE_BOARD_DIR
