@@ -1103,7 +1103,6 @@ MOTOR_left = const(0x02)
 """
 M2电机编号，0x02
 """
-i2c_scan = i2c.scan()
 
 _speed_buf = {}
 
@@ -1111,6 +1110,7 @@ class EncoderMotor(object):
     def __init__(self, i2c=i2c):
         self.batch = -1 
         self.i2c = i2c
+        i2c_scan = self.i2c.scan()
         if 18 in i2c_scan:
             # 编码电机(新)
             self.i2c_addr = 18
