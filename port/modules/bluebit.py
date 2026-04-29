@@ -283,7 +283,7 @@ class SEGdisplay(object):
                 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x00, 0x40
             ]
         elif self.chip == 2:
-            self.ht16k33 = HT16K33_SEG()
+            self.ht16k33 = HT16K33_SEG(i2c=self.i2c)
 
     def _uint(self, x):
         """ display unsigned int number """
