@@ -120,7 +120,7 @@ class TFT_displayer(framebuf.FrameBuffer):
             x += char_width #+ 5
 
     def clear(self, color = None):
-        if color:
+        if color is not None:
             super().background_color(color)
         super().fill(super().background_color())
         
