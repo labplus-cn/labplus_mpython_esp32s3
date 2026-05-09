@@ -119,9 +119,10 @@ class TFT_displayer(framebuf.FrameBuffer):
             super().blit(fb, x, y)
             x += char_width #+ 5
 
-    def clear(self, color = lcd.BLACK):
-        super().background_color(color)
-        super().fill(color)
+    def clear(self, color = None):
+        if color:
+            super().background_color(color)
+        super().fill(super().background_color())
         
     def show(self):
         lcd.show(self.buffer)
