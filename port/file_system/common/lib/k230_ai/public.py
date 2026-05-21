@@ -22,7 +22,7 @@ PERSON_KEYPOINT_DETECT = 10 # 人体关键点数据
 PERSON_KEYPOINT_DETECT_PLUS = 11 
 COLOR_STATISTICS_MODE = 13 # 颜色的统计信息
 COLOR_EXTRACTO_MODE = 14 # LAB颜色提取器
-APRILTAG_MODE = 15
+APRILTAG_DETECT_MODE = 15 # AprilTag 检测
 
 COLOE_MODE = 16
 SPEECH_RECOGNIZATION_MODE = 17
@@ -61,7 +61,6 @@ HAND_KEYPOINT_CLASS_GESTURE = ['fist','five','gun','love','one','six','three','t
 FACE_LANDMARK_EXPRESSION_ZH = ['正常','开心','伤心','惊讶','生气']
 DYNAMIC_GESTURE_STR = ['上','下','左','右'] 
 
-
 MODE=['默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
 
 AI ={
@@ -85,6 +84,7 @@ AI ={
     'PERSON_DETECTION':[PERSON_DETECTION,0x01],
     'PERSON_KEYPOINT_DETECT':[PERSON_KEYPOINT_DETECT,0x01],
     'PERSON_KEYPOINT_DETECT_PLUS':[PERSON_KEYPOINT_DETECT_PLUS,0x01],
+    'APRILTAG_DETECT_MODE':[APRILTAG_DETECT_MODE,0x01],
     'FACE_LANDMARK':[FACE_LANDMARK,0x01],
     'FACE_LANDMARK_LIVING_BODY':[FACE_LANDMARK_LIVING_BODY,0x01],
     'FACE_LANDMARK_EXPRESSION':[FACE_LANDMARK_EXPRESSION,0x01],
@@ -232,7 +232,6 @@ def AI_Uart_CMD_String(uart=None, cmd=0xfe, cmd_type=0xfe, cmd_data=[0, 0, 0], s
     
     # for i in range(len(str_temp)):
     #     check_sum = check_sum + str_temp[i]  
-
     CMD = bytes(CMD) + bytes([str_len]) + str_temp + bytes([0xAB])  # 0xAB为结束符
     uart.write(CMD)
 
@@ -303,12 +302,6 @@ class TASK:
         self.enable = False
         self.stop_lock.acquire()
         self.enable = True
-
-    # def kill(self):
-    #     pass
-
-
-
 
 class PIDController:
     def __init__(self, kp, ki, kd, min_out=-25, max_out=25):

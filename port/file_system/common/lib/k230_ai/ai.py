@@ -413,7 +413,7 @@ class LINEAR_V3_REGRESSION():
         self.CommandList = AI['LINEAR_REGRESSION_V3_MODE']
         self.data = {"cx": None, "cy": None, "angle": None, "is_int": False, "is_zebra": False}
         self.parameter = json.dumps({"color": line_color,'int':detect_intersections, 'zebra':detect_zebra})
-        self.sleep_time_ms = 100 
+        self.sleep_time_ms = 50 
         AI_Uart_CMD_String(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1], str_buf=self.parameter)
         time.sleep(0.5)
 
@@ -449,3 +449,21 @@ class AMR(object):
         if(not self.lock):
             AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
 
+
+class APRILTAG_DETECT(object):
+    """ AprilTag 检测 """
+    def __init__(self, uart):
+        self.lock = False
+        self.uart = uart
+        self.CommandList = AI['APRILTAG_DETECT_MODE']
+        self.data = {'family': None, 'id': None, 'rect': [], 'rotation': None, 'cx': None, 'cy': None}
+        self.tag_family = None
+        self.tag_id = None
+        self.sleep_time_ms = 50 
+        AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
+        time.sleep(0.5)
+
+    def recognize(self):
+        time.sleep_ms(self.sleep_time_ms)
+        if(not self.lock):
+            AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])

@@ -130,6 +130,8 @@ class SmartCameraK230:
             for i in range(5):
                 AI_Uart_CMD(self.uart,DEFAULT_MODE,0x01)
                 time.sleep_ms(100) 
+        elif(cur_state==FACE_REG_PLUS_MODE):
+            AI_Uart_CMD(self.uart,FACE_REG_PLUS_MODE,0x01)
         elif(cur_state==FACE_DETECTION_MODE):
             self.face_detect = FACE_DETECT(self.uart)
         elif(cur_state==HAND_DETECTION):
@@ -162,8 +164,8 @@ class SmartCameraK230:
             self.fcr = FaceRecogization(self.uart)
         elif(cur_state==APS_MODE):
             self.amr = AMR(self.uart)
-        elif(cur_state==FACE_REG_PLUS_MODE):
-            AI_Uart_CMD(self.uart,FACE_REG_PLUS_MODE,0x01)
+        elif(cur_state==APRILTAG_DETECT_MODE):
+            self.apriltag = APRILTAG_DETECT(self.uart)
         
         self.mode = cur_state
     
@@ -494,36 +496,24 @@ class SmartCameraK230:
                         self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
                 elif(self.mode==APS_MODE and self.amr!=None):
                     if(len(CMD)>0):
-                        # print(CMD)
-                        # if(CMD[2]==0x01 and CMD[3]==APS_MODE and CMD[4]==0x01):
-                        #     if(CMD[5]==0xff):
-                        #         self.amr.lock = True
-                        #         self.amr.res = {
-                        #                 "F": "none",
-                        #                 "AGL": 0,
-                        #                 "SW": [],
-                        #                 "GL": [],
-                        #                 "RL": [],
-                        #                 "UT": []
-                        #             }
                         if(CMD[2]==0x02 and CMD[3]==APS_MODE and CMD[4]==0x01):
                             b = bytes(CMD[22:-1])  
                             data = json.loads(b.decode('UTF-8','ignore'))
                             self.amr.lock = True
                             self.amr.res = data
-                # elif(self.mode==APRILTAG_MODE and self.apriltag!=None):
-                #     if(len(CMD)>0):
-                #         if(CMD[2]==0x01 and CMD[3]==AI['apriltag'][0] and CMD[4]==AI['apriltag'][2] and CMD[5]==0xff):
-                #             self.apriltag.lock = True
-                #             self.apriltag.tag_family,self.apriltag.tag_id = None,None
-                #         elif(CMD[2]==0x02 and CMD[3]==AI['apriltag'][0] and CMD[4]==AI['apriltag'][2]):
-                #             self.apriltag.lock = True
-                #             _str = str(CMD[-2].decode('UTF-8','ignore'))
-                #             data = _str.split('|')
-                #             self.apriltag.tag_family,self.apriltag.tag_id = int(data[0]),int(data[1])
-                #     else:
-                #         self.apriltag.tag_family,self.apriltag.tag_id = None,None
+                elif(self.mode==APRILTAG_DETECT_MODE and self.apriltag!=None):
+                    if(len(CMD)>0):
+                        if(CMD[2]==0x01 and CMD[3]==APRILTAG_DETECT_MODE and CMD[4]==0x01 and CMD[5]==0xff):
+                            self.apriltag.lock = True
+                            self.apriltag.tag_family,self.apriltag.tag_id = None,None
+                        elif(CMD[2]==0x02 and CMD[3]==APRILTAG_DETECT_MODE and CMD[4]==0x01):
+                            self.apriltag.lock = True
+                            b = bytes(CMD[22:-1])  
+                            self.apriltag.data = json.loads(b.decode('UTF-8','ignore'))
+                            self.apriltag.tag_family = self.apriltag.data.get('family', None)
+                            self.apriltag.tag_id = self.apriltag.data.get('id', None)
                 else:
+                    gc.collect()
                     pass
         except Exception as e:
             print(e)
