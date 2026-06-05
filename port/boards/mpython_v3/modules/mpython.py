@@ -1034,6 +1034,16 @@ from gui import *
 uuid
 """
 def uuid():
-    import ubinascii,machine
-    return ubinascii.hexlify(machine.unique_id()).decode().upper()
+    import ubinascii
+    import machine
+    uuid = ''
+    try:
+        uuid = ubinascii.hexlify(machine.unique_id_custom()).decode().upper()
+    except Exception as e:
+        uuid = ubinascii.hexlify(machine.unique_id()).decode().upper()
+    
+    if(uuid=='ffffffffffff'.upper() or uuid=='000000000000'.upper()):
+        uuid = ubinascii.hexlify(machine.unique_id()).decode().upper()
+
+    return uuid
 
