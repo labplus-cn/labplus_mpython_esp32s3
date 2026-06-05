@@ -1026,7 +1026,7 @@ def uuid():
     except Exception as e:
         uuid = ubinascii.hexlify(machine.unique_id()).decode().upper()
     
-    if(uuid=='ffffffffffff'.upper()):
+    if(uuid=='ffffffffffff'.upper() or uuid=='000000000000'.upper()):
         uuid = ubinascii.hexlify(machine.unique_id()).decode().upper()
 
     return uuid
