@@ -204,16 +204,16 @@ static mp_obj_t mtp_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
     return MP_OBJ_FROM_PTR(self);
 }
 
-static mp_obj_t update_fw(mp_obj_t self_in)
+static mp_obj_t update_fw(void)
 {
-    mtp_obj_t *self = self_in;
+    // mtp_obj_t *self = self_in;
     int ret = fts_fwupg_auto_upgrade();
     if(ret < 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("firmware upgrade fails."));
     }
     return mp_obj_new_int(ret);
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(update_fw_obj, update_fw);
+static MP_DEFINE_CONST_FUN_OBJ_0(update_fw_obj, update_fw);
 
 static const mp_rom_map_elem_t mtp_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_TouchPad) },
