@@ -51,7 +51,7 @@ class ACD1200(object):
 acd = ACD1200()
 
 while True:
-    sleep(1)
+    time.sleep(1)
     co2 = acd.read()# 单位ppm（百万分比浓度） 在大自然环境里，空气中二氧化碳的正常含量是0.04%（400 PPM)，在大城市里有时候达到500 PPM。室内没有人的情况下，二氧化碳浓度一般在500到1000 PPM左右。
     print(co2)
 '''

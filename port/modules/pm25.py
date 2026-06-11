@@ -66,14 +66,14 @@ class PM25():
         vals = []
         print('PM2.5测量中..')
         while True:
-            sleep(0.005)
+            time.sleep(0.005)
             try:
                 self.digital_pin.write_digital(0)
-                sleep(SAMPLING_TIME)
+                time.sleep(SAMPLING_TIME)
                 vals.append(self.analog_pin.read_analog())
                 sleep(DELTA_TIME)
                 self.digital_pin.write_digital(1)
-                sleep(SLEEP_TIME)
+                time.sleep(SLEEP_TIME)
                 if len(vals) == sample_size:
                     avg = sum(vals) / len(vals)
                     volt = self.calc_volt(avg)
