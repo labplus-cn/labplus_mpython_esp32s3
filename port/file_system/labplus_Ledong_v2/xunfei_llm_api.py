@@ -58,7 +58,7 @@ class AiThorClient:
     def _headers(self, mode="text"):
         """
         按模式构造请求头。
-          mode="text" / "img" → 使用 accessToken，appid=aicxjy-cyzai
+          mode="text" / "img" → 使用 accessToken，appid=aicxjycpx-zxwljxpt
           mode="audio"        → 使用 accessToken_audio，appid=aicxjycpx-zxwljxpt
         """
         is_audio = (mode == "audio")
@@ -72,7 +72,7 @@ class AiThorClient:
             "x-device-id":  str(self.cfg.get("deviceId", "")),
             "x-user-id":    str(self.cfg.get("userId", "")),
             "x-platform":   "Web",
-            "x-appid":      "aicxjycpx-zxwljxpt" if is_audio else "aicxjy-cyzai",
+            "x-appid":      "aicxjycpx-zxwljxpt",
             "x-user-tag":   "zxwl-tools" if is_audio else "changyan-ai-web-user",
             "x-extra":      json.dumps({"AppVersion": "1.0.0", "SDKVersion": sdk_ver}),
         }
@@ -407,13 +407,10 @@ class AiThorClient:
                 custom_vars   = {"content": content, "online": 1}
 
         shortcut = {"shortcutType": 0, "workflowId": wf_id}
-        if wf_ver:
-            shortcut["workflowVersion"] = wf_ver
 
         payload = {
             "debugMode":       False,
             "agentId":         agent_id,
-            "versionId":       ver_id,
             "agentType":       "1",
             "contentType":     1,
             "content":         content,
