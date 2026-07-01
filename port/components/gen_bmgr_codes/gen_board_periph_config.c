@@ -15,6 +15,7 @@
 #include "hal/gpio_types.h"
 #include "periph_i2s.h"
 #include "periph_spi.h"
+#include "periph_gpio.h"
 
 // Peripheral configuration structures
 const static i2c_master_bus_config_t esp_bmgr_i2c_master_cfg = {
@@ -112,6 +113,19 @@ const static periph_i2s_config_t esp_bmgr_i2s_audio_in_cfg = {
         },
 };
 
+#if CONFIG_LABPLUS_XUEJING_V2_BOARD
+const static periph_gpio_config_t esp_bmgr_gpio_pa_control_cfg = {
+    .gpio_config = {
+        .pin_bit_mask = BIT64(33),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    },
+    .default_level = 1,
+};
+#endif
+
 static periph_spi_config_t esp_bmgr_spi_display_cfg = {
     .spi_port = SPI2_HOST,
     .spi_bus_config = {
@@ -164,6 +178,18 @@ const esp_board_periph_desc_t g_esp_board_peripherals[] = {
         .cfg_size = sizeof(esp_bmgr_i2s_audio_in_cfg),
         .id = 0,
     },
+#if CONFIG_LABPLUS_XUEJING_V2_BOARD
+    {
+        .next = &g_esp_board_peripherals[4],
+        .name = "gpio_pa_control",
+        .type = "gpio",
+        .format = NULL,
+        .role = ESP_BOARD_PERIPH_ROLE_IO,
+        .cfg = &esp_bmgr_gpio_pa_control_cfg,
+        .cfg_size = sizeof(esp_bmgr_gpio_pa_control_cfg),
+        .id = 0,
+    },
+#endif
     {
         .next = NULL,
         .name = "spi_display",

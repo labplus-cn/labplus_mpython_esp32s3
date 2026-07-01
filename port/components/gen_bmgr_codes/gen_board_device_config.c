@@ -16,7 +16,7 @@
 // Device configuration structures
 const static dev_audio_codec_config_t esp_bmgr_audio_dac_cfg = {
     .name = "audio_dac",
-    .chip = "es8388",
+    .chip = "es8389",
     .type = "audio_codec",
     .adc_enabled = false,
     .adc_max_channel = 0,
@@ -27,12 +27,21 @@ const static dev_audio_codec_config_t esp_bmgr_audio_dac_cfg = {
     .dac_max_channel = 2,
     .dac_channel_mask = 0x3,
     .dac_init_gain = 0,
+#if CONFIG_LABPLUS_XUEJING_V2_BOARD
+    .pa_cfg = {
+        .name = "gpio_pa_control",
+        .port = 33,
+        .active_level = 1,
+        .gain = 6.0,
+    },
+#else
     .pa_cfg = {
             .name = "none",
             .port = -1,
             .active_level = 0,
             .gain = 0.0,
         },
+#endif
     .i2c_cfg = {
             .name = "i2c_master",
             .port = 0,
@@ -54,7 +63,7 @@ const static dev_audio_codec_config_t esp_bmgr_audio_dac_cfg = {
 
 const static dev_audio_codec_config_t esp_bmgr_audio_adc_cfg = {
     .name = "audio_adc",
-    .chip = "es8388",
+    .chip = "es8389",
     .type = "audio_codec",
     .adc_enabled = true,
     .adc_max_channel = 2,
@@ -111,9 +120,9 @@ const static dev_display_lcd_config_t esp_bmgr_display_lcd_cfg = {
                     .spi_name = "spi_display",
                     .panel_config = {
 #if CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD
-                            .reset_gpio_num = -1,
-#else
                             .reset_gpio_num = 47,
+#else
+                            .reset_gpio_num = -1,
 #endif
                             .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
                             .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
@@ -124,7 +133,7 @@ const static dev_display_lcd_config_t esp_bmgr_display_lcd_cfg = {
                             .vendor_config = NULL,
                         },
                     .io_spi_config = {
-#if CONFIG_MPYTHON_V3_BOARD || CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD
+#if CONFIG_MPYTHON_V3_BOARD || CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD || CONFIG_LABPLUS_XUEJING_V2_BOARD
                             .cs_gpio_num = 34,
 #elif CONFIG_LABPLUS_LEDONG_V2_BOARD || CONFIG_LABPLUS_XUNFEI_JS_PRIMARY_BOARD
                             .cs_gpio_num = -1,

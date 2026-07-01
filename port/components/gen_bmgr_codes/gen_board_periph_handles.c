@@ -13,6 +13,7 @@
 #include "periph_i2c.h"
 #include "periph_i2s.h"
 #include "periph_spi.h"
+#include "periph_gpio.h"
 
 // Peripheral handle array
 esp_board_periph_entry_t g_esp_board_periph_handles[] = {
@@ -30,6 +31,15 @@ esp_board_periph_entry_t g_esp_board_periph_handles[] = {
         .init = periph_i2s_init,
         .deinit = periph_i2s_deinit
     },
+#if CONFIG_LABPLUS_XUEJING_V2_BOARD
+    {
+        .next = &g_esp_board_periph_handles[3],
+        .type = "gpio",
+        .role = ESP_BOARD_PERIPH_ROLE_IO,
+        .init = periph_gpio_init,
+        .deinit = periph_gpio_deinit
+    },
+#endif
     {
         .next = NULL,
         .type = "spi",
