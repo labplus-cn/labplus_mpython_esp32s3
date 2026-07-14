@@ -10,10 +10,7 @@
 
 #include <stddef.h>
 #include "esp_board_periph.h"
-#include "periph_i2c.h"
-#include "periph_i2s.h"
-#include "periph_spi.h"
-#include "periph_gpio.h"
+#include "esp_board_manager_includes.h"
 
 // Peripheral handle array
 esp_board_periph_entry_t g_esp_board_periph_handles[] = {

@@ -261,7 +261,11 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
 
    合并固件
    ```
+   from machine import Pin
+   p = Pin(34, Pin.OUT)
+   p.on()
 
+idf.py -D MICROPY_BOARD=labplus_xuejing_v2 build merge_bin flash monitor
    idf.py -D MICROPY_BOARD=mpython_v3 merge_bin
    idf.py -D MICROPY_BOARD=labplus_Ledong_v2 merge_bin
    idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary merge_bin

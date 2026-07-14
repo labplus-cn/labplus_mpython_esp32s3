@@ -2,8 +2,8 @@
 educore
 '''
 import gc
-from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,ledong_shield,Magnetic,sync_ntp
-from mpython import accelerometer as _accelerometer
+# from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,encoder_motor
+from mpython import MPythonPin,PinMode,Pin,i2c,I2C,wifi,Button,button_a,button_b,numberMap,sync_ntp
 from mpython import rgb as _rgb
 from mpython import light as _light
 from mpython import sound as _sound
@@ -32,7 +32,7 @@ gui = GUI()
 gc.collect()
 
 
-pins_esp32 = (1, 2, 3, 4, 5, 0, 7, 16, 8, 9, 6,  46, 21, 17, 18, 48, 47, -1, -1, 43,  44, 45, 15, 10, 11, 12, 13, 14)
+pins_esp32 = (1, 2, 3, 4, 5, 0, 7, 8, -1, -1, 6, 46, 21, -1, -1, 48, 47, -1, -1, 43, 44, 45,  33,  -1, -1, -1, -1, -1, -1)
 # global pins_state
 pins_state = [None] * len(pins_esp32)
  
@@ -183,29 +183,29 @@ class light():
 
 
 '''
-加速度计
-'''
-class Accelerometer():
-    def __init__(self) :
-        self.shake_status = False
-        self.X = 0.0
-        self.Y = 0.0
-        self.Z = 0.0
+# 加速度计
+# '''
+# class Accelerometer():
+#     def __init__(self) :
+#         self.shake_status = False
+#         self.X = 0.0
+#         self.Y = 0.0
+#         self.Z = 0.0
 
-    def x(self):
-        self.X = _accelerometer.get_x()
-        return self.X
+#     def x(self):
+#         self.X = _accelerometer.get_x()
+#         return self.X
 
-    def y(self):
-        self.Y = _accelerometer.get_y()
-        return self.Y
+#     def y(self):
+#         self.Y = _accelerometer.get_y()
+#         return self.Y
 
-    def z(self):
-        self.Z = _accelerometer.get_z()
-        return self.Z
+#     def z(self):
+#         self.Z = _accelerometer.get_z()
+#         return self.Z
 
-    def shake(self):
-        return self.shake_status
+#     def shake(self):
+#         return self.shake_status
 
 class OLED():
     def __init__(self) :
@@ -295,7 +295,8 @@ class parrot():
            
     def speed(self,speed):
         if(self.type==1):
-            ledong_shield.set_motor(self.args_list[0],int(speed))
+            # ledong_shield.set_motor(self.args_list[0],int(speed))
+            pass
         elif(self.type==2):
             if(speed>=0):
                 speed = int(numberMap(speed, 0, 100, 0, 1023))
@@ -323,6 +324,7 @@ class servo(Servo):
             return
         
         self.used_pins.append(pin)
+        # self.servo = Servo(pin, min_us=750, max_us=2250, actuation_range=180)
         self.servo = Servo(pin, min_us=500, max_us=2500, actuation_range=180)
         self.servo_map[pin] = self.servo
     
@@ -382,7 +384,7 @@ class WiFi(wifi):
         super().__init__()
 
     def connect(self, ssid, psd, timeout=10000):
-        self.connectWiFi(ssid, psd, int(timeout))
+        self.connectWiFi(ssid, psd, int(timeout/1000))
     
     def status(self):
         return self.sta.isconnected()
@@ -595,24 +597,13 @@ class _dht11():
         self.tim = Timer(16)
         self.tim.init(period=1000, mode=Timer.PERIODIC, callback=self.timer_tick)
         time.sleep(1.5)
-        attempts = 0
-        while True:
-            try:
-                self.dht11.measure()
-            except Exception as e:
-                attempts = attempts + 1
-                time.sleep_ms(500)
-                if attempts > 5:
-                    break
-            else:
-                break
-                    
+        self.dht11.measure()
 
     def timer_tick(self,_):
         try: 
             self.dht11.measure()
         except: 
-            time.sleep_ms(500)
+            pass
 
     def read(self):
         return self.dht11.temperature(),self.dht11.humidity()
@@ -691,64 +682,64 @@ def get_dict_from_str(s):
 
 
 '''
-六轴 educore定时器
-'''
-class accelerometer():
-    def __init__(self):
-        self.tim_count = 0
-        self.tim = Timer(17)
-        self.tim.init(period=100, mode=Timer.PERIODIC, callback=self.educore_callback)
-        self._is_shaked = False
-        self._last_x = 0
-        self._last_y = 0
-        self._last_z = 0
-        self._count_shaked = 0
-        self.accelerometer = Accelerometer()
+# 六轴 educore定时器
+# '''
+# class accelerometer():
+#     def __init__(self):
+#         self.tim_count = 0
+#         self.tim = Timer(17)
+#         self.tim.init(period=100, mode=Timer.PERIODIC, callback=self.educore_callback)
+#         self._is_shaked = False
+#         self._last_x = 0
+#         self._last_y = 0
+#         self._last_z = 0
+#         self._count_shaked = 0
+#         self.accelerometer = Accelerometer()
 
-    def educore_callback(self,_):
-        self.tim_count += 1 
-        try:
-            self.accelerometer_callback()
-            gc.collect()
-        except Exception as e:
-            print(str(e))
+#     def educore_callback(self,_):
+#         self.tim_count += 1 
+#         try:
+#             self.accelerometer_callback()
+#             gc.collect()
+#         except Exception as e:
+#             print(str(e))
             
-        if(self.tim_count==200):
-            self.tim_count = 0
+#         if(self.tim_count==200):
+#             self.tim_count = 0
 
-    def accelerometer_callback(self):
-        '''加速度计'''
-        if self._is_shaked:
-            self._count_shaked += 1
-            if self._count_shaked == 5: 
-                self._count_shaked = 0
-                self.accelerometer.shake_status = False
-        x=self.accelerometer.x(); y=self.accelerometer.y();z=self.accelerometer.z()
-        if self._last_x == 0 and self._last_y == 0 and self._last_z == 0:
-            self._last_x = x; 
-            self._last_y = y; 
-            self._last_z = z; 
-            self.accelerometer.shake_status = False
-            return
-        diff_x = x - self._last_x; diff_y = y - self._last_y; diff_z = z - self._last_z
-        self._last_x = x; self.last_y = y; self._last_z = z
-        if self._count_shaked > 0: 
-            return
-        self._is_shaked = (diff_x * diff_x + diff_y * diff_y + diff_z * diff_z > 1)
-        if self._is_shaked: 
-            self.accelerometer.shake_status = True
+#     def accelerometer_callback(self):
+#         '''加速度计'''
+#         if self._is_shaked:
+#             self._count_shaked += 1
+#             if self._count_shaked == 5: 
+#                 self._count_shaked = 0
+#                 self.accelerometer.shake_status = False
+#         x=self.accelerometer.x(); y=self.accelerometer.y();z=self.accelerometer.z()
+#         if self._last_x == 0 and self._last_y == 0 and self._last_z == 0:
+#             self._last_x = x; 
+#             self._last_y = y; 
+#             self._last_z = z; 
+#             self.accelerometer.shake_status = False
+#             return
+#         diff_x = x - self._last_x; diff_y = y - self._last_y; diff_z = z - self._last_z
+#         self._last_x = x; self.last_y = y; self._last_z = z
+#         if self._count_shaked > 0: 
+#             return
+#         self._is_shaked = (diff_x * diff_x + diff_y * diff_y + diff_z * diff_z > 1)
+#         if self._is_shaked: 
+#             self.accelerometer.shake_status = True
         
-    def X(self):
-        return self.accelerometer.x()
+#     def X(self):
+#         return self.accelerometer.x()
     
-    def Y(self):
-        return self.accelerometer.y()
+#     def Y(self):
+#         return self.accelerometer.y()
     
-    def Z(self):
-        return self.accelerometer.z()
+#     def Z(self):
+#         return self.accelerometer.z()
     
-    def shake(self):
-        return self.accelerometer.shake()
+#     def shake(self):
+#         return self.accelerometer.shake()
 
 
 

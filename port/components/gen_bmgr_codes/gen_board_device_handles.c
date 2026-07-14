@@ -10,8 +10,7 @@
 
 #include <stddef.h>
 #include "esp_board_device.h"
-#include "dev_audio_codec.h"
-#include "dev_display_lcd.h"
+#include "esp_board_manager_includes.h"
 
 // Device handle array
 esp_board_device_handle_t g_esp_board_device_handles[] = {

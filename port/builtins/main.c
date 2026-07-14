@@ -82,7 +82,6 @@ typedef struct _native_code_node_t {
 } native_code_node_t;
 
 static native_code_node_t *native_code_head = NULL;
-
 static void esp_native_code_free_all(void);
 
 int vprintf_null(const char *format, va_list ap) {
@@ -150,13 +149,13 @@ soft_reset:
     
     // run boot-up scripts
     pyexec_frozen_module("_boot.py", true);
-    int ret = pyexec_file_if_exists("boot.py");
-    if (ret & PYEXEC_FORCED_EXIT) {
+    int boot_ret = pyexec_file_if_exists("boot.py");
+    if (boot_ret & PYEXEC_FORCED_EXIT) {
         goto soft_reset_exit;
     }
-    if (pyexec_mode_kind == PYEXEC_MODE_FRIENDLY_REPL && ret != 0) {
-        int ret = pyexec_file_if_exists("main.py");
-        if (ret & PYEXEC_FORCED_EXIT) {
+    if (pyexec_mode_kind == PYEXEC_MODE_FRIENDLY_REPL && boot_ret != 0) {
+        int main_ret = pyexec_file_if_exists("main.py");
+        if (main_ret & PYEXEC_FORCED_EXIT) {
             goto soft_reset_exit;
         }
     }

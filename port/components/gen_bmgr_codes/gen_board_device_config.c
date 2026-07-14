@@ -8,10 +8,11 @@
  * See LICENSE file for details.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include "esp_board_device.h"
-#include "dev_audio_codec.h"
-#include "dev_display_lcd.h"
+#include "esp_board_manager_includes.h"
+#include "hal/lcd_types.h"
 
 // Device configuration structures
 const static dev_audio_codec_config_t esp_bmgr_audio_dac_cfg = {
@@ -30,7 +31,7 @@ const static dev_audio_codec_config_t esp_bmgr_audio_dac_cfg = {
 #if CONFIG_LABPLUS_XUEJING_V2_BOARD
     .pa_cfg = {
         .name = "gpio_pa_control",
-        .port = 33,
+        .port = 9,
         .active_level = 1,
         .gain = 6.0,
     },
@@ -101,30 +102,30 @@ const static dev_audio_codec_config_t esp_bmgr_audio_adc_cfg = {
 
 const static dev_display_lcd_config_t esp_bmgr_display_lcd_cfg = {
     .name = "display_lcd",
-    .chip = "jd9853",
+    .chip = "st7789",
     .sub_type = "spi",
     .lcd_width = 320,
-    .lcd_height = 172,
+    .lcd_height = 240,
     .gap_x = 0,
-    .gap_y = 34,
+    .gap_y = 0,
     .swap_xy = true,
     .mirror_x = true,
-    .mirror_y = true,
+    .mirror_y = false,
     .need_reset = true,
-    .invert_color = false,
-    .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
+    .invert_color = true,
+    .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
     .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
     .bits_per_pixel = 16,
     .sub_cfg = {
             .spi = {
                     .spi_name = "spi_display",
                     .panel_config = {
-#if CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD
+#if CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD || CONFIG_LABPLUS_XUEJING_V2_BOARD
                             .reset_gpio_num = 47,
 #else
                             .reset_gpio_num = -1,
 #endif
-                            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
+                            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
                             .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
                             .bits_per_pixel = 16,
                             .flags = {
@@ -134,7 +135,7 @@ const static dev_display_lcd_config_t esp_bmgr_display_lcd_cfg = {
                         },
                     .io_spi_config = {
 #if CONFIG_MPYTHON_V3_BOARD || CONFIG_LABPLUS_XUNFEI_JS_MIDDLE_BOARD || CONFIG_LABPLUS_XUEJING_V2_BOARD
-                            .cs_gpio_num = 34,
+                            .cs_gpio_num = 48,
 #elif CONFIG_LABPLUS_LEDONG_V2_BOARD || CONFIG_LABPLUS_XUNFEI_JS_PRIMARY_BOARD
                             .cs_gpio_num = -1,
 #endif
