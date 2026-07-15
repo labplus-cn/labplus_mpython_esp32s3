@@ -3,7 +3,7 @@ import lvgl as lv
 from lv_gui import CANVAS
 from mpython import rgb
 import audio
-import sc
+from audio import sr
 from utils import change_route, set_key_config, lv_group
 
 container = None
@@ -18,12 +18,12 @@ anim_imgs = [
 play_time = time.time() - 16
 
 # 初始化
-sc.init(wakeup_word="我在")
-sc.add(1,"kai deng")
-sc.add(2,"guan deng")
-sc.add(3,"da kai yin yue")
-sc.add(4,"guan bi yin yue")
-sc.update()
+sr.init(wakeup_word="我在")
+sr.add(1,"kai deng")
+sr.add(2,"guan deng")
+sr.add(3,"da kai yin yue")
+sr.add(4,"guan bi yin yue")
+sr.update()
 
 def gui_back_cb(e):
     change_route('home', destroy)
@@ -39,7 +39,7 @@ def lv_timer_cb(timer):
         gui.draw_img(38, 106, anim_imgs[img_index], 244, 46)
         gui.update()
         img_index = 0 if img_index >= 3 else img_index + 1
-        res=sc.get_latest_id()
+        res=sr.get_latest_id()
         if res:
             print(res)
             if res == 1:
@@ -84,7 +84,7 @@ def init():
     gui.set_bg_color(0x000000)
     
     back_txt = lv.label(container)
-    back_txt.set_pos(10, 0)
+    back_txt.set_pos(10, 6)
     back_txt.set_text('Back')
     back_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     back_txt.set_style_text_color(lv.color_hex(0xFFFFFF), lv.PART.MAIN)

@@ -44,7 +44,7 @@ def init():
     container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
     
     back_txt = lv.label(container)
-    back_txt.set_pos(13, 0)
+    back_txt.set_pos(13, 6)
     back_txt.set_text('Back')
     back_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     back_txt.set_style_text_color(lv.color_hex(0xFFFFFF), lv.PART.MAIN)
@@ -59,7 +59,7 @@ def init():
     name_txt.set_text('Waveform')
     name_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     name_txt.set_style_text_color(lv.color_hex(0xFFFFFF), lv.PART.MAIN)
-    name_txt.set_pos(218, 0)
+    name_txt.set_pos(196, 6)
     
     chart = lv.chart(container)
     chart.set_size(300, 120)

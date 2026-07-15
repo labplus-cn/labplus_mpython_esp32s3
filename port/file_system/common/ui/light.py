@@ -103,7 +103,7 @@ def init():
     gui.update()
     
     back_txt = lv.label(container)
-    back_txt.set_pos(10, 0)
+    back_txt.set_pos(10, 6)
     back_txt.set_text('Back')
     back_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     back_txt.set_style_text_color(lv.color_hex(0x333333), lv.PART.MAIN)
@@ -116,6 +116,7 @@ def init():
 
     tips_txt = lv.label(container)
     tips_txt.set_text('You can watch the fireworks\nonce it gets dark!\n(Tip: Cover the light sensor)')
+    tips_txt.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
     tips_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     tips_txt.set_style_text_color(lv.color_hex(0x333333), lv.PART.MAIN)
     tips_txt.align(lv.ALIGN.CENTER, 0, 10)
