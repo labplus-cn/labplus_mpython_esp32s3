@@ -120,8 +120,8 @@ def draw_game():
     if game_over:
         draw_text(210, 10, 100, 24, game_score, lv.TEXT_ALIGN.RIGHT)
         draw_text(0, 50, 320, 50, 'GAME OVER', lv.TEXT_ALIGN.CENTER)
-        draw_text(0, 94, 320, 24, '按下B键重新开始游戏', lv.TEXT_ALIGN.CENTER)
-        draw_text(10, 0, 100, 24, 'A-返回')
+        draw_text(0, 94, 320, 24, 'Press B to restart the game', lv.TEXT_ALIGN.CENTER)
+        draw_text(10, 0, 100, 24, 'Back')
         return
     
     # 绘制角色
@@ -248,9 +248,9 @@ def init():
     layer = lv.layer_t()
     canvas.init_layer(layer)
     
-    draw_text(0, 50, 320, 50, '是勇士就下100层', lv.TEXT_ALIGN.CENTER)
-    draw_text(0, 94, 320, 24, '按下B键开始游戏', lv.TEXT_ALIGN.CENTER)
-    draw_text(10, 0, 100, 24, 'A-返回')
+    draw_text(0, 30, 320, 50, 'UNDERGROUND\nADVENTURE', lv.TEXT_ALIGN.CENTER)
+    draw_text(0, 100, 320, 24, 'Press B to start the game', lv.TEXT_ALIGN.CENTER)
+    draw_text(10, 0, 100, 24, 'Back')
     canvas.finish_layer(layer)
     
     # 创建定时器

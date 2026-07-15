@@ -104,7 +104,7 @@ def init():
     
     back_txt = lv.label(container)
     back_txt.set_pos(10, 0)
-    back_txt.set_text('A-返回')
+    back_txt.set_text('Back')
     back_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     back_txt.set_style_text_color(lv.color_hex(0x333333), lv.PART.MAIN)
     
@@ -115,7 +115,7 @@ def init():
     lv_group.add_obj(back_btn)
 
     tips_txt = lv.label(container)
-    tips_txt.set_text('等天黑了就可以看烟花啦！\n（提示：遮住光线传感器）')
+    tips_txt.set_text('You can watch the fireworks\nonce it gets dark!\n(Tip: Cover the light sensor)')
     tips_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     tips_txt.set_style_text_color(lv.color_hex(0x333333), lv.PART.MAIN)
     tips_txt.align(lv.ALIGN.CENTER, 0, 10)

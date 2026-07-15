@@ -65,7 +65,7 @@ def init():
     
     back_txt = lv.label(container)
     back_txt.set_pos(10, 0)
-    back_txt.set_text('A-返回')
+    back_txt.set_text('Back')
     back_txt.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     back_txt.set_style_text_color(lv.color_hex(0xffffff), lv.PART.MAIN)
     
