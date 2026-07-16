@@ -101,7 +101,7 @@ def init():
     con_txt2.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     con_txt2.set_style_text_color(lv.color_hex(0xFFFFFF), lv.PART.MAIN)
     con_txt2.set_style_text_align(lv.TEXT_ALIGN.CENTER, lv.PART.MAIN)
-    con_txt2.align(lv.ALIGN.CENTER, 0, 10)
+    con_txt2.align(lv.ALIGN.CENTER, 0, 32)
     
     back_btn = lv.obj(container)
     back_btn.set_size(0, 0)
