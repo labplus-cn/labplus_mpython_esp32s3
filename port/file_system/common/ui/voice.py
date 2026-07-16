@@ -97,7 +97,7 @@ def init():
     con_txt1.align(lv.ALIGN.CENTER, 0, -20)
     
     con_txt2 = lv.label(container)
-    con_txt2.set_text('Command: kai deng / guan deng')
+    con_txt2.set_text('Command word: \nkai deng / guan deng')
     con_txt2.set_style_text_font(lv.font_siyuan_heiti_medium_24, 0)
     con_txt2.set_style_text_color(lv.color_hex(0xFFFFFF), lv.PART.MAIN)
     con_txt2.set_style_text_align(lv.TEXT_ALIGN.CENTER, lv.PART.MAIN)
