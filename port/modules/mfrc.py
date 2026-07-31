@@ -47,7 +47,7 @@ class Rfid():
             self.serial_num_tuple = self._rfid.anticoll()
             if self.serial_num_tuple:
                 serial_num = int.from_bytes(bytes(self.serial_num_tuple[:-1]), 'little')
-                return serial_num
+                return str(serial_num)
         else:
             print("未检测到射频卡")
             return None
