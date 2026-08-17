@@ -260,18 +260,28 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
    ```   
 
    合并固件
+
+   ESP-IDF 5.x 的 `idf.py` 会把下划线命令 `merge_bin` 归一为内置的
+   `merge-bin`，输出固定名称 `build/merged-binary.bin`。本项目自定义的
+   `merge_bin` 目标会调用 `makeimg.py`，额外打包 LittleFS，并按板卡、版本、
+   提交和日期生成 `.bin` 与 `.uf2` 文件；请在完成对应板卡的 `build` 后使用：
+
+   ```bash
+   idf.py -D MICROPY_BOARD=mpython_v3 build
+   ninja -C build merge_bin
+
+   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build
+   ninja -C build merge_bin
+
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build
+   ninja -C build merge_bin
+
+   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build
+   ninja -C build merge_bin
    ```
 
-   idf.py -D MICROPY_BOARD=mpython_v3 merge_bin
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 merge_bin
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary merge_bin
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle merge_bin
-
-   idf.py -D MICROPY_BOARD=mpython_v3 build merge_bin
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build merge_bin
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build merge_bin
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build merge_bin
-   ```
+   命名归档会写入 `build/`，例如
+   `mpython_v3-v1.0-169.g2b5a1a32.dirty-2b5a1a32_2026-08-17.bin`。
 # 固件烧录
 
 ## wls下linux使用usb转串口

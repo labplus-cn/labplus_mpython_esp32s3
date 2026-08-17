@@ -59,7 +59,23 @@ CodexPad: ready, device=CodexPad-S10
 - `codexpad_inputs_detection.py`：检测按下、放开和摇杆有效变化；可通过 `SHOW_HOLDING` 打印持续按住状态。
 - `codexpad_scan_and_connect.py`：按广播中的按键组合筛选目标手柄，再连接并读取输入。
 
-这些示例针对本固件的原生 `bluetooth.BLE()` 驱动改写，使用 `pad.poll()` 维护自动重连；不需要 `asyncio`、`aioble` 或手柄 Bluetooth Device Address。官方仓库中的 `install_aioble` 示例不适用于本固件，因此未整合。
+这些示例针对本固件的原生 `bluetooth.BLE()` 驱动改写，使用 `pad.poll()` 维护自动重连；不需要 `asyncio`、`aioble`。连接时既可以按名称/RSSI 扫描，也可以传入手柄的 Bluetooth Device Address（MAC）进行精确筛选。
+
+## 按 MAC 地址连接
+
+Mind+ 扩展使用 MAC 地址连接手柄；MicroPython 驱动保持相同的调用习惯：
+
+```python
+from mpython_ble.application import CodexPad
+
+pad = CodexPad()
+if not pad.connect("AA:BB:CC:DD:EE:FF"):
+    raise RuntimeError(pad.last_error)
+
+print("CodexPad connected:", pad.device_name, pad.device_address)
+```
+
+`connect(mac)` 会继续扫描 `CodexPad-` 广播名，但只接受地址完全匹配的设备；断开后 `pad.poll()` 会继续按相同地址自动重连。地址也可以使用六字节 `bytes`/`bytearray` 传入。若留空或不传参数，行为仍是选择 RSSI 最强的 CodexPad。手柄使用随机 BLE 地址时，地址可能在重新上电后变化，此时应改用按键组合筛选。
 
 ## 用按键组合选择手柄
 
@@ -118,7 +134,7 @@ all_axes = pad.axis_values
 | 积木 ID | 图形化积木行为 | 生成的 MicroPython API |
 | --- | --- | --- |
 | `mpython_codexpad_init` | 初始化 CodexPad 对象 | `pad = CodexPad()` |
-| `mpython_codexpad_connect` | 连接附近的 CodexPad | `pad.connect()` |
+| `mpython_codexpad_connect` | 按 MAC 地址连接；留空时连接附近的 CodexPad | `pad.connect("AA:BB:CC:DD:EE:FF")` / `pad.connect()` |
 | `mpython_codexpad_scan_connect` | 使用三个可选按键组成的精确掩码扫描并连接 | `pad.scan_and_connect(BUTTON_START | BUTTON_CROSS_A)` |
 | `mpython_codexpad_connection` | 判断输入是否就绪或 BLE 链路是否已连接 | `pad.is_ready()` / `pad.is_connected()` |
 | `mpython_codexpad_button_state` | 判断指定按键当前按住、刚按下或刚放开 | `pad.holding(BUTTON_CROSS_A)` / `pad.pressed(BUTTON_CROSS_A)` / `pad.released(BUTTON_CROSS_A)` |
@@ -134,7 +150,7 @@ all_axes = pad.axis_values
 
 `poll()` 是显式维护积木，应放入主循环中以处理断开后的自动重连；它不会隐式改写用户的循环结构。`on_input(callback)`、`button_states`、`axis_values` 和 `last_error` 仍可在手写 MicroPython 中使用，但本版本不提供普通图形化积木。
 
-> 兼容性说明：本驱动只支持 CodexPad C10/S10 的自定义 BLE 协议，不支持 KS54 等经典蓝牙 HID 手柄；不需要也不应引入 `aioble`、`asyncio` 或 Bluetooth Device Address。
+> 兼容性说明：本驱动只支持 CodexPad C10/S10 的自定义 BLE 协议，不支持 KS54 等经典蓝牙 HID 手柄；不需要引入 `aioble` 或 `asyncio`。MAC 地址筛选只适用于广播中保持稳定的 BLE 地址。
 
 ## 设置手柄蓝牙发射功率
 

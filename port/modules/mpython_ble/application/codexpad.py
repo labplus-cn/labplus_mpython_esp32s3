@@ -60,6 +60,7 @@ _INPUTS_SERVICE_UUID = UUID(0xFFA0)
 _INPUTS_CHARACTERISTIC_UUID = UUID(0xFFA1)
 _TX_POWER_SERVICE_UUID = UUID(0x1804)
 _TX_POWER_CHARACTERISTIC_UUID = UUID(0x2A07)
+_CCCD_UUID = UUID(0x2902)
 
 
 def _ad_field(payload, field_type):
@@ -82,25 +83,53 @@ def _device_name(payload):
     return _ad_field(payload, 0x09) or _ad_field(payload, 0x08)
 
 
-def _advertised_button_mask(payload):
-    """Decode CodexPad manufacturer data, returning ``None`` when absent."""
+def _advertised_state(payload):
+    """Return ``(button_mask, firmware_major, held_seconds)`` when present."""
     data = _ad_field(payload, 0xFF)
     # AD manufacturer data begins with the 16-bit company identifier (FFFF).
-    if data is None or len(data) < 2 + 16:
+    if data is None or len(data) < 2 + 16 or data[:2] != b"\xff\xff":
         return None
     data = data[2:]
     if data[:8] != _MANUFACTURER_HEADER:
         return None
-    return struct.unpack_from("<I", data, 11)[0]
+    return struct.unpack_from("<I", data, 11)[0], data[8], data[15]
+
+
+def _parse_address(address):
+    """Normalize a human-readable BLE address to the scan-result bytes."""
+    if isinstance(address, str):
+        text = address.strip().replace("-", ":")
+        parts = text.split(":") if ":" in text else [
+            text[index:index + 2] for index in range(0, len(text), 2)
+        ]
+        if len(parts) != 6 or any(len(part) != 2 for part in parts):
+            raise ValueError("CodexPad MAC must contain six hexadecimal octets")
+        try:
+            octets = bytearray(6)
+            for index, part in enumerate(parts):
+                octets[index] = int(part, 16)
+            return bytes(octets)
+        except ValueError:
+            raise ValueError("CodexPad MAC must contain hexadecimal octets")
+    if isinstance(address, (bytes, bytearray)):
+        if len(address) != 6:
+            raise ValueError("CodexPad MAC must contain six bytes")
+        return bytes(address)
+    raise TypeError("CodexPad MAC must be a string or six-byte value")
+
+
+def _format_address(address):
+    """Format scan-result bytes in the same order accepted by connect()."""
+    return ":".join("{:02X}".format(value) for value in bytes(address))
 
 
 class CodexPad(object):
     """Input driver for CodexPad-C10 and CodexPad-S10 BLE controllers.
 
-    ``connect()`` scans for either controller model.  To select a controller
-    without knowing its address, call ``scan_and_connect(mask)`` while holding
-    exactly the buttons in ``mask``.  Do not use ``BUTTON_HOME`` as the sole
-    mask: holding Home powers the controller off.
+    ``connect()`` scans for either controller model.  Pass a MAC string to
+    select one controller, or call ``scan_and_connect(mask)`` while holding
+    exactly the buttons in ``mask`` when the address is unknown.  Do not use
+    ``BUTTON_HOME`` as the sole mask: holding Home powers the controller off.
     """
 
     def __init__(self, name_prefix=_CODEXPAD_PREFIX, ble=None, debug=False):
@@ -113,49 +142,81 @@ class CodexPad(object):
         self.debug = debug
         self.connected_handle = None
         self.device_name = None
+        self.device_address = None
         self.last_error = None
         self.model = None
         self._state = "idle"
         self._candidate = None
         self._scan_entries = {}
+        self._target_address = None
         self._button_mask = None
         self._service_ranges = {}
         self._service_queue = []
         self._service_index = -1
         self._current_service = None
+        self._current_characteristics = []
+        self._input_def_handle = None
         self._input_value_handle = None
+        self._input_descriptor_end = None
+        self._input_cccd_handle = None
         self._tx_power_value_handle = None
         self._ready = False
         self._auto_reconnect = False
         self._retry_at = time.ticks_ms()
         self._input_callback = None
+        self.last_callback_error = None
+        self._reset_inputs()
+
+    def _reset_inputs(self):
         self._previous_button_states = 0
         self._button_states = 0
-        self._previous_axis_values = [
-            AXIS_CENTER, AXIS_CENTER, AXIS_CENTER, AXIS_CENTER
-        ]
         self._axis_values = [AXIS_CENTER, AXIS_CENTER, AXIS_CENTER, AXIS_CENTER]
+        self._pressed_events = 0
+        self._released_events = 0
+        self._axis_change_deltas = [0, 0, 0, 0]
+        self._axis_endpoint_events = [False, False, False, False]
 
     def on_input(self, callback):
         """Set ``callback(button_states, axis_values)`` for input updates."""
         self._input_callback = callback
 
-    def connect(self, timeout_ms=20000, scan_ms=5000):
-        """Scan and connect to the nearest CodexPad-C10 or CodexPad-S10."""
-        return self._connect_with_mask(None, timeout_ms, scan_ms)
+    def connect(self, mac=None, timeout_ms=20000, scan_ms=5000):
+        """Connect to CodexPad, optionally filtering by its BLE MAC address.
+
+        ``mac`` accepts the Mind+ style ``AA:BB:CC:DD:EE:FF`` string.  The
+        old positional ``connect(timeout_ms, scan_ms)`` form remains valid.
+        """
+        if isinstance(mac, int):
+            if timeout_ms != 20000:
+                scan_ms, timeout_ms = timeout_ms, mac
+            else:
+                timeout_ms = mac
+            mac = None
+        elif isinstance(mac, str):
+            mac = mac.strip()
+        target_address = _parse_address(mac) if mac else None
+        return self._connect_with_mask(None, timeout_ms, scan_ms, target_address)
+
+    def connect_by_mac(self, mac, timeout_ms=20000, scan_ms=5000):
+        """Mind+ compatible alias for connecting to one MAC address."""
+        return self.connect(mac, timeout_ms, scan_ms)
 
     def scan_and_connect(self, button_mask, timeout_ms=20000, scan_ms=5000):
         """Connect only when the advertising button state exactly matches mask."""
         if button_mask == BUTTON_HOME:
             raise ValueError("BUTTON_HOME alone cannot be used as a connection mask")
-        return self._connect_with_mask(button_mask, timeout_ms, scan_ms)
+        return self._connect_with_mask(button_mask, timeout_ms, scan_ms, None)
 
-    def _connect_with_mask(self, button_mask, timeout_ms, scan_ms):
+    def _connect_with_mask(self, button_mask, timeout_ms, scan_ms, target_address):
         if self._ready:
             return True
+        if self._state != "idle":
+            self.last_error = "BLE operation already in progress: {}".format(self._state)
+            return False
         self._auto_reconnect = True
         self.last_error = None
         self._button_mask = button_mask
+        self._target_address = target_address
         self._start_scan(scan_ms)
         deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
         while time.ticks_diff(deadline, time.ticks_ms()) > 0:
@@ -181,6 +242,7 @@ class CodexPad(object):
     def disconnect(self):
         """Disconnect and turn off automatic reconnection."""
         self._auto_reconnect = False
+        self.last_error = None
         self._cancel_pending_operation()
 
     def is_connected(self):
@@ -193,19 +255,17 @@ class CodexPad(object):
         return (self._button_states & button) != 0
 
     def pressed(self, button):
-        return not (self._previous_button_states & button) and bool(
-            self._button_states & button
-        )
+        result = bool(self._pressed_events & button)
+        self._pressed_events &= ~button
+        return result
 
     def released(self, button):
-        return bool(self._previous_button_states & button) and not (
-            self._button_states & button
-        )
+        result = bool(self._released_events & button)
+        self._released_events &= ~button
+        return result
 
     def holding(self, button):
-        return bool(self._previous_button_states & button) and bool(
-            self._button_states & button
-        )
+        return bool(self._button_states & button)
 
     @property
     def button_states(self):
@@ -221,11 +281,11 @@ class CodexPad(object):
     def has_axis_value_changed(self, axis, threshold=1):
         if axis not in (0, 1, 2, 3) or threshold < 0:
             return False
-        previous = self._previous_axis_values[axis]
-        current = self._axis_values[axis]
-        return previous != current and (
-            current == 0 or current == 255 or abs(current - previous) >= threshold
-        )
+        delta = self._axis_change_deltas[axis]
+        endpoint = self._axis_endpoint_events[axis]
+        self._axis_change_deltas[axis] = 0
+        self._axis_endpoint_events[axis] = False
+        return delta > 0 and (endpoint or delta >= threshold)
 
     def set_remote_tx_power(self, tx_power, response=True):
         """Set the controller transmit power in dBm (-16, -12..+6)."""
@@ -234,22 +294,33 @@ class CodexPad(object):
             raise ValueError("unsupported CodexPad transmit power")
         if self.connected_handle is None or self._tx_power_value_handle is None:
             return False
-        self.ble.gattc_write(
-            self.connected_handle,
-            self._tx_power_value_handle,
-            struct.pack("<b", tx_power),
-            1 if response else 0,
-        )
+        try:
+            self.ble.gattc_write(
+                self.connected_handle,
+                self._tx_power_value_handle,
+                struct.pack("<b", tx_power),
+                1 if response else 0,
+            )
+        except (OSError, ValueError) as error:
+            self.last_error = "could not set transmit power: {}".format(error)
+            return False
         return True
 
     def _reset_discovery(self):
         self._candidate = None
         self._scan_entries = {}
+        self.device_name = None
+        self.device_address = None
+        self.model = None
         self._service_ranges = {}
         self._service_queue = []
         self._service_index = -1
         self._current_service = None
+        self._current_characteristics = []
+        self._input_def_handle = None
         self._input_value_handle = None
+        self._input_descriptor_end = None
+        self._input_cccd_handle = None
         self._tx_power_value_handle = None
         self._ready = False
 
@@ -257,75 +328,147 @@ class CodexPad(object):
         if self._state != "idle":
             return
         self._reset_discovery()
+        self._reset_inputs()
         self._state = "scanning"
         print("CodexPad: scanning for", self.name_prefix)
-        self.ble.gap_scan(scan_ms, 30000, 30000, True)
+        try:
+            self.ble.gap_scan(scan_ms, 30000, 30000, True)
+        except (OSError, ValueError) as error:
+            self.last_error = "could not start scan: {}".format(error)
+            self._state = "idle"
 
     def _cancel_pending_operation(self):
-        if self._state == "scanning":
-            self.ble.gap_scan(None)
-        elif self._state == "connecting":
+        state = self._state
+        if state == "scanning":
+            self._state = "cancelling_scan"
+            try:
+                self.ble.gap_scan(None)
+            except (OSError, ValueError):
+                self._state = "idle"
+        elif state == "connecting":
+            self._state = "cancelling_connection"
             try:
                 self.ble.gap_connect(None)
-            except (OSError, TypeError):
-                pass
+            except (OSError, TypeError, ValueError):
+                self._state = "idle"
         elif self.connected_handle is not None:
-            self.ble.gap_disconnect(self.connected_handle)
+            self._state = "disconnecting"
+            try:
+                self.ble.gap_disconnect(self.connected_handle)
+            except (OSError, ValueError):
+                self.connected_handle = None
+                self._ready = False
+                self._state = "idle"
         else:
             self._state = "idle"
+        self._reset_inputs()
 
     def _fail(self, message):
         self.last_error = message
         self._ready = False
+        self._reset_inputs()
         print("CodexPad:", message)
         if self.connected_handle is not None:
             self._state = "disconnecting"
-            self.ble.gap_disconnect(self.connected_handle)
+            try:
+                self.ble.gap_disconnect(self.connected_handle)
+            except (OSError, ValueError):
+                self.connected_handle = None
+                self._state = "idle"
         else:
             self._state = "idle"
 
     def _next_service(self):
         self._service_index += 1
         if self._service_index >= len(self._service_queue):
-            if self._input_value_handle is None:
-                self._fail("inputs characteristic FFA1 not found")
-                return
-            self._state = "subscribing"
-            # CodexPad uses the standard CCCD immediately after FFA1.
-            self.ble.gattc_write(
-                self.connected_handle, self._input_value_handle + 1, b"\x01\x00", 1
-            )
+            self._start_descriptor_discovery()
             return
         self._current_service = self._service_queue[self._service_index]
+        self._current_characteristics = []
         start_handle, end_handle = self._service_ranges[self._current_service]
         self._state = "discovering_characteristics"
-        self.ble.gattc_discover_characteristics(
-            self.connected_handle, start_handle, end_handle
-        )
+        try:
+            self.ble.gattc_discover_characteristics(
+                self.connected_handle, start_handle, end_handle
+            )
+        except (OSError, ValueError) as error:
+            self._fail("could not discover characteristics: {}".format(error))
 
-    def _save_characteristic(self, value_handle, uuid):
+    def _save_characteristic(self, def_handle, value_handle, uuid):
         uuid = UUID(uuid)
+        self._current_characteristics.append((def_handle, value_handle, uuid))
         if self._current_service == "inputs" and uuid == _INPUTS_CHARACTERISTIC_UUID:
+            self._input_def_handle = def_handle
             self._input_value_handle = value_handle
         elif self._current_service == "tx_power" and uuid == _TX_POWER_CHARACTERISTIC_UUID:
             self._tx_power_value_handle = value_handle
 
+    def _finish_characteristic_discovery(self):
+        if self._current_service != "inputs" or self._input_value_handle is None:
+            return
+        descriptor_end = self._service_ranges["inputs"][1]
+        for def_handle, value_handle, uuid in self._current_characteristics:
+            if def_handle > self._input_def_handle:
+                descriptor_end = min(descriptor_end, def_handle - 1)
+        self._input_descriptor_end = descriptor_end
+
+    def _start_descriptor_discovery(self):
+        if self._input_value_handle is None:
+            self._fail("inputs characteristic FFA1 not found")
+            return
+        # MicroPython and aioble use the characteristic value handle as the
+        # inclusive start of the descriptor discovery range.
+        start_handle = self._input_value_handle
+        if self._input_descriptor_end is None or start_handle > self._input_descriptor_end:
+            self._fail("inputs CCCD 2902 has no valid discovery range")
+            return
+        self._state = "discovering_descriptors"
+        try:
+            self.ble.gattc_discover_descriptors(
+                self.connected_handle, start_handle, self._input_descriptor_end
+            )
+        except (OSError, ValueError) as error:
+            self._fail("could not discover inputs CCCD: {}".format(error))
+
+    def _subscribe_inputs(self):
+        if self._input_cccd_handle is None:
+            self._fail("inputs CCCD 2902 not found")
+            return
+        self._state = "subscribing"
+        try:
+            self.ble.gattc_write(
+                self.connected_handle, self._input_cccd_handle, b"\x01\x00", 1
+            )
+        except (OSError, ValueError) as error:
+            self._fail("could not enable input notifications: {}".format(error))
+
     def _parse_inputs(self, data):
         if len(data) != 8:
             return
-        self._previous_button_states = self._button_states
-        self._previous_axis_values[0] = self._axis_values[0]
-        self._previous_axis_values[1] = self._axis_values[1]
-        self._previous_axis_values[2] = self._axis_values[2]
-        self._previous_axis_values[3] = self._axis_values[3]
+        previous_buttons = self._button_states
+        previous_axes = tuple(self._axis_values)
         values = struct.unpack("<IBBBB", data)
+        self._previous_button_states = previous_buttons
         self._button_states = values[0]
+        self._pressed_events |= (~previous_buttons) & self._button_states
+        self._released_events |= previous_buttons & (~self._button_states)
         self._axis_values[0] = values[1]
         self._axis_values[1] = values[2]
         self._axis_values[2] = values[3]
         self._axis_values[3] = values[4]
+        for axis in range(4):
+            delta = abs(self._axis_values[axis] - previous_axes[axis])
+            if delta > self._axis_change_deltas[axis]:
+                self._axis_change_deltas[axis] = delta
+            if delta and self._axis_values[axis] in (0, 255):
+                self._axis_endpoint_events[axis] = True
         if self._input_callback is not None:
-            self._input_callback(self._button_states, tuple(self._axis_values))
+            try:
+                self._input_callback(self._button_states, tuple(self._axis_values))
+                self.last_callback_error = None
+            except Exception as error:
+                self.last_callback_error = error
+                print("CodexPad: input callback failed:", error)
 
     def _irq(self, event, data):
         if self.debug:
@@ -337,25 +480,33 @@ class CodexPad(object):
                 return
             addr = bytes(addr)
             name = _device_name(adv_data)
-            button_mask = _advertised_button_mask(adv_data)
+            advertised_state = _advertised_state(adv_data)
             # A CodexPad name and its manufacturer data can arrive in separate
             # ADV_IND / SCAN_RSP events, so retain both fields per address.
             entry = self._scan_entries.get(addr)
             if entry is None:
-                entry = [addr_type, None, None]
+                entry = [addr_type, None, None, None, None]
                 self._scan_entries[addr] = entry
             if name is not None:
                 entry[1] = name
-            if button_mask is not None:
-                entry[2] = button_mask
+            if advertised_state is not None:
+                entry[2], entry[3], entry[4] = advertised_state
             if entry[1] is None or not entry[1].startswith(self.name_prefix):
+                return
+            if self._target_address is not None and addr != self._target_address:
                 return
             if self._button_mask is not None and entry[2] != self._button_mask:
                 return
+            if self._button_mask is not None and entry[3] is not None:
+                if entry[3] > 1 and (entry[4] is None or entry[4] < 1):
+                    return
             if self._candidate is None or rssi > self._candidate[3]:
                 self._candidate = (entry[0], addr, entry[1], rssi)
 
         elif event == IRQ.IRQ_SCAN_DONE:
+            if self._state == "cancelling_scan":
+                self._state = "idle"
+                return
             if self._state != "scanning":
                 return
             if self._candidate is None:
@@ -364,31 +515,59 @@ class CodexPad(object):
                 return
             addr_type, addr, name, rssi = self._candidate
             self.device_name = name.decode("utf-8", "ignore")
+            self.device_address = _format_address(addr)
             self.model = self.device_name
             self._state = "connecting"
             print("CodexPad: found", self.device_name, "RSSI", rssi)
-            self.ble.gap_connect(addr_type, addr)
+            try:
+                self.ble.gap_connect(addr_type, addr)
+            except (OSError, ValueError) as error:
+                self._fail("could not start connection: {}".format(error))
 
         elif event == IRQ.IRQ_PERIPHERAL_CONNECT:
             conn_handle, addr_type, addr = data
+            if self._state == "cancelling_connection":
+                # A successful connection raced with cancellation.  Close it
+                # immediately so no unowned link remains in the controller.
+                self.connected_handle = conn_handle
+                self._state = "disconnecting"
+                try:
+                    self.ble.gap_disconnect(conn_handle)
+                except (OSError, ValueError):
+                    self.connected_handle = None
+                    self._state = "idle"
+                return
             if self._state != "connecting":
                 return
             self.connected_handle = conn_handle
             self._state = "discovering_services"
             print("CodexPad: connected, discovering GATT")
-            self.ble.gattc_discover_services(conn_handle)
+            try:
+                self.ble.gattc_discover_services(conn_handle)
+            except (OSError, ValueError) as error:
+                self._fail("could not discover services: {}".format(error))
 
         elif event == IRQ.IRQ_PERIPHERAL_DISCONNECT:
             conn_handle, addr_type, addr = data
+            if self._state == "cancelling_connection" and self.connected_handle is None:
+                self._state = "idle"
+                self._retry_at = time.ticks_add(time.ticks_ms(), 1000)
+                return
             if conn_handle != self.connected_handle:
                 return
             was_ready = self._ready
+            was_disconnecting = self._state == "disconnecting"
             self.connected_handle = None
             self._ready = False
             self._state = "idle"
             self._retry_at = time.ticks_add(time.ticks_ms(), 1000)
-            if was_ready:
+            self._reset_inputs()
+            if not was_ready and not was_disconnecting and self.last_error is None:
+                self.last_error = "disconnected before driver was ready"
+            if was_ready and self._auto_reconnect:
                 print("CodexPad: disconnected; reconnect scheduled")
+            elif was_ready:
+                print("CodexPad: disconnected")
 
         elif event == IRQ.IRQ_GATTC_SERVICE_RESULT:
             conn_handle, start_handle, end_handle, uuid = data
@@ -417,7 +596,7 @@ class CodexPad(object):
         elif event == IRQ.IRQ_GATTC_CHARACTERISTIC_RESULT:
             conn_handle, def_handle, value_handle, properties, uuid = data
             if conn_handle == self.connected_handle:
-                self._save_characteristic(value_handle, uuid)
+                self._save_characteristic(def_handle, value_handle, uuid)
 
         elif event == IRQ.IRQ_GATTC_CHARACTERISTIC_DONE:
             conn_handle, status = data
@@ -426,13 +605,30 @@ class CodexPad(object):
             if status != 0:
                 self._fail("characteristic discovery failed: {}".format(status))
                 return
+            self._finish_characteristic_discovery()
             self._next_service()
+
+        elif event == IRQ.IRQ_GATTC_DESCRIPTOR_RESULT:
+            conn_handle, descriptor_handle, uuid = data
+            if conn_handle != self.connected_handle or self._state != "discovering_descriptors":
+                return
+            if UUID(uuid) == _CCCD_UUID and self._input_cccd_handle is None:
+                self._input_cccd_handle = descriptor_handle
+
+        elif event == IRQ.IRQ_GATTC_DESCRIPTOR_DONE:
+            conn_handle, status = data
+            if conn_handle != self.connected_handle or self._state != "discovering_descriptors":
+                return
+            if status != 0:
+                self._fail("descriptor discovery failed: {}".format(status))
+                return
+            self._subscribe_inputs()
 
         elif event == IRQ.IRQ_GATTC_WRITE_DONE:
             conn_handle, value_handle, status = data
             if conn_handle != self.connected_handle or self._state != "subscribing":
                 return
-            if value_handle != self._input_value_handle + 1:
+            if value_handle != self._input_cccd_handle:
                 return
             if status != 0:
                 self._fail("could not enable input notifications: {}".format(status))
