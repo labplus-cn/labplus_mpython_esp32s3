@@ -20,3 +20,4 @@ managed_components/
 port/lockfiles/dependencies.lock.esp32s3
 port/eim_config.toml
 port/tests/test_codexpad_mac.py
+port/lockfiles/dependencies.lock.esp32s3

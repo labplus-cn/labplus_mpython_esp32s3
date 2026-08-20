@@ -41,7 +41,8 @@ except:
 
 
 # 上电后立即关闭rgb,防止随机灯亮问题
-_rgb = NeoPixel(Pin(8, Pin.OUT), 4, 3, 1,0.1)
+
+_rgb = NeoPixel(Pin(16, Pin.OUT), 3, 3, 1, brightness=0.3)
 _rgb.write()
 del _rgb
 
