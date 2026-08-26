@@ -354,7 +354,7 @@ class rfid():
             if(wait):
                 while True:
                     rf = self.scan_rfid.scanning()
-                    if rf:
+                    if rf.serial_number():
                         return rf
                     else:
                         time.sleep_ms(100)
