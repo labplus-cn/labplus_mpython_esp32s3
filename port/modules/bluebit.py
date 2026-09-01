@@ -959,7 +959,9 @@ class Scan_Rfid():
     def scanning(self):
         if self.rf != None:
             print("find card: {}" .format(self.rf.serial_number()))
-        return self.rf
+            return self.rf
+        else:
+            return None
 
 class Scan_Rfid_Edu():
     """扫描Rfid卡类.
@@ -971,7 +973,9 @@ class Scan_Rfid_Edu():
     def scanning(self):
         if self.rf != None:
             print("find card: {}" .format(self.rf.serial_number()))
-        return self.rf
+            return self.rf
+        else:
+            return None
 
 class GasSensor():
     '''

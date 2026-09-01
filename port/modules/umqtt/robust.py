@@ -27,7 +27,7 @@ class MQTTClient(simple.MQTTClient):
                 self.delay(i)
 
     def publish(self, topic, msg, retain=False, qos=0):
-        sleep_ms(5)
+        sleep_ms(50)
         while 1:
             try:
                 return super().publish(topic, msg, retain, qos)
