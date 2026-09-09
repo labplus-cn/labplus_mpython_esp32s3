@@ -1,13 +1,15 @@
-from machine import Pin, UART
+from machine import Pin, UART, Timer
 from lib.k230_ai import *
 import time
 import gc
-from machine import Timer
+import sys
 gc.collect()
 
 class SmartCameraK230:
     def __init__(self, tx=Pin.P1, rx=Pin.P0):
-        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=1024)
+        # K230 字符串帧最大约 2071 字节，1024 字节会在 ESP32-S3 UART
+        # 硬件层直接截断，必须与协议解析缓冲区保持同量级。
+        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
         # self.uart = UART(2, baudrate=1152000, tx=tx, rx=rx)
         self.mode = DEFAULT_MODE
         self.lock = False
@@ -17,12 +19,24 @@ class SmartCameraK230:
         self.tf_status = 0
         self.tf_sn = ''
         self.rx_buffer = bytearray()
+        self._timer_busy = False
 
         time.sleep(0.01)
         self.wait_for_ai_init()
-        self.tim9 = Timer(-1)
-        self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
-        # self.thread_listen()
+        try:
+            self.tim9 = Timer(-1)
+            self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
+        except Exception as e:
+            self._report_exception("启动 K230 UART 定时器", e)
+
+    def _report_exception(self, context, error):
+        """统一输出 K230 异常；尽量保留 MicroPython 堆栈信息。"""
+        print("[K230] {}: {}".format(context, error))
+        try:
+            sys.print_exception(error)
+        except Exception:
+            # CPython 或精简版固件可能没有 sys.print_exception。
+            pass
   
     def wait_for_ai_init(self): 
         self.lock = True
@@ -202,18 +216,26 @@ class SmartCameraK230:
     #     AI_Uart_CMD(self.uart, 0x01, 0xFA, [0x04,int(mode)])
     #     time.sleep_ms(20)
 
-    def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.05)
-        self._task.start()
-    
-    def timer9_tick(self,_):
-        self.uart_thread()
+    def timer9_tick(self, _):
+        """定时轮询 UART；防止上一次解析未结束时重入。"""
+        if self._timer_busy:
+            return
+        self._timer_busy = True
+        try:
+            self.uart_thread()
+        except Exception as e:
+            # uart_thread 已有内部保护，这里作为定时器回调的最后一道保护。
+            self._report_exception("UART 定时器回调异常", e)
+        finally:
+            self._timer_busy = False
 
-    def uart_thread(self): 
+    def uart_thread(self):
         gc.collect()
-        try:          
+        CMD = None
+        try:
             if(self.lock==False):
-                CMD = uart_handle(self.uart)
+                # 使用成员缓冲区，保留分包、粘包以及一次读取中的剩余帧。
+                CMD = uart_handle(self.uart, self.rx_buffer)
                 # print(CMD)
                 # print('=====CMD=====')
                 if(CMD==None or len(CMD)==0):
@@ -340,7 +362,7 @@ class SmartCameraK230:
                             else:
                                 self.face_expression.lock = True
                                 self.face_expression.expression = CMD[5]
-                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION_ZH[CMD[5]]
+                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION[CMD[5]]
                 elif(self.mode==FALL_DETECTION and self.fall!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==FALL_DETECTION and CMD[4]==0x01):
@@ -524,4 +546,10 @@ class SmartCameraK230:
                     gc.collect()
                     pass
         except Exception as e:
-            print(e)
+            cmd_info = "none"
+            if CMD is not None and len(CMD) >= 4:
+                cmd_info = "type=0x{:02X}, cmd=0x{:02X}".format(CMD[2], CMD[3])
+            self._report_exception(
+                "UART 处理异常(mode={}, {})".format(self.mode, cmd_info),
+                e
+            )

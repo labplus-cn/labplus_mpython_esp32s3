@@ -7,9 +7,22 @@ try:
 except ImportError:
     network = None
 import micropython
+import time
 from machine import Timer
 from umqtt.robust import MQTTClient
 from smart_home_rules import SmartHomeRules
+
+
+try:
+    _ticks_ms = time.ticks_ms
+    _ticks_diff = time.ticks_diff
+except AttributeError:
+    # 仅供主机兼容测试；掌控板上的 MicroPython 使用 time.ticks_*。
+    def _ticks_ms():
+        return int(time.time() * 1000)
+
+    def _ticks_diff(current, previous):
+        return current - previous
 
 
 class _ReconnectAwareMQTTClient(MQTTClient):
@@ -56,6 +69,11 @@ class SmartHomeMQTT:
         self.command_timer_generation = 0
         self.safe_outputs = {}
         self.offline_protection_active = False
+        # 规则定时器和图形化主循环可能访问同一个 I2C 传感器；缓存和忙标记
+        # 让规则优先复用最近一次采样，避免重复触发 SHT20 转换。
+        self._state_cache = {}
+        self._state_cache_at = {}
+        self._state_read_busy = {}
         self.rule_endpoint_id = 'controller_01'
         self._registered_rules = {}
         self._announced_rules = set()
@@ -218,7 +236,54 @@ class SmartHomeMQTT:
         return handler(data or {})
 
     def publish_state(self, endpoint_id, data):
+        self._cache_state(endpoint_id, data)
         self._publish('state', endpoint_id, data)
+
+    def _cache_state(self, endpoint_id, data):
+        """合并保存端点最近状态，供本地规则读取。"""
+        if not isinstance(data, dict):
+            return
+        previous = self._state_cache.get(endpoint_id)
+        merged = dict(previous) if isinstance(previous, dict) else {}
+        for key in data:
+            merged[key] = data[key]
+        self._state_cache[endpoint_id] = merged
+        self._state_cache_at[endpoint_id] = _ticks_ms()
+
+    def read_cached_state(self, endpoint_id, field, reader, publish=False, cache_ms=5000):
+        """读取规则字段并复用短期缓存，避免与主循环争用传感器总线。
+
+        图形化生成的规则 reader 在缓存未命中时才调用底层驱动；首次采样可
+        选择发布合并后的状态，使只放置规则积木的程序也能在平台显示数值。
+        ``cache_ms`` 是内部策略，不作为学生积木参数暴露。
+        """
+        state = self._state_cache.get(endpoint_id)
+        sampled_at = self._state_cache_at.get(endpoint_id)
+        if isinstance(state, dict) and field in state and sampled_at is not None:
+            if _ticks_diff(_ticks_ms(), sampled_at) < int(cache_ms):
+                return state[field]
+
+        # SHT20 等驱动在转换期间会 sleep_ms；若调度任务在此窗口重入，
+        # 返回上一次值（或 None），而不是再次读同一 I2C 设备。
+        if self._state_read_busy.get(endpoint_id):
+            return state.get(field) if isinstance(state, dict) else None
+
+        self._state_read_busy[endpoint_id] = True
+        try:
+            value = reader()
+        finally:
+            self._state_read_busy[endpoint_id] = False
+
+        self._cache_state(endpoint_id, {field: value})
+        if publish and self.connected:
+            try:
+                # 直接发布，保留 reader 来源的缓存时间，避免每次规则 tick
+                # 都把缓存标成新的主循环采样。
+                self._publish('state', endpoint_id, self._state_cache[endpoint_id], qos=1)
+            except Exception:
+                # 平台暂不可用不应阻断本地规则；下一次缓存过期后继续采样。
+                pass
+        return value
 
     def publish_event(self, endpoint_id, event, data=None):
         self._publish('event', endpoint_id, data, event=event)

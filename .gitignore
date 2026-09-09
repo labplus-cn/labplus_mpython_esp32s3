@@ -21,3 +21,6 @@ port/lockfiles/dependencies.lock.esp32s3
 port/eim_config.toml
 port/tests/test_codexpad_mac.py
 port/lockfiles/dependencies.lock.esp32s3
+port/tests/test_k230_voice_lists.py
+port/tests/smart_home_mqtt_test.py
+port/tests/smart_home_mqtt_test.py
