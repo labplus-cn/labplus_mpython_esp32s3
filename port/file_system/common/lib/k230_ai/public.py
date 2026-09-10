@@ -56,12 +56,66 @@ FACTORY_MODE = 99
 
 # OBJ_TYPE = ['飞机','自行车','鸟','船','瓶子','公交车','汽车','猫','椅子','奶牛','餐桌','狗','屋子','摩托','人','盆栽','羊','沙发','火车','电视']
 
-YOLO80_ZH = ["人","自行车","汽车","摩托车","飞机","公共汽车","火车","卡车","船","交通灯","消防栓","停车标志","泊车计时器","长椅","鸟","猫","狗","马","绵羊","奶牛","大象","熊","斑马","长颈鹿","背包","雨伞","手提包","领带","手提箱","飞盘","滑雪板","运动球","风筝","棒球","蝙蝠","棒球手套","滑板","冲浪板","网球拍","瓶子","酒杯","杯子","叉子","刀","勺子","碗","香蕉","苹果","三明治","橙子","西兰花","胡萝卜","热狗","披萨","甜甜圈","蛋糕","椅子","沙发","盆栽","床","餐桌","厕所","电视","笔记本电脑","鼠标","遥控器","键盘","手机","微波炉","烤箱","烤面包机", "水槽","冰箱","书籍","时钟","花瓶","剪刀","泰迪熊","吹风机","牙刷"] 
-HAND_KEYPOINT_CLASS_GESTURE = ['fist','five','gun','love','one','six','three','thumbUp','yeah']
-FACE_LANDMARK_EXPRESSION_ZH = ['正常','开心','伤心','惊讶','生气']
-DYNAMIC_GESTURE_STR = ['上','下','左','右'] 
+# YOLO80 中文标签（与英文标签保持相同索引顺序）：
+# 人、自行车、汽车、摩托车、飞机、公共汽车、火车、卡车、船、交通灯、消防栓、停车标志、泊车计时器、长椅、鸟、猫、狗、马、绵羊、奶牛、大象、熊、斑马、长颈鹿、背包、雨伞、手提包、领带、手提箱、飞盘、滑雪板、单板滑雪板、运动球、风筝、棒球棒、棒球手套、滑板、冲浪板、网球拍、瓶子、酒杯、杯子、叉子、刀、勺子、碗、香蕉、苹果、三明治、橙子、西兰花、胡萝卜、热狗、披萨、甜甜圈、蛋糕、椅子、沙发、盆栽、床、餐桌、厕所、电视、笔记本电脑、鼠标、遥控器、键盘、手机、微波炉、烤箱、烤面包机、水槽、冰箱、书籍、时钟、花瓶、剪刀、泰迪熊、吹风机、牙刷。
+YOLO80_ZH = ["人","自行车","汽车","摩托车","飞机","公共汽车","火车","卡车","船","交通灯","消防栓","停车标志","泊车计时器","长椅","鸟","猫","狗","马","绵羊","奶牛","大象","熊","斑马","长颈鹿","背包","雨伞","手提包","领带","手提箱","飞盘","滑雪板","单板滑雪板","运动球","风筝","棒球棒","棒球手套","滑板","冲浪板","网球拍","瓶子","酒杯","杯子","叉子","刀","勺子","碗","香蕉","苹果","三明治","橙子","西兰花","胡萝卜","热狗","披萨","甜甜圈","蛋糕","椅子","沙发","盆栽","床","餐桌","厕所","电视","笔记本电脑","鼠标","遥控器","键盘","手机","微波炉","烤箱","烤面包机","水槽","冰箱","书籍","时钟","花瓶","剪刀","泰迪熊","吹风机","牙刷"]
+# YOLO80 English labels, with the same index order as YOLO80_ZH.
+YOLO80_EN = ["person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light","fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch","potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"]
 
-MODE=['默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
+# 手势中文标签（与英文标签保持相同索引顺序）：握拳、五指、手枪、比心、数字一、数字六、数字三、点赞、胜利手势。
+HAND_KEYPOINT_CLASS_GESTURE_ZH = ['握拳','五指','手枪','比心','一','六','三','点赞','胜利手势']
+HAND_KEYPOINT_CLASS_GESTURE_EN = ['fist','five','gun','love','one','six','three','thumbUp','yeah']
+
+# 人脸表情中文标签（与英文标签保持相同索引顺序）：正常、开心、伤心、惊讶、生气。
+FACE_LANDMARK_EXPRESSION_ZH = ['正常','开心','伤心','惊讶','生气']
+FACE_LANDMARK_EXPRESSION_EN = ['normal', 'happy', 'sad', 'surprised', 'angry']
+
+# 动态手势中文标签（与英文标签保持相同索引顺序）：上、下、左、右。
+DYNAMIC_GESTURE_STR_ZH = ['上','下','左','右']
+DYNAMIC_GESTURE_STR_EN = ['up', 'down', 'left', 'right']
+
+# 识别模式中文标签（与英文模式保持相同索引顺序）：默认、数字识别、物体识别、人脸检测、人脸识别、自学习分类、颜色识别、二维码识别、语音识别、交通标志识别、KPU自定义模型、寻找色块识别、图像处理、LAB颜色提取器、AprilTag。
+MODE_ZH = ['默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
+MODE_EN = ['default', 'digit recognition', 'object recognition', 'face detection', 'face recognition', 'self-learning classification', 'color recognition', 'QR code recognition', 'speech recognition', 'traffic sign recognition', 'KPU custom model', 'color block recognition', 'image processing', 'LAB color extractor', 'AprilTag']
+
+USE_ENGLISH_VOICE = True  # False 使用中文，True 使用英文
+YOLO80_LABELS = []
+YOLO80 = YOLO80_LABELS
+HAND_KEYPOINT_CLASS_GESTURE = []
+FACE_LANDMARK_EXPRESSION = []
+DYNAMIC_GESTURE_STR = []
+MODE = []
+
+
+def set_voice_language(use_english):
+    """通过 if/else 切换当前识别结果的中文或英文文本。"""
+    global USE_ENGLISH_VOICE
+    global YOLO80_LABELS, HAND_KEYPOINT_CLASS_GESTURE
+    global FACE_LANDMARK_EXPRESSION, DYNAMIC_GESTURE_STR, MODE
+
+    USE_ENGLISH_VOICE = bool(use_english)
+    if USE_ENGLISH_VOICE:
+        selected_yolo80 = YOLO80_EN
+        selected_hand_gesture = HAND_KEYPOINT_CLASS_GESTURE_EN
+        selected_expression = FACE_LANDMARK_EXPRESSION_EN
+        selected_dynamic_gesture = DYNAMIC_GESTURE_STR_EN
+        selected_mode = MODE_EN
+    else:
+        selected_yolo80 = YOLO80_ZH
+        selected_hand_gesture = HAND_KEYPOINT_CLASS_GESTURE_ZH
+        selected_expression = FACE_LANDMARK_EXPRESSION_ZH
+        selected_dynamic_gesture = DYNAMIC_GESTURE_STR_ZH
+        selected_mode = MODE_ZH
+
+    # 原地更新，保证已经持有这些列表引用的对象也能看到语言切换结果。
+    YOLO80_LABELS[:] = selected_yolo80
+    HAND_KEYPOINT_CLASS_GESTURE[:] = selected_hand_gesture
+    FACE_LANDMARK_EXPRESSION[:] = selected_expression
+    DYNAMIC_GESTURE_STR[:] = selected_dynamic_gesture
+    MODE[:] = selected_mode
+
+
+set_voice_language(USE_ENGLISH_VOICE)
 
 AI ={
     'reset':[0xff, 0x01, 0x02],
@@ -116,22 +170,35 @@ DEBUG = False  # 增加全局debug控制变量
 MAX_BUF_SIZE = 4096  # 缓冲区最大字节数
 
 
-def uart_handle(uart):
-    rx_buf = bytearray()
+def uart_handle(uart, rx_buf=None):
+    """读取并解析一个 K230 数据包。
 
-    # 读取 UART 数据
-    if uart.any():
-        data = uart.read()
-        if data:
-            if DEBUG:
-                print("[UART RX] " + data.hex(' ').upper())
-            rx_buf.extend(data)
+    rx_buf 由调用方持有，用来保留跨 UART 读取的半包和同一次读取中的
+    多个数据包。保留单参数调用方式，兼容旧代码。
+    """
+    if rx_buf is None:
+        rx_buf = bytearray()
 
-            # 缓冲区保护
-            if len(rx_buf) > MAX_BUF_SIZE:
+    # 读取 UART 数据。读异常时保留已有缓冲，下一次任务继续尝试。
+    try:
+        if uart.any():
+            data = uart.read()
+            if data:
                 if DEBUG:
-                    print("[UART] 缓冲区超限({} > {})，清空".format(len(rx_buf), MAX_BUF_SIZE))
-                rx_buf = bytearray()
+                    print("[UART RX] " + data.hex(' ').upper())
+                rx_buf.extend(data)
+
+                # 缓冲区保护必须原地清空，不能重新绑定 rx_buf，
+                # 否则调用方持有的持久化 bytearray 不会同步更新。
+                if len(rx_buf) > MAX_BUF_SIZE:
+                    if DEBUG:
+                        print("[UART] 缓冲区超限({} > {})，清空".format(len(rx_buf), MAX_BUF_SIZE))
+                    # 当前固件的 bytearray 不支持 del，使用切片赋值原地清空。
+                    rx_buf[:] = b""
+    except Exception as e:
+        if DEBUG:
+            print("[UART] 读取异常: {}".format(e))
+        return None
 
     while True:
         # 至少要有包头(2字节) + 命令类型(1字节)
@@ -142,64 +209,72 @@ def uart_handle(uart):
         if not (rx_buf[0] == 0xBB and rx_buf[1] == 0xAA):
             if DEBUG:
                 print("[UART] 丢弃无效字节: 0x{:02X}".format(rx_buf[0]))
-            rx_buf = rx_buf[1:]
+            rx_buf[:] = rx_buf[1:]
             continue
 
         cmd_type = rx_buf[2]
 
-        # 命令 0x01: 固定长度 2(包头) + 1(命令) + 2 +6(数据) + 1(校验) = 12字节
+        # 命令 0x01: 固定长度 2(包头) + 1(命令) + 8(数据) + 1(校验) = 12字节
         if cmd_type == 0x01:
             total_len = 12
             if len(rx_buf) < total_len:
                 if DEBUG:
                     print("[UART] 等待 0x01 包数据到齐")
                 break
-            pkt = rx_buf[:total_len]
+            pkt = bytes(rx_buf[:total_len])
             checksum = CheckCode(pkt[:11])  # 校验包头+命令+数据(共11字节)
             if DEBUG:
                 print("[UART] 解析到 0x01 包: " + pkt.hex(' ').upper())
             if checksum == pkt[11]:
                 if DEBUG:
                     print("[UART] 校验成功")
-                return pkt  # 返回完整包
-            else:
-                if DEBUG:
-                    print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]))
-            rx_buf = rx_buf[total_len:]
+                rx_buf[:] = rx_buf[total_len:]
+                return pkt
 
-        # 命令 0x02: 2(包头) + 3(命令) + 15(固定头) +2(字符串长度) + N(字符串) + 1(校验)
+            if DEBUG:
+                print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]))
+            # 只丢弃当前包头的第一个字节，继续寻找可能的下一个包头。
+            rx_buf[:] = rx_buf[1:]
+
+        # 命令 0x02: 20字节固定头 + 2字节长度 + 字符串 + 0xAB
         elif cmd_type == 0x02:
-            if len(rx_buf) < 22:  # 至少要有包头+命令+固定头+2字节长度
+            if len(rx_buf) < 22:  # 至少要有固定头和2字节字符串长度
                 if DEBUG:
                     print("[UART] 等待 0x02 头部数据到齐")
                 break
             # 两字节长度，高字节在前，低字节在后
             str_len = (rx_buf[20] << 8) | rx_buf[21]
             total_len = 22 + str_len + 1
+            if total_len > MAX_BUF_SIZE:
+                if DEBUG:
+                    print("[UART] 0x02 包长度异常: {}".format(total_len))
+                # 长度字段已经不可信，丢弃当前固定头和长度字段，
+                # 保留其后的数据，允许后续合法帧重新同步。
+                rx_buf[:] = rx_buf[22:]
+                continue
             if len(rx_buf) < total_len:
                 if DEBUG:
                     print("[UART] 等待 0x02 字符串数据到齐 (len={})".format(str_len))
                 break
-            pkt = rx_buf[:total_len]
-           
+            pkt = bytes(rx_buf[:total_len])
+
             if pkt[-1] != 0xAB:
                 if DEBUG:
                     print("[UART] 0x02 包尾校验失败 (期望=AB, 接收={:02X})，丢弃第一个字节".format(pkt[-1]))
-                rx_buf = rx_buf[1:]
+                rx_buf[:] = rx_buf[1:]
                 continue
             if DEBUG:
                 print("[UART] 解析到 0x02 包")
                 print(pkt)
-            rx_buf = rx_buf[total_len:]
-        
-            return pkt  # 返回完整包
+            rx_buf[:] = rx_buf[total_len:]
+            return pkt
 
         else:
             if DEBUG:
                 print("[UART] 未知命令 0x{:02X}，丢弃第一个字节".format(cmd_type))
-            rx_buf = rx_buf[1:]
+            rx_buf[:] = rx_buf[1:]
 
-            return None  # 无有效包返回
+    return None  # 当前还没有完整数据包
 
 def AI_Uart_CMD(uart, cmd=0, cmd_type=0, cmd_data=[0, 0, 0, 0, 0, 0, 0, 0]):
     gc.collect()

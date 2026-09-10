@@ -1,13 +1,15 @@
-from machine import Pin, UART
+from machine import Pin, UART, Timer
 from lib.k230_ai import *
 import time
 import gc
-from machine import Timer
+import sys
 gc.collect()
 
 class SmartCameraK230:
     def __init__(self, tx=Pin.P1, rx=Pin.P0):
-        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=1024)
+        # K230 字符串帧最大约 2071 字节，1024 字节会在 ESP32-S3 UART
+        # 硬件层直接截断，必须与协议解析缓冲区保持同量级。
+        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
         # self.uart = UART(2, baudrate=1152000, tx=tx, rx=rx)
         self.mode = DEFAULT_MODE
         self.lock = False
@@ -17,12 +19,24 @@ class SmartCameraK230:
         self.tf_status = 0
         self.tf_sn = ''
         self.rx_buffer = bytearray()
+        self._timer_busy = False
 
         time.sleep(0.01)
         self.wait_for_ai_init()
-        self.tim9 = Timer(-1)
-        self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
-        # self.thread_listen()
+        try:
+            self.tim9 = Timer(-1)
+            self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
+        except Exception as e:
+            self._report_exception("启动 K230 UART 定时器", e)
+
+    def _report_exception(self, context, error):
+        """统一输出 K230 异常；尽量保留 MicroPython 堆栈信息。"""
+        print("[K230] {}: {}".format(context, error))
+        try:
+            sys.print_exception(error)
+        except Exception:
+            # CPython 或精简版固件可能没有 sys.print_exception。
+            pass
   
     def wait_for_ai_init(self): 
         self.lock = True
@@ -182,11 +196,13 @@ class SmartCameraK230:
 
     def classify_kmodel_init(self, param={"kmodel_path":'/data/xxx.kmodel', "labels":["0","1","2"], "confidence_threshold":0.3, "nms_threshold":0.45, "max_boxes_num":50}):
         self.classify_model = ClassifyMODEL(self.uart, param)
-        self.mode = CLASSIFY_MODEL_MODE 
+        self.classify_model.results = []
+        self.mode = CLASSIFY_MODEL_MODE
     
     def detect_kmodel_init(self, param={"kmodel_path":'/data/xxx.kmodel', "labels":["0","1","2"], "confidence_threshold":0.3, "nms_threshold":0.45, "max_boxes_num":50}):
         self.detect_kmodel = DetectMODEL(self.uart, param)
-        self.mode = DETECT_MODEL_MODE 
+        self.detect_kmodel.results = []
+        self.mode = DETECT_MODEL_MODE
     
     def linear_regression_fast_init(self, threshold=(0,100)):
         self.linear_regression_fast = LINEAR_REGRESSION(self.uart,threshold=threshold)
@@ -200,18 +216,26 @@ class SmartCameraK230:
     #     AI_Uart_CMD(self.uart, 0x01, 0xFA, [0x04,int(mode)])
     #     time.sleep_ms(20)
 
-    def thread_listen(self):
-        self._task = TASK(func=self.uart_thread,sec=0.05)
-        self._task.start()
-    
-    def timer9_tick(self,_):
-        self.uart_thread()
+    def timer9_tick(self, _):
+        """定时轮询 UART；防止上一次解析未结束时重入。"""
+        if self._timer_busy:
+            return
+        self._timer_busy = True
+        try:
+            self.uart_thread()
+        except Exception as e:
+            # uart_thread 已有内部保护，这里作为定时器回调的最后一道保护。
+            self._report_exception("UART 定时器回调异常", e)
+        finally:
+            self._timer_busy = False
 
-    def uart_thread(self): 
+    def uart_thread(self):
         gc.collect()
-        try:          
+        CMD = None
+        try:
             if(self.lock==False):
-                CMD = uart_handle(self.uart)
+                # 使用成员缓冲区，保留分包、粘包以及一次读取中的剩余帧。
+                CMD = uart_handle(self.uart, self.rx_buffer)
                 # print(CMD)
                 # print('=====CMD=====')
                 if(CMD==None or len(CMD)==0):
@@ -338,7 +362,7 @@ class SmartCameraK230:
                             else:
                                 self.face_expression.lock = True
                                 self.face_expression.expression = CMD[5]
-                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION_ZH[CMD[5]]
+                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION[CMD[5]]
                 elif(self.mode==FALL_DETECTION and self.fall!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==FALL_DETECTION and CMD[4]==0x01):
@@ -464,35 +488,41 @@ class SmartCameraK230:
                     if(len(CMD)>0):
                         if(CMD[2]==0x01 and CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01 and CMD[5]==0xff):
                             self.classify_model.lock = True
-                            self.classify_model.result = {"id": None, "score": 0}
+                            self.classify_model.result = {"id": None, "score": 0, "results": []}
+                            self.classify_model.results = []
                             self.classify_model.id,self.classify_model.score = None,0
                         elif(CMD[2]==0x02 and CMD[3]==CLASSIFY_MODEL_MODE and CMD[4]==0x01):
                             self.classify_model.lock = True
                             b = bytes(CMD[22:-1])  
                             data = json.loads(b.decode('UTF-8','ignore'))
                             self.classify_model.result = data
+                            self.classify_model.results = data.get('results', [])
                             self.classify_model.id = data.get('id', None)
                             self.classify_model.score = data.get('score', 0)
                             # self.classify_model.num = data.get('num', 0)
                     else:
-                        self.classify_model.result = {"id": None, "score": 0}
+                        self.classify_model.result = {"id": None, "score": 0, "results": []}
+                        self.classify_model.results = []
                         self.classify_model.id,self.classify_model.score = None,0
                 elif(self.mode==DETECT_MODEL_MODE and self.detect_kmodel!=None):
                     if(len(CMD)>0):
                         if(CMD[2]==0x01 and CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01 and CMD[5]==0xff):
                             self.detect_kmodel.lock = True
-                            self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
+                            self.detect_kmodel.result = {"id": None, "score": 0, "num": 0, "results": []}
+                            self.detect_kmodel.results = []
                             self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
                         elif(CMD[2]==0x02 and CMD[3]==DETECT_MODEL_MODE and CMD[4]==0x01):
                             self.detect_kmodel.lock = True
                             b = bytes(CMD[22:-1])  
                             data = json.loads(b.decode('UTF-8','ignore'))
                             self.detect_kmodel.result = data
+                            self.detect_kmodel.results = data.get('results', [])
                             self.detect_kmodel.id = data.get('id', None)
                             self.detect_kmodel.score = data.get('score', 0)
                             self.detect_kmodel.num = data.get('num', 0)
                     else:
-                        self.detect_kmodel.result = {"id": None, "score": 0, "num": 0}
+                        self.detect_kmodel.result = {"id": None, "score": 0, "num": 0, "results": []}
+                        self.detect_kmodel.results = []
                         self.detect_kmodel.id,self.detect_kmodel.score,self.detect_kmodel.num = None,0,0
                 elif(self.mode==APS_MODE and self.amr!=None):
                     if(len(CMD)>0):
@@ -516,5 +546,10 @@ class SmartCameraK230:
                     gc.collect()
                     pass
         except Exception as e:
-            print(e)
-    
+            cmd_info = "none"
+            if CMD is not None and len(CMD) >= 4:
+                cmd_info = "type=0x{:02X}, cmd=0x{:02X}".format(CMD[2], CMD[3])
+            self._report_exception(
+                "UART 处理异常(mode={}, {})".format(self.mode, cmd_info),
+                e
+            )
