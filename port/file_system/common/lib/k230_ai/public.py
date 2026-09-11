@@ -82,7 +82,7 @@ USE_ENGLISH_VOICE = True  # False 使用中文，True 使用英文
 YOLO80_LABELS = []
 YOLO80 = YOLO80_LABELS
 HAND_KEYPOINT_CLASS_GESTURE = []
-FACE_LANDMARK_EXPRESSION = []
+FACE_LANDMARK_EXPRESSION_STR = []
 DYNAMIC_GESTURE_STR = []
 MODE = []
 
@@ -91,7 +91,7 @@ def set_voice_language(use_english):
     """通过 if/else 切换当前识别结果的中文或英文文本。"""
     global USE_ENGLISH_VOICE
     global YOLO80_LABELS, HAND_KEYPOINT_CLASS_GESTURE
-    global FACE_LANDMARK_EXPRESSION, DYNAMIC_GESTURE_STR, MODE
+    global FACE_LANDMARK_EXPRESSION_STR, DYNAMIC_GESTURE_STR, MODE
 
     USE_ENGLISH_VOICE = bool(use_english)
     if USE_ENGLISH_VOICE:
@@ -110,7 +110,7 @@ def set_voice_language(use_english):
     # 原地更新，保证已经持有这些列表引用的对象也能看到语言切换结果。
     YOLO80_LABELS[:] = selected_yolo80
     HAND_KEYPOINT_CLASS_GESTURE[:] = selected_hand_gesture
-    FACE_LANDMARK_EXPRESSION[:] = selected_expression
+    FACE_LANDMARK_EXPRESSION_STR[:] = selected_expression
     DYNAMIC_GESTURE_STR[:] = selected_dynamic_gesture
     MODE[:] = selected_mode
 

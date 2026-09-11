@@ -362,7 +362,7 @@ class SmartCameraK230:
                             else:
                                 self.face_expression.lock = True
                                 self.face_expression.expression = CMD[5]
-                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION[CMD[5]]
+                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION_STR[CMD[5]]
                 elif(self.mode==FALL_DETECTION and self.fall!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==FALL_DETECTION and CMD[4]==0x01):

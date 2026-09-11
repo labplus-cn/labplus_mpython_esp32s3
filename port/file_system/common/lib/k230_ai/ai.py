@@ -251,7 +251,7 @@ class FaceExpressionDetct(object):
         self.uart = uart
         self.CommandList = AI['FACE_LANDMARK_EXPRESSION']
         self.expression = 0
-        self.expression_str = FACE_LANDMARK_EXPRESSION[0]
+        self.expression_str = FACE_LANDMARK_EXPRESSION_STR[0]
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
         time.sleep(1)
