@@ -109,15 +109,18 @@ if(MICROPY_PY_TINYUSB)
         ${MICROPY_BOARD_DIR}
     )
     # Build the Espressif tinyusb component with MicroPython shared/tinyusb/tusb_config.h
-    # idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
-    # message(STATUS "获取到的tinyusb库目标：${tusb_lib}") # 关键调试行
+    if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+        idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
+        message(STATUS "获取到的tinyusb库目标：${tusb_lib}") # 关键调试行
 
-    # target_include_directories(${tusb_lib} PRIVATE
-    #     ${MICROPY_DIR}/shared/tinyusb
-    #     ${MICROPY_DIR}
-    #     ${MICROPY_PORT_DIR}
-    #     ${MICROPY_BOARD_DIR}
-    # )
+        target_include_directories(${tusb_lib} PRIVATE
+            ${MICROPY_DIR}/shared/tinyusb
+            ${MICROPY_DIR}
+            ${MICROPY_PORT_DIR}
+            ${MICROPYTHON_PORT_DIR}
+            ${MICROPY_BOARD_DIR}
+        )
+    endif()
 endif()
 
 list(APPEND MICROPY_SOURCE_PORT
@@ -331,6 +334,18 @@ foreach(comp ${__COMPONENT_NAMES_RESOLVED})
     micropy_gather_target_properties(__idf_${comp})
     micropy_gather_target_properties(${comp})
 endforeach()
+
+# 动态将 tinyusb 库私有链接到所有的 IDF_COMPONENTS，以继承它们的头文件路径（在此阶段所有 target 已被 CMake 注册，保证链接成功）
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    idf_component_get_property(tusb_lib espressif__tinyusb COMPONENT_LIB)
+    if(TARGET ${tusb_lib})
+        foreach(comp ${IDF_COMPONENTS})
+            if(TARGET __idf_${comp})
+                target_link_libraries(${tusb_lib} PRIVATE __idf_${comp})
+            endif()
+        endforeach()
+    endif()
+endif()
 
 # Include the main MicroPython cmake rules.
 include(${MICROPY_DIR}/py/mkrules.cmake)
