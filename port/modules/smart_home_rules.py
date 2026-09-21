@@ -94,14 +94,17 @@ class SmartHomeRules:
             return False
         return False
 
-    def _event(self, rule_id, status, action_count=0, error=None):
+    def _event(self, rule_id, status, action_count=0, error=None, actions=None):
         data = {
             'rule_id': rule_id,
             'status': status,
+            'source': 'local_rule',
             'action_count': action_count
         }
         if error:
             data['error'] = error
+        if actions:
+            data['actions'] = actions
         if hasattr(self.owner, 'publish_event'):
             endpoint_id = getattr(self.owner, 'rule_endpoint_id', 'controller_01')
             self.owner.publish_event(endpoint_id, 'rule_executed', data)
@@ -113,18 +116,35 @@ class SmartHomeRules:
         action_data = []
         try:
             for action in actions:
-                result = self.owner.execute_action(
-                    action.get('endpoint_id'),
-                    action.get('action'),
-                    action.get('data') or {}
-                )
+                endpoint_id = action.get('endpoint_id')
+                action_name = action.get('action')
+                data = action.get('data') or {}
+                try:
+                    result = self.owner.execute_action(
+                        endpoint_id,
+                        action_name,
+                        data,
+                        source='local_rule',
+                        rule_id=rule_id
+                    )
+                except TypeError:
+                    result = self.owner.execute_action(
+                        endpoint_id,
+                        action_name,
+                        data
+                    )
                 action_data.append(result if result is not None else {})
             entry['last_run_at'] = now
             entry['last_skip_at'] = None
-            self._event(rule_id, 'success', len(actions))
-        except Exception:
-            entry['last_run_at'] = now
-            self._event(rule_id, 'failed', len(action_data), 'execute_failed')
+            self._event(rule_id, 'success', len(actions), actions=actions)
+        except Exception as error:
+            err_msg = str(error)
+            if err_msg in ('manual_override', 'safety_lock'):
+                entry['last_skip_at'] = now
+                self._event(rule_id, 'skipped', len(action_data), error=err_msg, actions=actions)
+            else:
+                entry['last_run_at'] = now
+                self._event(rule_id, 'failed', len(action_data), error='execute_failed', actions=actions)
 
     def _tick_rule(self, entry, now):
         rule = entry['rule']

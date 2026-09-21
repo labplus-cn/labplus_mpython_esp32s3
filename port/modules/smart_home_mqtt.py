@@ -25,6 +25,10 @@ except AttributeError:
         return current - previous
 
 
+COMMAND_RESULT_LIMIT = 64
+
+
+
 class _ReconnectAwareMQTTClient(MQTTClient):
     def __init__(self, owner, **kwargs):
         self.owner = owner
@@ -47,6 +51,7 @@ class _ReconnectAwareMQTTClient(MQTTClient):
             owner._restore_command_subscription()
             owner._announce_registered_endpoints(force=True)
             owner._announce_registered_rules(force=True)
+            owner._flush_pending_states()
             owner._start_command_timer()
         finally:
             owner._reconnect_in_progress = False
@@ -56,13 +61,17 @@ class _ReconnectAwareMQTTClient(MQTTClient):
 
 
 class SmartHomeMQTT:
-    def __init__(self, server, client_id, user, password, topic_key, port=1883, keepalive=15):
+    def __init__(self, server, client_id, user, password, topic_key, port=1883, keepalive=15, now_ms=None):
         self.topic = 'sh/v1/' + topic_key
         self.endpoints = {}
         self.announced_endpoints = set()
         self.connected = False
         self.command_handler = None
         self.command_results = {}
+        self.command_result_order = []
+        self.pending_states = {}
+        self.manual_overrides = {}
+        self._now_ms = now_ms or _ticks_ms
         self.commands_subscribed = False
         self.command_timer = None
         self.command_poll_pending = False
@@ -77,7 +86,7 @@ class SmartHomeMQTT:
         self.rule_endpoint_id = 'controller_01'
         self._registered_rules = {}
         self._announced_rules = set()
-        self.rule_engine = SmartHomeRules(self)
+        self.rule_engine = SmartHomeRules(self, now_ms=self._now_ms)
         # publish() 等待 QoS 1 PUBACK 时，不能让定时轮询读取同一个 socket。
         self._mqtt_io_busy = False
         # 防止 robust.wait_msg() 在恢复回调发布消息时重入同一组恢复回调。
@@ -129,6 +138,7 @@ class SmartHomeMQTT:
         self.publish_status('controller_01', True)
         self._announce_registered_endpoints()
         self._announce_registered_rules()
+        self._flush_pending_states()
 
     def disconnect(self):
         self._enter_offline_protection('disconnect')
@@ -225,19 +235,73 @@ class SmartHomeMQTT:
         """登记一条本地规则；reader 返回 trigger 当前字段值。"""
         self.rule_engine.add_rule(rule, reader)
 
-    def execute_action(self, endpoint_id, action, data):
+    def set_manual_override(self, endpoint_id, until_ms):
+        """记录手动优先窗口（默认30秒）。"""
+        self.manual_overrides[endpoint_id] = int(until_ms)
+
+    def execute_action(self, endpoint_id, action, data, source='manual', rule_id=None, command_id=None):
         """执行端点动作，供 MQTT set 和本地规则共用同一动作注册表。"""
+        if self.offline_protection_active and source != 'safety':
+            raise ValueError('safety_lock')
+
+        if source == 'local_rule':
+            override_until = self.manual_overrides.get(endpoint_id)
+            if override_until is not None:
+                if _ticks_diff(override_until, self._now_ms()) > 0:
+                    raise ValueError('manual_override')
+                else:
+                    self.manual_overrides.pop(endpoint_id, None)
+
         endpoint = self.endpoints.get(endpoint_id)
         if not endpoint:
             raise ValueError('device_not_found')
         handler = endpoint['actions'].get(action)
         if not handler:
             raise ValueError('unsupported_action')
-        return handler(data or {})
+
+        result = handler(data or {})
+
+        if source == 'manual':
+            self.set_manual_override(endpoint_id, self._now_ms() + 30000)
+
+        return result
+
+    def _queue_latest_state(self, endpoint_id, data):
+        """保存每个端点最近一次未送达状态。"""
+        if not isinstance(data, dict):
+            return
+        previous = self.pending_states.get(endpoint_id)
+        merged = dict(previous) if isinstance(previous, dict) else {}
+        for key in data:
+            merged[key] = data[key]
+        self.pending_states[endpoint_id] = merged
+
+    def _flush_pending_states(self):
+        """连接恢复后按端点补发最新状态。"""
+        if not self.connected or not self.pending_states:
+            return
+        for endpoint_id in list(self.pending_states.keys()):
+            data = self.pending_states.get(endpoint_id)
+            if not data:
+                self.pending_states.pop(endpoint_id, None)
+                continue
+            try:
+                self._publish('state', endpoint_id, data, qos=1)
+                self.pending_states.pop(endpoint_id, None)
+            except Exception:
+                break
 
     def publish_state(self, endpoint_id, data):
         self._cache_state(endpoint_id, data)
-        self._publish('state', endpoint_id, data)
+        if not self.connected:
+            self._queue_latest_state(endpoint_id, data)
+            return
+        try:
+            self._publish('state', endpoint_id, data)
+            if endpoint_id in self.pending_states:
+                self.pending_states.pop(endpoint_id, None)
+        except Exception:
+            self._queue_latest_state(endpoint_id, data)
 
     def _cache_state(self, endpoint_id, data):
         """合并保存端点最近状态，供本地规则读取。"""
@@ -280,9 +344,13 @@ class SmartHomeMQTT:
                 # 直接发布，保留 reader 来源的缓存时间，避免每次规则 tick
                 # 都把缓存标成新的主循环采样。
                 self._publish('state', endpoint_id, self._state_cache[endpoint_id], qos=1)
+                if endpoint_id in self.pending_states:
+                    self.pending_states.pop(endpoint_id, None)
             except Exception:
-                # 平台暂不可用不应阻断本地规则；下一次缓存过期后继续采样。
-                pass
+                # 平台暂不可用不应阻断本地规则；进入待补发队列并在下一次缓存过期后继续采样。
+                self._queue_latest_state(endpoint_id, self._state_cache[endpoint_id])
+        elif publish and not self.connected:
+            self._queue_latest_state(endpoint_id, self._state_cache[endpoint_id])
         return value
 
     def publish_event(self, endpoint_id, event, data=None):
@@ -375,20 +443,36 @@ class SmartHomeMQTT:
             self.publish_ack(endpoint_id, command_id, result['ok'], result.get('data'), result.get('error'))
             return
         try:
-            result = self.execute_action(endpoint_id, action, data)
+            result = self.execute_action(endpoint_id, action, data, source='manual', command_id=command_id)
             if result is None:
                 result = {}
             self._finish_command(endpoint_id, command_id, True, data=result)
         except Exception as error:
             error_code = str(error)
-            if error_code not in ('device_not_found', 'unsupported_action'):
+            if error_code not in ('device_not_found', 'unsupported_action', 'safety_lock', 'manual_override'):
                 error_code = 'execute_failed'
             self._finish_command(endpoint_id, command_id, False, error=error_code)
 
+    def _remember_command_result(self, command_id, result):
+        """保存去重结果，最多保留64条。"""
+        if command_id in self.command_results:
+            try:
+                self.command_result_order.remove(command_id)
+            except ValueError:
+                pass
+        elif len(self.command_result_order) >= COMMAND_RESULT_LIMIT:
+            oldest = self.command_result_order.pop(0)
+            self.command_results.pop(oldest, None)
+        self.command_result_order.append(command_id)
+        self.command_results[command_id] = result
+
     def _finish_command(self, endpoint_id, command_id, ok, data=None, error=None):
         result = {'ok': ok, 'data': data, 'error': error}
-        self.command_results[command_id] = result
-        self.publish_ack(endpoint_id, command_id, ok, data, error)
+        self._remember_command_result(command_id, result)
+        try:
+            self.publish_ack(endpoint_id, command_id, ok, data, error)
+        except Exception:
+            pass
 
     def check_msg(self):
         return self.client.check_msg()

@@ -28,6 +28,7 @@ class FakeMQTTClient:
         self.last_will = None
         self.check_calls = 0
         self.publish_hook = None
+        self.fail_publish = False
         FakeMQTTClient.instances.append(self)
 
     def set_callback(self, callback):
@@ -46,6 +47,8 @@ class FakeMQTTClient:
 
     def publish(self, topic, message, retain=False, qos=0):
         # 保存发布记录，测试随后解析 ack 内容和校验 QoS/retain。
+        if self.fail_publish:
+            raise OSError('publish_failed')
         self.published.append((topic, message, retain, qos))
         if self.publish_hook is not None:
             self.publish_hook()
@@ -139,6 +142,31 @@ def reset_fake_clients():
     FakeTimer.instances = []
     FakeMicroPython.scheduled = []
     FakeNetwork.connected = True
+
+
+def test_sensor_state_cache_reuses_a_sample_for_rule_readers():
+    """规则读取同一传感器字段时应复用缓存，避免与主循环争用 SHT20 I2C。"""
+    reset_fake_clients()
+    home = module.SmartHomeMQTT(
+        server='127.0.0.1',
+        client_id='esp32_class_01',
+        user='device_user',
+        password='device_password',
+        topic_key='a1b2cX7kP9',
+    )
+    home.connect()
+    reads = []
+
+    def read_temperature():
+        reads.append(1)
+        return 26.25
+
+    assert home.read_cached_state('temp_humi_01', 'temperature_c', read_temperature, True) == 26.25
+    assert home.read_cached_state('temp_humi_01', 'temperature_c', read_temperature, True) == 26.25
+    assert reads == [1]
+    states = [ujson.loads(item[1]) for item in FakeMQTTClient.instances[-1].published
+              if ujson.loads(item[1]).get('channel') == 'state']
+    assert states[-1]['data']['temperature_c'] == 26.25
 
 
 def test_set_command_runs_registered_action_and_acknowledges():
@@ -569,7 +597,147 @@ def test_wifi_loss_runs_each_registered_safe_output_once_and_never_restores_it()
     assert home.offline_protection_active is False
 
 
+def test_command_results_bounded_at_64():
+    """命令去重缓存最多保留 64 条，按 FIFO 淘汰最旧记录。"""
+    reset_fake_clients()
+    home = module.SmartHomeMQTT(
+        server='127.0.0.1',
+        client_id='esp32_class_01',
+        user='device_user',
+        password='device_password',
+        topic_key='a1b2cX7kP9',
+    )
+    for number in range(65):
+        home._finish_command('fan_01', 'cmd-%d' % number, True, {'speed_pct': number})
+
+    assert len(home.command_results) == 64
+    assert len(home.command_result_order) == 64
+    assert 'cmd-0' not in home.command_results
+    assert 'cmd-64' in home.command_results
+    assert home.command_results['cmd-64']['data']['speed_pct'] == 64
+
+    # 再次保存已有 ID，更新其位置而不增加数量
+    home._finish_command('fan_01', 'cmd-1', True, {'speed_pct': 100})
+    assert len(home.command_results) == 64
+    assert home.command_result_order[-1] == 'cmd-1'
+    assert home.command_results['cmd-1']['data']['speed_pct'] == 100
+
+
+def test_publish_state_queues_pending_state_on_failure_and_flushes_on_reconnect():
+    """发布状态失败时按端点合并暂存，重连后补发并清空队列。"""
+    reset_fake_clients()
+    home = module.SmartHomeMQTT(
+        server='127.0.0.1',
+        client_id='esp32_class_01',
+        user='device_user',
+        password='device_password',
+        topic_key='a1b2cX7kP9',
+    )
+    home.connect()
+    client = FakeMQTTClient.instances[-1]
+
+    # 模拟发布失败
+    client.fail_publish = True
+    home.publish_state('temp_humi_01', {'temperature_c': 28.5})
+    home.publish_state('temp_humi_01', {'humidity_pct': 60.0})
+    assert home.pending_states['temp_humi_01'] == {'temperature_c': 28.5, 'humidity_pct': 60.0}
+
+    # 网络恢复后补发
+    client.fail_publish = False
+    home._flush_pending_states()
+    assert 'temp_humi_01' not in home.pending_states
+    flushed_states = [
+        ujson.loads(item[1]) for item in client.published
+        if ujson.loads(item[1]).get('channel') == 'state' and ujson.loads(item[1]).get('endpoint_id') == 'temp_humi_01'
+    ]
+    assert flushed_states[-1]['data'] == {'temperature_c': 28.5, 'humidity_pct': 60.0}
+
+
+def test_action_success_decoupled_from_mqtt_publish_failure():
+    """物理动作执行成功后，即使 MQTT ACK 发送失败也不报 execute_failed。"""
+    reset_fake_clients()
+    home = module.SmartHomeMQTT(
+        server='127.0.0.1',
+        client_id='esp32_class_01',
+        user='device_user',
+        password='device_password',
+        topic_key='a1b2cX7kP9',
+    )
+    home.connect()
+    action_ran = []
+    home.register_endpoint('fan_01', 'fan', actions={'set_speed': lambda data: action_ran.append(data)})
+
+    client = FakeMQTTClient.instances[-1]
+    client.fail_publish = True  # 让 publish_ack 抛异常
+
+    command = {
+        'msg_type': 'smart_home',
+        'channel': 'set',
+        'endpoint_id': 'fan_01',
+        'id': 'cmd-reliable-01',
+        'action': 'set_speed',
+        'data': {'speed_pct': 80}
+    }
+    client.callback('sh/v1/a1b2cX7kP9', ujson.dumps(command))
+
+    assert action_ran == [{'speed_pct': 80}]
+    assert home.command_results['cmd-reliable-01']['ok'] is True
+
+
+def test_manual_override_priority_and_safety_lock():
+    """验证安全归零 > 平台手动控制(30秒锁定) > 本地规则。"""
+    reset_fake_clients()
+    current_time = [100000]
+    home = module.SmartHomeMQTT(
+        server='127.0.0.1',
+        client_id='esp32_class_01',
+        user='device_user',
+        password='device_password',
+        topic_key='a1b2cX7kP9',
+        now_ms=lambda: current_time[0]
+    )
+    executed = []
+    home.register_endpoint('fan_01', 'fan', actions={'set_speed': lambda data: executed.append(data.get('speed_pct'))})
+
+    # 手动控制执行
+    home.execute_action('fan_01', 'set_speed', {'speed_pct': 30}, source='manual', command_id='cmd-1')
+    assert executed[-1] == 30
+    assert home.manual_overrides['fan_01'] == 130000
+
+    # 30秒内本地规则尝试控制该端点，抛出 manual_override 异常
+    try:
+        home.execute_action('fan_01', 'set_speed', {'speed_pct': 60}, source='local_rule', rule_id='rule_1')
+        assert False, 'Should have raised manual_override'
+    except ValueError as err:
+        assert str(err) == 'manual_override'
+    assert executed[-1] == 30
+
+    # 30秒后本地规则再次尝试控制，允许执行
+    current_time[0] = 130001
+    home.execute_action('fan_01', 'set_speed', {'speed_pct': 60}, source='local_rule', rule_id='rule_1')
+    assert executed[-1] == 60
+
+    # 离线安全保护激活时，禁止 manual 与 local_rule，仅允许 safety
+    home._enter_offline_protection('test')
+    try:
+        home.execute_action('fan_01', 'set_speed', {'speed_pct': 70}, source='manual')
+        assert False, 'Should have raised safety_lock'
+    except ValueError as err:
+        assert str(err) == 'safety_lock'
+
+    try:
+        home.execute_action('fan_01', 'set_speed', {'speed_pct': 80}, source='local_rule')
+        assert False, 'Should have raised safety_lock'
+    except ValueError as err:
+        assert str(err) == 'safety_lock'
+
+    # safety 来源不受安全锁阻拦
+    home.execute_action('fan_01', 'set_speed', {'speed_pct': 0}, source='safety')
+    assert executed[-1] == 0
+
+
 # 该文件不依赖 pytest，直接在 MicroPython REPL 中运行即可执行全部行为测试。
+test_sensor_state_cache_reuses_a_sample_for_rule_readers()
 test_set_command_runs_registered_action_and_acknowledges()
 test_default_keepalive_detects_abnormal_program_stop_promptly()
 test_non_set_message_does_not_run_endpoint_action()
@@ -583,4 +751,9 @@ test_subscribe_commands_runs_check_msg_from_one_scheduled_timer_and_restores_aft
 test_command_poll_does_not_read_socket_during_publish()
 test_local_rule_uses_registered_action_and_is_tick_by_existing_timer()
 test_wifi_loss_runs_each_registered_safe_output_once_and_never_restores_it()
+test_command_results_bounded_at_64()
+test_publish_state_queues_pending_state_on_failure_and_flushes_on_reconnect()
+test_action_success_decoupled_from_mqtt_publish_failure()
+test_manual_override_priority_and_safety_lock()
 print('smart_home_mqtt MicroPython tests passed')
+

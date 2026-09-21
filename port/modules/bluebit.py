@@ -151,7 +151,7 @@ class SHT20(object):
 
 class Color(object):
     """
-    颜色模块控制类
+    颜色传感器模块控制类
 
     :param i2c: I2C实例对象,默认i2c=i2c.
     """

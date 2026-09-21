@@ -178,8 +178,96 @@ def test_announcement_failure_does_not_stop_local_rule():
     assert home.actions == [('fan_01', 'set_speed', {'speed_pct': 40})]
 
 
+def test_manual_override_window_suppresses_local_rules():
+    """手动控制窗口内，规则 tick 触发跳过事件而不改写物理动作。"""
+    now = [1000]
+    executed_actions = []
+
+    class MockOwner:
+        def __init__(self):
+            self.events = []
+            self.manual_until = 31000
+
+        def execute_action(self, endpoint_id, action, data, source='manual', rule_id=None, command_id=None):
+            if source == 'local_rule' and now[0] < self.manual_until:
+                raise ValueError('manual_override')
+            executed_actions.append((endpoint_id, action, data))
+            return data
+
+        def publish_event(self, endpoint_id, event, data=None):
+            self.events.append((endpoint_id, event, data))
+
+    owner = MockOwner()
+    rules = SmartHomeRules(owner, now_ms=lambda: now[0])
+    rule = {
+        'rule_id': 'rule_temp_fan',
+        'name': '高温开风扇',
+        'enabled': True,
+        'trigger': {
+            'endpoint_id': 'temp_humi_01',
+            'field': 'temperature_c',
+            'operator': '>',
+            'value': 28
+        },
+        'actions': [{
+            'endpoint_id': 'fan_01',
+            'action': 'set_speed',
+            'data': {'speed_pct': 90}
+        }],
+        'debounce_ms': 0,
+        'cooldown_ms': 0
+    }
+    rules.add_rule(rule, lambda: 32)
+    rules.tick()
+
+    # 动作未执行，事件记录为 skipped 且 error 为 manual_override
+    assert executed_actions == []
+    assert len(owner.events) == 1
+    event = owner.events[-1][2]
+    assert event['status'] == 'skipped'
+    assert event['error'] == 'manual_override'
+    assert event['source'] == 'local_rule'
+    assert event['actions'] == [{'endpoint_id': 'fan_01', 'action': 'set_speed', 'data': {'speed_pct': 90}}]
+
+
+def test_rule_executed_event_contains_action_details_and_source():
+    """验证规则执行成功时，事件载荷包含 source='local_rule' 与完整的 actions 结构。"""
+    now = [0]
+    home = FakeHome()
+    rules = SmartHomeRules(home, now_ms=lambda: now[0])
+    rule = {
+        'rule_id': 'rule_light_on',
+        'name': '光照弱开灯',
+        'enabled': True,
+        'trigger': {
+            'endpoint_id': 'light_01',
+            'field': 'light_lux',
+            'operator': '<',
+            'value': 100
+        },
+        'actions': [{
+            'endpoint_id': 'relay_01',
+            'action': 'set_power',
+            'data': {'power': True}
+        }],
+        'debounce_ms': 0,
+        'cooldown_ms': 0
+    }
+    rules.add_rule(rule, lambda: 50)
+    rules.tick()
+
+    assert home.actions == [('relay_01', 'set_power', {'power': True})]
+    event = home.events[-1][2]
+    assert event['status'] == 'success'
+    assert event['source'] == 'local_rule'
+    assert event['action_count'] == 1
+    assert event['actions'] == [{'endpoint_id': 'relay_01', 'action': 'set_power', 'data': {'power': True}}]
+
+
 test_rule_waits_for_debounce_and_runs_once()
 test_cooldown_blocks_retrigger_until_next_window()
 test_failed_action_is_reported_and_rule_can_be_updated_without_duplicate_registration()
 test_announcement_failure_does_not_stop_local_rule()
+test_manual_override_window_suppresses_local_rules()
+test_rule_executed_event_contains_action_details_and_source()
 print('smart-home rules MicroPython-compatible tests passed')
