@@ -3,6 +3,7 @@
 #include "esp_mn_speech_commands.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 #include "sr.h"
 
 static mp_obj_dict_t *callback_dict = NULL;
@@ -62,15 +63,23 @@ static mp_obj_t mp_esp_mn_commands_add(mp_obj_t command_id_obj, mp_obj_t text_ob
     }
     int command_id = mp_obj_get_int(command_id_obj);
     const char *text = mp_obj_str_get_str(text_obj);
-    esp_mn_commands_add(command_id, text);
+    esp_err_t err = esp_mn_commands_add(command_id, text);
+    if (err != ESP_OK) {
+        ESP_LOGE("SPEECH", "Failed to add command %d: '%s' (err=%d)", command_id, text, err);
+    } else {
+        ESP_LOGI("SPEECH", "Added command %d: '%s'", command_id, text);
+    }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(mp_esp_mn_commands_add_obj, mp_esp_mn_commands_add);
 
 // 应用更新，并标记下次sr.add()时需要先清除旧命令词
 static mp_obj_t mp_esp_mn_commands_update(void) {
+    ESP_LOGI("SPEECH", "sr.update: waiting for multinet ready...");
     wait_for_multinet_ready();  // 确保multinet已初始化，否则命令词不生效
+    ESP_LOGI("SPEECH", "sr.update: updating speech commands FST...");
     esp_mn_commands_update();
+    ESP_LOGI("SPEECH", "sr.update: FST update completed");
     pending_clear = true;
     return mp_const_none;
 }
@@ -93,12 +102,14 @@ static MP_DEFINE_CONST_FUN_OBJ_2(mp_sr_set_callback_obj, mp_sr_set_callback);
 static mp_obj_t mp_sr_get_latest_command_id(void) {
     int cmd_id = get_latest_command_id();
     reset_latest_command_id();
+    vTaskDelay(pdMS_TO_TICKS(10));  // 自动让出CPU，防止用户while True死循环卡死系统
     return mp_obj_new_int(cmd_id);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_get_latest_command_id_obj, mp_sr_get_latest_command_id);
 
 static mp_obj_t mp_sr_get_wakeup_flag(void) {
     int cmd_id = get_wakeup_flag();
+    vTaskDelay(pdMS_TO_TICKS(10));  // 自动让出CPU，防止用户while True死循环卡死系统
     return mp_obj_new_int(cmd_id);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_get_wakeup_flag_obj, mp_sr_get_wakeup_flag);

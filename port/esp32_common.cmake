@@ -267,6 +267,10 @@ idf_component_register(
 # Set the MicroPython target as the current (main) IDF component target.
 set(MICROPY_TARGET ${COMPONENT_TARGET})
 
+if(MICROPY_LANGUAGE STREQUAL "en")
+    list(APPEND MICROPY_DEF_COMPONENT MPYTHON_LANGUAGE_EN=1)
+endif()
+
 # Define mpy-cross flags, for use with frozen code.
 if(CONFIG_IDF_TARGET_ARCH_XTENSA)
     set(MICROPY_CROSS_FLAGS -march=xtensawin)

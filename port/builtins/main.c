@@ -65,6 +65,10 @@
 #include "esp_board_manager.h"
 #include "dev_display_lcd.h"
 
+#if defined(MPYTHON_LANGUAGE_EN)
+#include "logo_labplus_Ledong_v2_en.h"
+#endif
+
 #if MICROPY_BLUETOOTH_NIMBLE
 #include "extmod/modbluetooth.h"
 #endif
@@ -146,7 +150,12 @@ soft_reset:
     esp_board_manager_init();
     dev_display_lcd_handles_t *disp_handle;
     esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);
+#if defined(MPYTHON_LANGUAGE_EN)
+    memcpy(disp_handle->lcd_buf, logo_labplus_Ledong_v2_en, sizeof(logo_labplus_Ledong_v2_en));
+    lcd_draw_image(disp_handle, 0, 0, 320, 172, disp_handle->lcd_buf);
+#else
     lcd_draw_logo(disp_handle);
+#endif
     
     // run boot-up scripts
     pyexec_frozen_module("_boot.py", true);

@@ -4,9 +4,16 @@ from __future__ import print_function
 import argparse
 import datetime
 import subprocess
-import os, sys
+import os
+import shutil
+import sys
+import tempfile
+from pathlib import Path
 
-sys.path.append(os.getenv("IDF_PATH") + "/components/partition_table")
+idf_path = os.getenv("IDF_PATH")
+if not idf_path:
+    raise RuntimeError("IDF_PATH is not set; activate the ESP-IDF environment first")
+sys.path.append(str(Path(idf_path) / "components" / "partition_table"))
 
 import gen_esp32part
 
@@ -82,39 +89,60 @@ def load_partition_table(filename):
     with open(filename, "rb") as f:
         return gen_esp32part.PartitionTable.from_binary(f.read())
 
-def littlefs_bin_park(file_path, board_name, size):
-    os.system("mkdir -p file_system")
-    os.system(f"cp -r {file_path}/common/*  file_system/")
-    os.system(f"cp -rf {file_path}/{board_name}/*  file_system/")
-    os.system(f"./../mklittlefs -c file_system  -s {size} littlefs.bin")
-            
-# Extract command-line arguments.
-# arg_sdkconfig = sys.argv[1]
-# arg_bootloader_bin = sys.argv[2]
-# arg_partitions_bin = sys.argv[3]
-# arg_application_bin = sys.argv[4]
-# arg_output_bin = sys.argv[5]
-# arg_output_uf2 = sys.argv[6]
-arg_board_name = sys.argv[1]
-git_tag = get_version_info_from_git("../")
-git_hash = get_hash_from_git("../")
+def littlefs_bin_park(port_dir, build_dir, board_name, language, size):
+    file_system_dir = port_dir / "file_system"
+    sources = [file_system_dir / "common", file_system_dir / board_name]
+    if language == "en":
+        sources.append(port_dir / "en" / board_name)
+
+    for source in sources:
+        if not source.is_dir():
+            raise FileNotFoundError("File-system source directory not found: {}".format(source))
+
+    # A fresh staging directory prevents stale files from earlier builds leaking
+    # into this firmware image. The English tree overlays common and board files.
+    with tempfile.TemporaryDirectory(prefix="makeimg-filesystem-", dir=str(build_dir)) as temp_dir:
+        staging_dir = Path(temp_dir) / "file_system"
+        staging_dir.mkdir()
+        for source in sources:
+            shutil.copytree(str(source), str(staging_dir), dirs_exist_ok=True)
+
+        subprocess.run(
+            [str(port_dir / "mklittlefs"), "-c", str(staging_dir), "-s", str(size), str(build_dir / "littlefs.bin")],
+            check=True,
+            cwd=str(build_dir),
+        )
+
+
+parser = argparse.ArgumentParser(description="Build the complete MicroPython firmware image")
+parser.add_argument("board", help="MicroPython board name")
+parser.add_argument("language", nargs="?", choices=("zh", "en"), default="zh")
+args = parser.parse_args()
+
+port_dir = Path(__file__).resolve().parent
+repo_dir = port_dir.parent
+build_dir = Path.cwd().resolve()
+arg_board_name = args.board
+arg_language = args.language
+
+git_tag = get_version_info_from_git(str(repo_dir))
+git_hash = get_hash_from_git(str(repo_dir))
 build_date = datetime.date.today().strftime("%Y-%m-%d")
-bin_name = "{}-{}-{}_{}.bin".format(arg_board_name, git_tag, git_hash, build_date)
-uf2_name = "{}-{}-{}_{}.uf2".format(arg_board_name, git_tag, git_hash, build_date)
+bin_name = "{}-{}-{}_{}-{}.bin".format(arg_board_name, git_tag, git_hash, build_date, arg_language)
+uf2_name = "{}-{}-{}_{}-{}.uf2".format(arg_board_name, git_tag, git_hash, build_date, arg_language)
 print(bin_name)
 
-littlefs_bin_park(f"../file_system", arg_board_name, 0x200000)
+littlefs_bin_park(port_dir, build_dir, arg_board_name, arg_language, 0x200000)
 
-arg_sdkconfig = "sdkconfig"
-arg_bootloader_bin = "bootloader/bootloader.bin"
-arg_partitions_bin = "partition_table/partition-table.bin"
-arg_application_bin = "micropython.bin"
-arg_vfs_bin = "littlefs.bin"
-arg_output_bin = bin_name
-arg_output_uf2= uf2_name
-arg_font_bin = "../Noto_Sans_CJK_SC_Light16.bin"
-arg_voice_data_bin = "../managed_components/espressif__esp-sr/esp-tts/esp_tts_chinese/esp_tts_voice_data_xiaoxin.dat"
-arg_sr_bin = "srmodels/srmodels.bin"
+arg_sdkconfig = build_dir / "sdkconfig"
+arg_bootloader_bin = build_dir / "bootloader" / "bootloader.bin"
+arg_partitions_bin = build_dir / "partition_table" / "partition-table.bin"
+arg_application_bin = build_dir / "micropython.bin"
+arg_vfs_bin = build_dir / "littlefs.bin"
+arg_output_bin = build_dir / bin_name
+arg_output_uf2 = build_dir / uf2_name
+arg_voice_data_bin = port_dir / "managed_components" / "espressif__esp-sr" / "esp-tts" / "esp_tts_chinese" / "esp_tts_voice_data_xiaoxin.dat"
+arg_sr_bin = build_dir / "srmodels" / "srmodels.bin"
 
 # Load required sdkconfig values.
 idf_target = load_sdkconfig_str_value(arg_sdkconfig, "IDF_TARGET", "").upper()
@@ -181,9 +209,12 @@ files_in = [
     ("partitions", offset_partitions, max_size_partitions, arg_partitions_bin),
     ("application", offset_application, max_size_application, arg_application_bin),
     ("vfs", offset_vfs, max_size_vfs, arg_vfs_bin),
-    ("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin),
-    ("model", offset_sr, max_size_sr, arg_sr_bin),
 ]
+if arg_language != "en" and offset_voice_data > 0:
+    files_in.append(("voice_data", offset_voice_data, max_size_voice_data, arg_voice_data_bin))
+files_in.extend([
+    ("model", offset_sr, max_size_sr, arg_sr_bin),
+])
 file_out = arg_output_bin
 
 # Write output file with combined firmware.
@@ -211,7 +242,7 @@ with open(file_out, "wb") as fout:
 
 # Generate .uf2 file if the SoC has native USB.
 if idf_target in ("ESP32S2", "ESP32S3"):
-    sys.path.append(os.path.join(os.path.dirname(__file__), "../micropython/tools"))
+    sys.path.append(str(repo_dir / "micropython" / "tools"))
     import uf2conv
 
     families = uf2conv.load_families()

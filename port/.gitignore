@@ -1,4 +1,6 @@
 dependencies.lock
 managed_components/
 build/
+build_zh/
+build_en/
 .cache/

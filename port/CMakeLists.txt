@@ -14,6 +14,15 @@ if(NOT MICROPY_BOARD)
     set(MICROPY_BOARD mpython_v3)
 endif()
 
+set(MICROPY_LANGUAGE "zh" CACHE STRING "Firmware language (zh or en)")
+set_property(CACHE MICROPY_LANGUAGE PROPERTY STRINGS zh en)
+if(NOT MICROPY_LANGUAGE STREQUAL "zh" AND NOT MICROPY_LANGUAGE STREQUAL "en")
+    message(FATAL_ERROR "MICROPY_LANGUAGE must be zh or en, got: ${MICROPY_LANGUAGE}")
+endif()
+if(MICROPY_LANGUAGE STREQUAL "en" AND NOT MICROPY_BOARD STREQUAL "labplus_Ledong_v2")
+    message(FATAL_ERROR "English firmware is currently available only for labplus_Ledong_v2")
+endif()
+
 # Set the board directory and check that it exists.
 if(NOT MICROPY_BOARD_DIR)
     set(MICROPY_BOARD_DIR ${CMAKE_CURRENT_LIST_DIR}/boards/${MICROPY_BOARD})
@@ -76,21 +85,26 @@ idf_build_set_property(DEPENDENCIES_LOCK lockfiles/dependencies.lock.${IDF_TARGE
 # idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=memp_malloc" APPEND)
 # idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=memp_free" APPEND)
 
-add_custom_target(
-    merge_bin
-    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/makeimg.py" ${MICROPY_BOARD}
-    DEPENDS 
-        ${PROJECT_BIN}
-    VERBATIM
-    COMMAND_EXPAND_LISTS
-    )
-
 # if(MPYTHON_V3_BOARD OR LABPLUS_LEDONG_V2_BOARD)
     set(USER_C_MODULES ${CMAKE_CURRENT_LIST_DIR}/usercmodule/micropython.cmake)
 # endif()
 
 # Define the project.
 project(micropython)
+
+# Package the complete firmware (including LittleFS) as part of the normal build.
+# This is the project's custom merge_bin target, distinct from IDF's merge-bin.
+add_custom_target(
+    merge_bin ALL
+    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/makeimg.py" ${MICROPY_BOARD} ${MICROPY_LANGUAGE}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    VERBATIM
+    COMMAND_EXPAND_LISTS
+)
+add_dependencies(merge_bin app)
+if(TARGET srmodels_bin)
+    add_dependencies(merge_bin srmodels_bin)
+endif()
 
 # Check for lockfile changes and either warn or error depending on build type
 message("Checking lockfile contents...")

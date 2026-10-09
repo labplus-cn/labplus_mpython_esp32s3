@@ -77,6 +77,11 @@ The `install.sh` step only needs to be done once. You will need to source
 Building the firmware
 ---------------------
 
+This repository also supports Chinese and English firmware builds for
+`labplus_Ledong_v2`. Project-specific language selection, filesystem resource
+overlays, and driver locations are documented in
+[中英文固件与资源分布](中英文固件与资源分布.md).
+
 The MicroPython cross-compiler must be built to pre-compile some of the
 built-in scripts to bytecode.  This can be done by (from the root of
 this repository):

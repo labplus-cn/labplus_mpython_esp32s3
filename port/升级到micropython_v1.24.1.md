@@ -261,27 +261,23 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
 
    合并固件
 
-   ESP-IDF 5.x 的 `idf.py` 会把下划线命令 `merge_bin` 归一为内置的
-   `merge-bin`，输出固定名称 `build/merged-binary.bin`。本项目自定义的
-   `merge_bin` 目标会调用 `makeimg.py`，额外打包 LittleFS，并按板卡、版本、
-   提交和日期生成 `.bin` 与 `.uf2` 文件；请在完成对应板卡的 `build` 后使用：
+   项目自定义的 `merge_bin` 已加入默认构建目标。运行一次 `idf.py ... build`，
+   就会在编译完成后自动打包 LittleFS，并生成按板卡、版本、提交、日期和语言
+   命名的 `.bin` 与 `.uf2`；无需再单独运行 `ninja -C build merge_bin`。
+   IDF 自带的 `merge-bin` 只生成 `merged-binary.bin`，不包含本项目额外的文件系统
+   打包流程。
+
+   掌控板 Ledong V2 中文版和英文版使用独立构建目录，避免 sdkconfig 与输出文件互相覆盖：
 
    ```bash
-   idf.py -D MICROPY_BOARD=mpython_v3 build
-   ninja -C build merge_bin
-
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build
-   ninja -C build merge_bin
-
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build
-   ninja -C build merge_bin
-
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build
-   ninja -C build merge_bin
+   idf.py -B build_zh -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=zh build
+   idf.py -B build_en -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=en build
    ```
 
-   命名归档会写入 `build/`，例如
-   `mpython_v3-v1.0-169.g2b5a1a32.dirty-2b5a1a32_2026-08-17.bin`。
+   未指定 `MICROPY_LANGUAGE` 时默认为 `zh`。英文版目前只为 `labplus_Ledong_v2`
+   提供；两套固件分别输出在 `build_zh/` 和 `build_en/` 中。若只需重新打包，仍可
+   从 `port/` 项目目录执行 `ninja -C build_zh merge_bin` 或 `ninja -C build_en merge_bin`。
+   资源覆盖顺序、驱动目录和英文 Logo 的处理见[中英文固件与资源分布](中英文固件与资源分布.md)。
 # 固件烧录
 
 ## wls下linux使用usb转串口

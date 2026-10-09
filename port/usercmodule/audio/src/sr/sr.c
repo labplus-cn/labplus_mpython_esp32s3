@@ -29,7 +29,8 @@ static const char *TAG = "SPEECH";
 
 int wakeup_flag = 0;
 static esp_afe_sr_iface_t *afe_handle = NULL;
-//static esp_afe_sr_data_t *afe_data = NULL;
+static esp_afe_sr_data_t *s_afe_data = NULL;
+static volatile bool wakenet_enabled = true;
 static volatile int task_flag = 0;
 volatile int latest_command_id = 0;
 srmodel_list_t *models = NULL;
@@ -43,66 +44,20 @@ afe_fetch_result_t *afe_result = NULL;
 
 void vad_record()
 {
-    // if (afe_result->vad_state == VAD_SPEECH) {
-    //     if (!recording) {
-    //         silence_counter = 0;
-    //         // 第一次检测到语音，开始录音
-    //         wav_codec = (wav_codec_t*) heap_caps_malloc(sizeof(wav_codec_t), MALLOC_CAP_SPIRAM);
-    //         wav_codec->lfs2_file = vfs_lfs2_file_open(file_path, LFS2_O_WRONLY | LFS2_O_CREAT | LFS2_O_TRUNC);
-    //         recording = true;
-    //         printf("检测到语音，开始录音\n");
-    //     }
-    // }else {  // VAD_SILENCE
-    //     if (recording) {
-    //         silence_counter++;
-    //         if (silence_counter >= SILENCE_THRESHOLD) {
-    //             recording = false;
-    //             vad_record_flag=false;
-    //             silence_counter = 0;
-    //             if (wav_codec) {
-    //                 vfs_lfs2_file_close(wav_codec->lfs2_file);
-    //                 if(wav_codec){
-    //                     heap_caps_free(wav_codec);
-    //                     wav_codec=NULL;
-    //                 }
-    //             }
-    //             printf("检测到静音，停止录音\n");
-    //             // 录音结束，释放信号量
-    //             xSemaphoreGive(recording_done_semaphore);
-    //         }
-    //     }
-    // }
-    // if (recording && wav_codec) {
-    //     if (afe_result->vad_cache_size > 0) {
-    //         printf("写入 vad cache: %d 字节\n",afe_result->vad_cache_size);
-    //         lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
-    //                         &wav_codec->lfs2_file->file,
-    //                         afe_result->vad_cache,
-    //                         afe_result->vad_cache_size);
-    //     }
-    //     if (afe_result->vad_state == 1) {
-    //         lfs2_file_write(&wav_codec->lfs2_file->vfs->lfs,
-    //                         &wav_codec->lfs2_file->file,
-    //                         afe_result->data,
-    //                         afe_result->data_size);
-    //     }
-    // }
 }
 
 //AFE支持两路MIC或一路mic输入，但单路数据少，处理更快，所以用通道转换，把两路mic输入转一路送AFE
-//如果使用双mic送AFE,注释掉所有通道转换相关代码。这种方式，似乎配置成"MM"有问题，需要配置成"M",然后
-//能完配置afe_config->pcm_config相关参数为双通道才行。
-//sr-bak2.c使用esp-gmf pipe实现，但命令词识别响应较慢，找不到原因，暂时用本代码实现。
 void feed_Task(void *arg)
 {
     esp_codec_dev_handle_t codec_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_record_handle();
     assert(codec_dev != NULL);
+    esp_codec_dev_set_in_gain(codec_dev, 35.0);
     esp_afe_sr_data_t *afe_data = arg;
     int audio_chunksize = afe_handle->get_feed_chunksize(afe_data); //返回每通道采样点数
     int nch = afe_handle->get_feed_channel_num(afe_data);
     int i2s_buff_len = audio_chunksize * sizeof(int16_t) * nch * 2; //使用通道转换，因为两路mic输入，数据量增大一倍，再乘2
     // int i2s_buff_len = audio_chunksize * sizeof(int16_t) * nch; 
-    ESP_LOGI("TAG", "buff len: %d", i2s_buff_len);
+    ESP_LOGI(TAG, "buff len: %d", i2s_buff_len);
     int16_t *i2s_buff = heap_caps_malloc(i2s_buff_len,MALLOC_CAP_SPIRAM);
     assert(i2s_buff != NULL);
     int16_t *afe_buff = heap_caps_malloc(i2s_buff_len/2,MALLOC_CAP_SPIRAM);
@@ -121,11 +76,8 @@ void feed_Task(void *arg)
     TEST_ASSERT_NOT_EQUAL(c_handle, NULL);
 
     while (task_flag) {
-        // int64_t us = esp_timer_get_time();
         esp_codec_dev_read(codec_dev, (void *)i2s_buff, i2s_buff_len);
-        // ESP_LOGE("TAG", "time: %lld", esp_timer_get_time() - us);
         esp_ae_ch_cvt_process(c_handle, audio_chunksize, (esp_ae_sample_t)i2s_buff, (esp_ae_sample_t)afe_buff);
-        // afe_handle->feed(afe_data, i2s_buff);
         afe_handle->feed(afe_data, afe_buff);
     }
 
@@ -139,7 +91,11 @@ void detect_Task(void *arg)
 {
     esp_afe_sr_data_t *afe_data = arg;
     int afe_chunksize = afe_handle->get_fetch_chunksize(afe_data);
+#if defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN
+    char *mn_name = esp_srmodel_filter(models, ESP_MN_PREFIX, ESP_MN_ENGLISH);
+#else
     char *mn_name = esp_srmodel_filter(models, ESP_MN_PREFIX, ESP_MN_CHINESE);
+#endif
     // ESP_LOGI(TAG, "multinet:%s", mn_name);
     esp_mn_iface_t *multinet = esp_mn_handle_from_name(mn_name);
     // ESP_LOGI(TAG, "RAM left %lu", esp_get_free_heap_size());
@@ -148,6 +104,7 @@ void detect_Task(void *arg)
     int mu_chunksize = multinet->get_samp_chunksize(model_data);
     assert(mu_chunksize == afe_chunksize);
     multinet_ready = true;  // 通知sr.update()可以安全调用esp_mn_commands_update()
+    wakenet_enabled = true;
 
     // esp_mn_commands_clear();
     // esp_mn_commands_update();
@@ -168,25 +125,41 @@ void detect_Task(void *arg)
             continue;
         }
 
-        if (afe_result->wakeup_state == WAKENET_DETECTED) {
-            ESP_LOGI(TAG, "WAKEWORD DETECTED");
-	        multinet->clean(model_data);
-
-	        if(wakeup_word[0] != '\0'){
-	            text_to_speech(wakeup_word);
-	        }
-
-        }
-
-        if (afe_result->raw_data_channels == 1 && afe_result->wakeup_state == WAKENET_DETECTED) {
-            wakeup_flag = 1;
-        } else if (afe_result->raw_data_channels > 1 && afe_result->wakeup_state == WAKENET_CHANNEL_VERIFIED) {
-            // For a multi-channel AFE, it is necessary to wait for the channel to be verified.
-            ESP_LOGI(TAG, "AFE_FETCH_CHANNEL_VERIFIED, channel index: %d", afe_result->trigger_channel_id);
-            wakeup_flag = 1;
+        // 仅在当前处于未唤醒状态时检测唤醒词
+        if (wakeup_flag == 0) {
+            if (afe_result->raw_data_channels == 1 && afe_result->wakeup_state == WAKENET_DETECTED) {
+                ESP_LOGI(TAG, "WAKEWORD DETECTED");
+                multinet->clean(model_data);
+#if !(defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN)
+                if (wakeup_word[0] != '\0') {
+                    text_to_speech(wakeup_word);
+                }
+#endif
+                afe_handle->disable_wakenet(afe_data);
+                wakenet_enabled = false;
+                wakeup_flag = 1;
+            } else if (afe_result->raw_data_channels > 1 && afe_result->wakeup_state == WAKENET_CHANNEL_VERIFIED) {
+                ESP_LOGI(TAG, "AFE_FETCH_CHANNEL_VERIFIED, channel index: %d", afe_result->trigger_channel_id);
+                multinet->clean(model_data);
+#if !(defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN)
+                if (wakeup_word[0] != '\0') {
+                    text_to_speech(wakeup_word);
+                }
+#endif
+                afe_handle->disable_wakenet(afe_data);
+                wakenet_enabled = false;
+                wakeup_flag = 1;
+            }
         }
 
         if (wakeup_flag == 1) {
+            // 确保在命令词识别阶段禁用唤醒词，释放CPU并防止误触发reset
+            if (wakenet_enabled) {
+                afe_handle->disable_wakenet(afe_data);
+                wakenet_enabled = false;
+                ESP_LOGI(TAG, "[AFE] WakeNet disabled, listening for command... (timeout=%d ms)", timeout);
+            }
+
             esp_mn_state_t mn_state = multinet->detect(model_data, afe_result->data);
 
             if (mn_state == ESP_MN_STATE_DETECTING) {
@@ -195,26 +168,35 @@ void detect_Task(void *arg)
 
             if (mn_state == ESP_MN_STATE_DETECTED) {
                 esp_mn_results_t *mn_result = multinet->get_results(model_data);
-                for (int i = 0; i < mn_result->num; i++) {
-                    ESP_LOGI(TAG, "TOP %d, command_id: %d, phrase_id: %d, string:%s prob: %f",
-                    i+1, mn_result->command_id[i], mn_result->phrase_id[i], mn_result->string, mn_result->prob[i]);
+                if (mn_result) {
+                    ESP_LOGI(TAG, "[MN_DETECTED] Candidates count: %d", mn_result->num);
+                    for (int i = 0; i < mn_result->num; i++) {
+                        ESP_LOGI(TAG, "  -> #%d: cmd_id=%d, phrase_id=%d, prob=%.4f, str='%s'",
+                        i+1, mn_result->command_id[i], mn_result->phrase_id[i], mn_result->prob[i], mn_result->string);
+                    }
+                    if (mn_result->num > 0) {
+                        latest_command_id = mn_result->command_id[0];
+                    }
+                } else {
+                    ESP_LOGI(TAG, "[MN_DETECTED] No result struct returned");
                 }
-                if (mn_result->num > 0) {
-                    latest_command_id = mn_result->command_id[0];
-                    afe_handle->enable_wakenet(afe_data);
-                    wakeup_flag=0;
-                    ESP_LOGI(TAG, "-----------awaits to be waken up-----------");
-                    continue;
-                }
-//                ESP_LOGI(TAG, "-----------listening-----------");
+                // 无论是否匹配到有效命令词，检测结束都必须恢复wakenet并清理multinet，避免卡死
+                afe_handle->enable_wakenet(afe_data);
+                wakenet_enabled = true;
+                wakeup_flag = 0;
+                multinet->clean(model_data);
+                ESP_LOGI(TAG, "-----------awaits to be waken up (WakeNet re-enabled)-----------");
+                continue;
             }
 
             if (mn_state == ESP_MN_STATE_TIMEOUT) {
                 esp_mn_results_t *mn_result = multinet->get_results(model_data);
-                ESP_LOGI(TAG, "timeout, string:%s\n", mn_result->string);
+                ESP_LOGI(TAG, "[MN_TIMEOUT] Timeout reached! partial string='%s'", (mn_result && mn_result->string) ? mn_result->string : "");
                 afe_handle->enable_wakenet(afe_data);
+                wakenet_enabled = true;
                 wakeup_flag = 0;
-                ESP_LOGI(TAG, "-----------awaits to be waken up-----------");
+                multinet->clean(model_data);
+                ESP_LOGI(TAG, "-----------awaits to be waken up (WakeNet re-enabled)-----------");
                 continue;
             }
         }
@@ -227,39 +209,47 @@ void detect_Task(void *arg)
     vTaskDelete(NULL);
 }
 
-void sr_init(const char *word, uint16_t t, bool f)
+void sr_init(const char *word, uint16_t t)
 {
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set(TAG, ESP_LOG_INFO);
+    esp_log_level_set("AFE_SR", ESP_LOG_INFO);
+    esp_log_level_set("AFE", ESP_LOG_INFO);
+    esp_log_level_set("ESP_MN", ESP_LOG_INFO);
+    esp_log_level_set("MULTINET", ESP_LOG_INFO);
+
     if (word && word[0] != '\0') {
         strncpy(wakeup_word, word, sizeof(wakeup_word) - 1);
         wakeup_word[sizeof(wakeup_word) - 1] = '\0';  // 确保字符串以 '\0' 结尾
     }
     timeout = t;
 
+    ESP_LOGI(TAG, "sr_init: timeout=%d, wakeup_word='%s'", timeout, wakeup_word);
+
     // bsp_codec_dev_open(16000, 1, 16, CODEC_INPUT);
     models = esp_srmodel_init("model");
 
     afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
-    // afe_config->pcm_config.total_ch_num = 2;
-    // afe_config->pcm_config.mic_num = 2;
-    // afe_config->pcm_config.ref_num = 0;
-    // afe_config->pcm_config.sample_rate = 16000;
-    // afe_config_print(afe_config);
     afe_config->afe_ringbuf_size = 50;  // 增大ring buffer，避免multinet推理慢导致feed buffer溢出
     afe_handle = esp_afe_handle_from_config(afe_config);
 
     esp_afe_sr_data_t *afe_data = afe_handle->create_from_config(afe_config);
-//    afe_handle->disable_vad(afe_data);
     afe_handle->disable_aec(afe_data);
     afe_config_free(afe_config);
 
+#if !(defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN)
     if (word && word[0] != '\0') {
         model_init();  // 提前初始化TTS，避免首次唤醒时阻塞detect_Task导致AFE ring buffer溢出
     }
+#endif
 
+    s_afe_data = afe_data;
+    wakenet_enabled = true;
     task_flag = 1;
 
-    xTaskCreatePinnedToCore(detect_Task, "detect", 4 * 1024, (void*)afe_data, 10, NULL, 1);
+    xTaskCreatePinnedToCore(detect_Task, "detect", 8 * 1024, (void*)afe_data, 5, NULL, 1);
     xTaskCreatePinnedToCore(feed_Task, "feed", 4 * 1024, (void*)afe_data, 5, NULL, 0);
+    ESP_LOGI(TAG, "sr_init: tasks created successfully");
 }
 int get_latest_command_id(void) {
     return latest_command_id;
@@ -270,8 +260,14 @@ int get_wakeup_flag(void) {
 
 void set_wakeup_flag(void) {
     if(wakeup_flag == 0){
+#if !(defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN)
         if(wakeup_word[0] != '\0'){
             text_to_speech(wakeup_word);
+        }
+#endif
+        if (afe_handle && s_afe_data) {
+            afe_handle->disable_wakenet(s_afe_data);
+            wakenet_enabled = false;
         }
         wakeup_flag = 1;
     }
