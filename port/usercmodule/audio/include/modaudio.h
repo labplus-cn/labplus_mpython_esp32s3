@@ -31,4 +31,9 @@ extern const mp_obj_module_t tts_module;
 extern const mp_obj_module_t sr_module;
 // extern const mp_obj_module_t baidu_tts_module;
 
+#include "esp_err.h"
+#include <stdbool.h>
+esp_err_t audio_play_prompt_file(const char *path);
+bool audio_prompt_is_playing(void);
+
 #endif //__MODAUDIO_H_

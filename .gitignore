@@ -23,3 +23,6 @@ port/tests/test_codexpad_mac.py
 port/lockfiles/dependencies.lock.esp32s3
 port/tests/test_k230_voice_lists.py
 port/littlefs.bin
+port/build_en/*
+port/build_mpython_v3_en/*
+port/lockfiles/dependencies.lock.esp32s3

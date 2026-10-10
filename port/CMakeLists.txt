@@ -19,8 +19,8 @@ set_property(CACHE MICROPY_LANGUAGE PROPERTY STRINGS zh en)
 if(NOT MICROPY_LANGUAGE STREQUAL "zh" AND NOT MICROPY_LANGUAGE STREQUAL "en")
     message(FATAL_ERROR "MICROPY_LANGUAGE must be zh or en, got: ${MICROPY_LANGUAGE}")
 endif()
-if(MICROPY_LANGUAGE STREQUAL "en" AND NOT MICROPY_BOARD STREQUAL "labplus_Ledong_v2")
-    message(FATAL_ERROR "English firmware is currently available only for labplus_Ledong_v2")
+if(MICROPY_LANGUAGE STREQUAL "en" AND NOT MICROPY_BOARD STREQUAL "labplus_Ledong_v2" AND NOT MICROPY_BOARD STREQUAL "mpython_v3")
+    message(FATAL_ERROR "English firmware is available only for labplus_Ledong_v2 and mpython_v3")
 endif()
 
 # Set the board directory and check that it exists.

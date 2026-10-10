@@ -3,42 +3,39 @@ from audio import sr
 from mpython import *
 import time
 
-# In English firmware, WakeNet uses "Hi ESP" wake word.
-# Initialize audio player for prompt tone
-audio.player_init()
-audio.set_volume(80)
-
-# Wakeup timeout is set to 6000ms.
+# In English firmware:
+# 1. Wake words supported simultaneously: "Hi, ESP" and "Alexa".
+# 2. sr.init() automatically plays "im_here_16k.mp3" when woken up (no extra user code needed!).
+# 3. Timeout is set to 6000ms.
 sr.init(timeout=6000)
 
-sr.add(1, 'turn on the light')
-sr.add(2, 'turn off the light')
-sr.add(3, 'play music')
-sr.add(4, 'stop music')
+# Recommended English commands (smooth acoustics, highest accuracy):
+sr.add(1, 'turn on')
+sr.add(2, 'turn off')
+sr.add(3, 'play')
+sr.add(4, 'stop')
 sr.update()
-print('Speech recognition ready! Please say: "Hi, ESP"')
+
+print('Speech recognition ready! Please say: "Hi, ESP" or "Alexa"')
 
 def on_button_a_pressed(_):
+    # Press Button A to trigger wakeup manually (also auto-plays prompt sound!)
     sr.trigger_wakeup()
 
 button_a.event_pressed = on_button_a_pressed
 
-last_woken = False
-
 while True:
-    is_woken = bool(sr.get_wakeup_flag())
-    if is_woken and not last_woken:
-        print("[Woken Up] 'Hi, ESP' detected! Playing 'I'm here'...")
-        audio.play('im_here_16k.mp3')
-    last_woken = is_woken
-
-    res = sr.get_latest_id()
-    if res == 1:
-        print('--> Command 1 detected: turn on the light')
-    elif res == 2:
-        print('--> Command 2 detected: turn off the light')
-    elif res == 3:
-        print('--> Command 3 detected: play music')
-    elif res == 4:
-        print('--> Command 4 detected: stop music')
+    cmd = sr.get_latest_id()
+    if cmd == 1:
+        print('--> Command 1: turn on')
+        rgb.fill((255, 0, 0))
+        rgb.write()
+    elif cmd == 2:
+        print('--> Command 2: turn off')
+        rgb.fill((0, 0, 0))
+        rgb.write()
+    elif cmd == 3:
+        print('--> Command 3: play')
+    elif cmd == 4:
+        print('--> Command 4: stop')
     time.sleep_ms(100)

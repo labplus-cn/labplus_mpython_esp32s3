@@ -28,21 +28,25 @@ static mp_obj_t mp_sr_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw
 {
     enum { ARG_wakeup, ARG_timeout };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_wakeup_word, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },  // 唤醒应答词
-        { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 6000} },              // 超时时间
+        { MP_QSTR_wakeup_word, MP_ARG_OBJ, {.u_obj = mp_const_none} },  // 唤醒应答词
+        { MP_QSTR_timeout, MP_ARG_INT, {.u_int = 6000} },              // 超时时间
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     const char *word = NULL;  // 默认唤醒词
-    if (args[0].u_obj != mp_const_none) {
-        word = mp_obj_str_get_str(args[0].u_obj);
+    uint16_t t = args[ARG_timeout].u_int;
+
+    if (args[ARG_wakeup].u_obj != mp_const_none) {
+        if (mp_obj_is_int(args[ARG_wakeup].u_obj) && n_args == 1 && kw_args->used == 0) {
+            // 用户直接传整数（如 sr.init(10000)），视作超时时间
+            t = mp_obj_get_int(args[ARG_wakeup].u_obj);
+        } else if (mp_obj_is_str(args[ARG_wakeup].u_obj)) {
+            word = mp_obj_str_get_str(args[ARG_wakeup].u_obj);
+        }
     }
 
-    uint16_t t = args[1].u_int;
-
     sr_init(word, t);
-    // test();
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(mp_sr_init_obj, 0, mp_sr_init);
@@ -80,6 +84,7 @@ static mp_obj_t mp_esp_mn_commands_update(void) {
     ESP_LOGI("SPEECH", "sr.update: updating speech commands FST...");
     esp_mn_commands_update();
     ESP_LOGI("SPEECH", "sr.update: FST update completed");
+    sr_print_active_commands();
     pending_clear = true;
     return mp_const_none;
 }
@@ -113,6 +118,12 @@ static mp_obj_t mp_sr_get_wakeup_flag(void) {
     return mp_obj_new_int(cmd_id);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_get_wakeup_flag_obj, mp_sr_get_wakeup_flag);
+
+static mp_obj_t mp_sr_reset_latest_command_id(void) {
+    reset_latest_command_id();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_sr_reset_latest_command_id_obj, mp_sr_reset_latest_command_id);
 
 // 触发唤醒
 static mp_obj_t mp_sr_trigger_wakeup(void) {
@@ -171,6 +182,7 @@ static const mp_rom_map_elem_t sr_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_update), MP_ROM_PTR(&mp_esp_mn_commands_update_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_callback),     MP_ROM_PTR(&mp_sr_set_callback_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_latest_id),    MP_ROM_PTR(&mp_sr_get_latest_command_id_obj) },
+    { MP_ROM_QSTR(MP_QSTR_reset_latest_id),  MP_ROM_PTR(&mp_sr_reset_latest_command_id_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_wakeup_flag),    MP_ROM_PTR(&mp_sr_get_wakeup_flag_obj) },
     { MP_ROM_QSTR(MP_QSTR_trigger_wakeup),    MP_ROM_PTR(&mp_sr_trigger_wakeup_obj) },
     // { MP_ROM_QSTR(MP_QSTR_trigger_sleep),    MP_ROM_PTR(&mp_sr_trigger_sleep_obj) },

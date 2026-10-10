@@ -16,7 +16,6 @@ anim_imgs = [
     'ui/assets/light-pic2.png',
 ]
 play_time = time.time() - 16
-last_woken = False
 
 # 初始化
 audio.player_init()
@@ -31,7 +30,7 @@ def gui_back_cb(e):
     change_route('home', destroy)
 
 def lv_timer_cb(timer):
-    global img_index, play_time, last_woken
+    global img_index, play_time
     if not timer_flag:
         timer.delete()
     else:
@@ -41,13 +40,6 @@ def lv_timer_cb(timer):
         gui.draw_img(38, 106, anim_imgs[img_index], 244, 46)
         gui.update()
         img_index = 0 if img_index >= 3 else img_index + 1
-        
-        # 唤醒提示音
-        is_woken = bool(sr.get_wakeup_flag())
-        if is_woken and not last_woken:
-            audio.set_volume(80)
-            audio.play('im_here_16k.mp3')
-        last_woken = is_woken
 
         res=sr.get_latest_id()
         if res:

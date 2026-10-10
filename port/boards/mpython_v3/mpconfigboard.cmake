@@ -12,6 +12,10 @@ set(SDKCONFIG_DEFAULTS
     # boards/mpython_v3/sdkconfig.usb
 )
 
+if(MICROPY_LANGUAGE STREQUAL "en")
+    list(APPEND SDKCONFIG_DEFAULTS boards/mpython_v3/sdkconfig.en)
+endif()
+
 if(NOT MPY_PORT_DIR)
     get_filename_component(MPY_PORT_DIR ${CMAKE_CURRENT_LIST_DIR}/../.. ABSOLUTE)
 endif()

@@ -93,7 +93,9 @@ def littlefs_bin_park(port_dir, build_dir, board_name, language, size):
     file_system_dir = port_dir / "file_system"
     sources = [file_system_dir / "common", file_system_dir / board_name]
     if language == "en":
-        sources.append(port_dir / "en" / board_name)
+        # The mpython_v3 English UI was supplied under its product name.
+        english_resource_name = "labplus_mpython_pro" if board_name == "mpython_v3" else board_name
+        sources.append(port_dir / "en" / english_resource_name)
 
     for source in sources:
         if not source.is_dir():

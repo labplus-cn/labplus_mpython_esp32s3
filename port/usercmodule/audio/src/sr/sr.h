@@ -14,6 +14,7 @@ void reset_latest_command_id(void);
 int get_wakeup_flag(void);
 void set_wakeup_flag(void);
 void wait_for_multinet_ready(void);  // 阻塞直到multinet初始化完成，sr.update()调用前需先调用此函数
+void sr_print_active_commands(void);
 
 // // 触发唤醒
 // void sr_trigger_wakeup(void);

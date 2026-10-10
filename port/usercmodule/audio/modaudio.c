@@ -79,6 +79,13 @@ static int in_data_callback(uint8_t *data, int data_size, void *ctx)
     return ret;
 }
 
+static volatile bool s_prompt_playing = false;
+
+bool audio_prompt_is_playing(void)
+{
+    return s_prompt_playing;
+}
+
 static int mock_event_callback(esp_asp_event_pkt_t *event, void *ctx)
 {
     if (event->type == ESP_ASP_EVENT_TYPE_MUSIC_INFO) {
@@ -89,6 +96,11 @@ static int mock_event_callback(esp_asp_event_pkt_t *event, void *ctx)
         esp_asp_state_t st = 0;
         memcpy(&st, event->payload, event->payload_size);
         ESP_LOGW(TAG, "Get State, %d,%s", st, esp_audio_simple_player_state_to_str(st));
+        if ((st == ESP_ASP_STATE_STOPPED) || (st == ESP_ASP_STATE_FINISHED) || (st == ESP_ASP_STATE_ERROR)) {
+            s_prompt_playing = false;
+        } else if (st == ESP_ASP_STATE_RUNNING) {
+            s_prompt_playing = true;
+        }
         if (ctx && ((st == ESP_ASP_STATE_STOPPED) || (st == ESP_ASP_STATE_FINISHED) || (st == ESP_ASP_STATE_ERROR))) {
             xSemaphoreGive((SemaphoreHandle_t)ctx);
         }
@@ -231,6 +243,85 @@ static mp_obj_t audio_play(mp_obj_t uri)
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(audio_play_obj, audio_play);
+
+esp_err_t audio_play_prompt_file(const char *path)
+{
+    if (path == NULL || path[0] == '\0') {
+        return ESP_OK;
+    }
+
+    if (!lfs_isRegist) {
+        esp_vfs_littlefs_conf_t conf = {
+            .base_path = "/littlefs",
+            .partition_label = "vfs",
+            .format_if_mount_failed = false,
+            .dont_mount = false,
+        };
+        esp_err_t ret = esp_vfs_littlefs_register(&conf);
+        if (ret == ESP_OK) {
+            lfs_isRegist = true;
+        }
+    }
+
+    if (esp_gmf_app_get_playback_handle() == NULL) {
+        esp_gmf_app_codec_info_t codec_info = ESP_GMF_APP_CODEC_INFO_DEFAULT();
+        codec_info.play_info.sample_rate = 16000;
+        codec_info.play_info.channel = 2;
+        codec_info.play_info.bits_per_sample = 16;
+        codec_info.record_info = codec_info.play_info;
+        esp_gmf_app_setup_codec_dev(&codec_info);
+    }
+
+    if (player_handle == NULL) {
+        esp_asp_cfg_t cfg = {
+            .out.cb = out_data_callback,
+            .out.user_ctx = esp_gmf_app_get_playback_handle(),
+            .task_prio = 5,
+        };
+        esp_gmf_err_t err = esp_audio_simple_player_new(&cfg, &player_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "audio_play_prompt_file: failed to create player (%d)", err);
+            return ESP_FAIL;
+        }
+        esp_audio_simple_player_set_event(player_handle, mock_event_callback, NULL);
+        esp_codec_dev_handle_t playback_dev = (esp_codec_dev_handle_t)esp_gmf_app_get_playback_handle();
+        if (playback_dev) {
+            esp_codec_dev_set_out_vol(playback_dev, 80);
+        }
+    }
+
+    esp_asp_state_t state = ESP_ASP_STATE_NONE;
+    if (esp_audio_simple_player_get_state(player_handle, &state) == ESP_OK) {
+        if (state == ESP_ASP_STATE_RUNNING || state == ESP_ASP_STATE_PAUSED) {
+            esp_audio_simple_player_stop(player_handle);
+        }
+    }
+
+    char file_path[128];
+    if (path[0] == '/') {
+        snprintf(file_path, sizeof(file_path), "%s", path);
+    } else {
+        snprintf(file_path, sizeof(file_path), "/littlefs/%s", path);
+    }
+
+    FILE *f = fopen(file_path, "rb");
+    if (!f) {
+        ESP_LOGW(TAG, "Prompt file not found: %s", file_path);
+        return ESP_ERR_NOT_FOUND;
+    }
+    fclose(f);
+
+    char full_uri[144];
+    snprintf(full_uri, sizeof(full_uri), "file:/%s", file_path);
+    ESP_LOGI(TAG, "Playing wakeup prompt: %s", full_uri);
+    s_prompt_playing = true;
+    esp_gmf_err_t err = esp_audio_simple_player_run(player_handle, full_uri, NULL);
+    if (err != ESP_OK) {
+        s_prompt_playing = false;
+        return (esp_err_t)err;
+    }
+    return ESP_OK;
+}
 
 static mp_obj_t audio_pause(void)
 {

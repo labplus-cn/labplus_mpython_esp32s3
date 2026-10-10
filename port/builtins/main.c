@@ -66,7 +66,15 @@
 #include "dev_display_lcd.h"
 
 #if defined(MPYTHON_LANGUAGE_EN)
+#if CONFIG_MPYTHON_V3_BOARD
+#include "logo_mpython_v3_en.h"
+#define MPYTHON_EN_LOGO logo_mpython_v3_en
+#elif CONFIG_LABPLUS_LEDONG_V2_BOARD
 #include "logo_labplus_Ledong_v2_en.h"
+#define MPYTHON_EN_LOGO logo_labplus_Ledong_v2_en
+#else
+#error "English boot logo is not available for this board"
+#endif
 #endif
 
 #if MICROPY_BLUETOOTH_NIMBLE
@@ -108,7 +116,7 @@ void mp_task(void *pvParameter) {
     #if MICROPY_PY_THREAD
     mp_thread_init(pxTaskGetStackStart(NULL), MICROPY_TASK_STACK_SIZE / sizeof(uintptr_t));
     #endif
-    // esp_log_level_set("*", ESP_LOG_ERROR);
+    esp_log_level_set("*", ESP_LOG_ERROR);
     #if MICROPY_HW_ESP_USB_SERIAL_JTAG
     usb_serial_jtag_init();
     #elif MICROPY_HW_ENABLE_USBDEV
@@ -151,7 +159,7 @@ soft_reset:
     dev_display_lcd_handles_t *disp_handle;
     esp_board_manager_get_device_handle("display_lcd", (void **)&disp_handle);
 #if defined(MPYTHON_LANGUAGE_EN)
-    memcpy(disp_handle->lcd_buf, logo_labplus_Ledong_v2_en, sizeof(logo_labplus_Ledong_v2_en));
+    memcpy(disp_handle->lcd_buf, MPYTHON_EN_LOGO, sizeof(MPYTHON_EN_LOGO));
     lcd_draw_image(disp_handle, 0, 0, 320, 172, disp_handle->lcd_buf);
 #else
     lcd_draw_logo(disp_handle);

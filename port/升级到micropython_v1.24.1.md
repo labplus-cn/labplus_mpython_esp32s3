@@ -267,16 +267,18 @@ linux系统按乐鑫要求安装一些库，安装gcc cmake
    IDF 自带的 `merge-bin` 只生成 `merged-binary.bin`，不包含本项目额外的文件系统
    打包流程。
 
-   掌控板 Ledong V2 中文版和英文版使用独立构建目录，避免 sdkconfig 与输出文件互相覆盖：
+   Ledong V2 与 mpython_v3 的中文版和英文版各使用独立构建目录，避免 sdkconfig 与输出文件互相覆盖：
 
    ```bash
-   idf.py -B build_zh -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=zh build
-   idf.py -B build_en -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=en build
+   idf.py -B build_ledong_v2_zh -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=zh build
+   idf.py -B build_ledong_v2_en -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=en build
+   idf.py -B build_mpython_v3_zh -D MICROPY_BOARD=mpython_v3 -D MICROPY_LANGUAGE=zh build
+   idf.py -B build_mpython_v3_en -D MICROPY_BOARD=mpython_v3 -D MICROPY_LANGUAGE=en build
    ```
 
-   未指定 `MICROPY_LANGUAGE` 时默认为 `zh`。英文版目前只为 `labplus_Ledong_v2`
-   提供；两套固件分别输出在 `build_zh/` 和 `build_en/` 中。若只需重新打包，仍可
-   从 `port/` 项目目录执行 `ninja -C build_zh merge_bin` 或 `ninja -C build_en merge_bin`。
+   未指定 `MICROPY_LANGUAGE` 时默认为 `zh`。英文版目前支持 `labplus_Ledong_v2`
+   和 `mpython_v3`，后者沿用 `port/en/labplus_mpython_pro/` 的英文资源。若只需重新打包，
+   可从 `port/` 项目目录执行 `ninja -C <对应构建目录> merge_bin`。
    资源覆盖顺序、驱动目录和英文 Logo 的处理见[中英文固件与资源分布](中英文固件与资源分布.md)。
 # 固件烧录
 
