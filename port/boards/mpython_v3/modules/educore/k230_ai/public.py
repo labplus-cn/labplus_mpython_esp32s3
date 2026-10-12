@@ -2,6 +2,11 @@ import gc
 import _thread
 import time
 
+try:
+    from firmware_language import IS_ENGLISH
+except ImportError:
+    IS_ENGLISH = False  # Standalone driver copies default to Chinese.
+
 DISPLAY_WIDTH = 544
 DISPLAY_HEIGHT = 368
 DEFAULT_MODE = 0 # 默认UI
@@ -49,13 +54,44 @@ FACTORY_MODE = 99
 
 # OBJ_TYPE = ['飞机','自行车','鸟','船','瓶子','公交车','汽车','猫','椅子','奶牛','餐桌','狗','屋子','摩托','人','盆栽','羊','沙发','火车','电视']
 
-YOLO80_ZH = ["人","自行车","汽车","摩托车","飞机","公共汽车","火车","卡车","船","交通灯","消防栓","停车标志","泊车计时器","长椅","鸟","猫","狗","马","绵羊","奶牛","大象","熊","斑马","长颈鹿","背包","雨伞","手提包","领带","手提箱","飞盘","滑雪板","运动球","风筝","棒球","蝙蝠","棒球手套","滑板","冲浪板","网球拍","瓶子","酒杯","杯子","叉子","刀","勺子","碗","香蕉","苹果","三明治","橙子","西兰花","胡萝卜","热狗","披萨","甜甜圈","蛋糕","椅子","沙发","盆栽","床","餐桌","厕所","电视","笔记本电脑","鼠标","遥控器","键盘","手机","微波炉","烤箱","烤面包机", "水槽","冰箱","书籍","时钟","花瓶","剪刀","泰迪熊","吹风机","牙刷"] 
-HAND_KEYPOINT_CLASS_GESTURE = ['fist','five','gun','love','one','six','three','thumbUp','yeah']
+YOLO80_ZH = ["人","自行车","汽车","摩托车","飞机","公共汽车","火车","卡车","船","交通灯","消防栓","停车标志","泊车计时器","长椅","鸟","猫","狗","马","绵羊","奶牛","大象","熊","斑马","长颈鹿","背包","雨伞","手提包","领带","手提箱","飞盘","滑雪板","单板滑雪板","运动球","风筝","棒球棒","棒球手套","滑板","冲浪板","网球拍","瓶子","酒杯","杯子","叉子","刀","勺子","碗","香蕉","苹果","三明治","橙子","西兰花","胡萝卜","热狗","披萨","甜甜圈","蛋糕","椅子","沙发","盆栽","床","餐桌","厕所","电视","笔记本电脑","鼠标","遥控器","键盘","手机","微波炉","烤箱","烤面包机", "水槽","冰箱","书籍","时钟","花瓶","剪刀","泰迪熊","吹风机","牙刷"]
+YOLO80_EN = ["person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light","fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch","potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"]
+HAND_KEYPOINT_CLASS_GESTURE_ZH = ['握拳','五指','手枪','比心','一','六','三','点赞','胜利手势']
+HAND_KEYPOINT_CLASS_GESTURE_EN = ['fist','five','gun','love','one','six','three','thumbUp','yeah']
 FACE_LANDMARK_EXPRESSION_ZH = ['正常','开心','伤心','惊讶','生气']
-DYNAMIC_GESTURE_STR = ['上','下','左','右'] 
+FACE_LANDMARK_EXPRESSION_EN = ['normal','happy','sad','surprised','angry']
+DYNAMIC_GESTURE_STR_ZH = ['上','下','左','右']
+DYNAMIC_GESTURE_STR_EN = ['up','down','left','right']
 
 
-MODE=['默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
+MODE_ZH = ['默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
+MODE_EN = ['default','digit recognition','object recognition','face detection','face recognition','self-learning classification','color recognition','QR code recognition','speech recognition','traffic sign recognition','KPU custom model','color block recognition','image processing','LAB color extractor','AprilTag']
+
+USE_ENGLISH_VOICE = IS_ENGLISH
+YOLO80_LABELS = []
+HAND_KEYPOINT_CLASS_GESTURE = []
+FACE_LANDMARK_EXPRESSION_LABELS = []
+DYNAMIC_GESTURE_STR = []
+MODE = []
+
+
+def set_voice_language(use_english):
+    """Switch result labels without invalidating existing list references."""
+    global USE_ENGLISH_VOICE
+    USE_ENGLISH_VOICE = bool(use_english)
+    if USE_ENGLISH_VOICE:
+        labels = (YOLO80_EN, HAND_KEYPOINT_CLASS_GESTURE_EN,
+                  FACE_LANDMARK_EXPRESSION_EN, DYNAMIC_GESTURE_STR_EN, MODE_EN)
+    else:
+        labels = (YOLO80_ZH, HAND_KEYPOINT_CLASS_GESTURE_ZH,
+                  FACE_LANDMARK_EXPRESSION_ZH, DYNAMIC_GESTURE_STR_ZH, MODE_ZH)
+    for target, source in zip(
+            (YOLO80_LABELS, HAND_KEYPOINT_CLASS_GESTURE,
+             FACE_LANDMARK_EXPRESSION_LABELS, DYNAMIC_GESTURE_STR, MODE), labels):
+        target[:] = source
+
+
+set_voice_language(USE_ENGLISH_VOICE)
 
 AI ={
     'reset':[0xff, 0x01, 0x02],

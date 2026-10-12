@@ -6,7 +6,7 @@ class YOLO80(object):
     '''物体识别'''
     def __init__(self, uart):
         self.uart = uart
-        self.category_list = YOLO80_ZH
+        self.category_list = YOLO80_LABELS
         self.id = None
         self.max_score = 0
         self.objnum = 0
@@ -245,7 +245,7 @@ class FaceExpressionDetct(object):
         self.uart = uart
         self.CommandList = AI['FACE_LANDMARK_EXPRESSION']
         self.expression = 0
-        self.expression_str = FACE_LANDMARK_EXPRESSION_ZH[0]
+        self.expression_str = FACE_LANDMARK_EXPRESSION_LABELS[0]
         self.lock = False
         AI_Uart_CMD(uart=self.uart, cmd=self.CommandList[0], cmd_type=self.CommandList[1])
         time.sleep(0.5)

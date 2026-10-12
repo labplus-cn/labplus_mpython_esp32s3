@@ -1047,3 +1047,19 @@ def uuid():
 
     return uuid
 
+
+"""
+获取当前时间，flag=0 返回日期，flag=1 返回时间
+"""
+def RTCdate(flag):
+   from machine import RTC
+   rtc = RTC()
+   dt = rtc.datetime()
+   date_str = "{}年{}月{}日".format(dt[0],dt[1],dt[2])
+   time_str = "{}时:{}分:{}秒".format(dt[4],dt[5],dt[6])
+#    date_str = "{}Year{}Month{}Day".format(dt[0],dt[1],dt[2])
+#    time_str = "{}Hour:{}Minute:{}Second".format(dt[4],dt[5],dt[6])
+   if flag == 0:
+       return date_str
+   else:
+       return time_str

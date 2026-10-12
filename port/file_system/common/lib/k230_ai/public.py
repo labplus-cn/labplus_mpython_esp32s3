@@ -2,6 +2,11 @@ import gc
 import _thread
 import time
 
+try:
+    from firmware_language import IS_ENGLISH
+except ImportError:
+    IS_ENGLISH = False  # Standalone copies without a generated firmware config.
+
 DISPLAY_WIDTH = 544
 DISPLAY_HEIGHT = 368
 
@@ -78,7 +83,7 @@ DYNAMIC_GESTURE_STR_EN = ['up', 'down', 'left', 'right']
 MODE_ZH = ['默认','数字识别','物体识别','人脸检测','人脸识别','自学习分类','颜色识别','二维码识别','语音识别','交通标志识别','KPU自定义模型','寻找色块识别','图像处理','LAB颜色提取器','AprilTag']
 MODE_EN = ['default', 'digit recognition', 'object recognition', 'face detection', 'face recognition', 'self-learning classification', 'color recognition', 'QR code recognition', 'speech recognition', 'traffic sign recognition', 'KPU custom model', 'color block recognition', 'image processing', 'LAB color extractor', 'AprilTag']
 
-USE_ENGLISH_VOICE = True  # False 使用中文，True 使用英文
+USE_ENGLISH_VOICE = IS_ENGLISH  # Build default; set_voice_language() may override it.
 YOLO80_LABELS = []
 YOLO80 = YOLO80_LABELS
 HAND_KEYPOINT_CLASS_GESTURE = []

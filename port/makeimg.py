@@ -5,10 +5,11 @@ import argparse
 import datetime
 import subprocess
 import os
-import shutil
 import sys
 import tempfile
 from pathlib import Path
+
+from filesystem_image import stage_file_system
 
 idf_path = os.getenv("IDF_PATH")
 if not idf_path:
@@ -90,24 +91,11 @@ def load_partition_table(filename):
         return gen_esp32part.PartitionTable.from_binary(f.read())
 
 def littlefs_bin_park(port_dir, build_dir, board_name, language, size):
-    file_system_dir = port_dir / "file_system"
-    sources = [file_system_dir / "common", file_system_dir / board_name]
-    if language == "en":
-        # The mpython_v3 English UI was supplied under its product name.
-        english_resource_name = "labplus_mpython_pro" if board_name == "mpython_v3" else board_name
-        sources.append(port_dir / "en" / english_resource_name)
-
-    for source in sources:
-        if not source.is_dir():
-            raise FileNotFoundError("File-system source directory not found: {}".format(source))
-
     # A fresh staging directory prevents stale files from earlier builds leaking
     # into this firmware image. The English tree overlays common and board files.
     with tempfile.TemporaryDirectory(prefix="makeimg-filesystem-", dir=str(build_dir)) as temp_dir:
         staging_dir = Path(temp_dir) / "file_system"
-        staging_dir.mkdir()
-        for source in sources:
-            shutil.copytree(str(source), str(staging_dir), dirs_exist_ok=True)
+        stage_file_system(port_dir, board_name, language, staging_dir)
 
         subprocess.run(
             [str(port_dir / "mklittlefs"), "-c", str(staging_dir), "-s", str(size), str(build_dir / "littlefs.bin")],
