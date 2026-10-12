@@ -7,6 +7,12 @@ try:
 except ImportError:
     IS_ENGLISH = False  # Standalone copies without a generated firmware config.
 
+try:
+    from mpython_i18n import print_i18n as _print_i18n
+except ImportError:
+    def _print_i18n(chinese, english, *args, **kwargs):
+        print(english if IS_ENGLISH else chinese, *args, **kwargs)
+
 DISPLAY_WIDTH = 544
 DISPLAY_HEIGHT = 368
 
@@ -87,7 +93,8 @@ USE_ENGLISH_VOICE = IS_ENGLISH  # Build default; set_voice_language() may overri
 YOLO80_LABELS = []
 YOLO80 = YOLO80_LABELS
 HAND_KEYPOINT_CLASS_GESTURE = []
-FACE_LANDMARK_EXPRESSION = []
+FACE_LANDMARK_EXPRESSION_LABELS = []
+FACE_LANDMARK_EXPRESSION_STR = FACE_LANDMARK_EXPRESSION_LABELS
 DYNAMIC_GESTURE_STR = []
 MODE = []
 
@@ -96,7 +103,7 @@ def set_voice_language(use_english):
     """通过 if/else 切换当前识别结果的中文或英文文本。"""
     global USE_ENGLISH_VOICE
     global YOLO80_LABELS, HAND_KEYPOINT_CLASS_GESTURE
-    global FACE_LANDMARK_EXPRESSION, DYNAMIC_GESTURE_STR, MODE
+    global FACE_LANDMARK_EXPRESSION_LABELS, DYNAMIC_GESTURE_STR, MODE
 
     USE_ENGLISH_VOICE = bool(use_english)
     if USE_ENGLISH_VOICE:
@@ -115,7 +122,7 @@ def set_voice_language(use_english):
     # 原地更新，保证已经持有这些列表引用的对象也能看到语言切换结果。
     YOLO80_LABELS[:] = selected_yolo80
     HAND_KEYPOINT_CLASS_GESTURE[:] = selected_hand_gesture
-    FACE_LANDMARK_EXPRESSION[:] = selected_expression
+    FACE_LANDMARK_EXPRESSION_LABELS[:] = selected_expression
     DYNAMIC_GESTURE_STR[:] = selected_dynamic_gesture
     MODE[:] = selected_mode
 
@@ -197,12 +204,15 @@ def uart_handle(uart, rx_buf=None):
                 # 否则调用方持有的持久化 bytearray 不会同步更新。
                 if len(rx_buf) > MAX_BUF_SIZE:
                     if DEBUG:
-                        print("[UART] 缓冲区超限({} > {})，清空".format(len(rx_buf), MAX_BUF_SIZE))
+                        _print_i18n(
+                            "[UART] 缓冲区超限({} > {})，清空".format(len(rx_buf), MAX_BUF_SIZE),
+                            "[UART] RX buffer overflow ({} > {}); cleared".format(len(rx_buf), MAX_BUF_SIZE),
+                        )
                     # 当前固件的 bytearray 不支持 del，使用切片赋值原地清空。
                     rx_buf[:] = b""
     except Exception as e:
         if DEBUG:
-            print("[UART] 读取异常: {}".format(e))
+            _print_i18n("[UART] 读取异常: {}".format(e), "[UART] Read error: {}".format(e))
         return None
 
     while True:
@@ -213,7 +223,10 @@ def uart_handle(uart, rx_buf=None):
         # 检查包头
         if not (rx_buf[0] == 0xBB and rx_buf[1] == 0xAA):
             if DEBUG:
-                print("[UART] 丢弃无效字节: 0x{:02X}".format(rx_buf[0]))
+                _print_i18n(
+                    "[UART] 丢弃无效字节: 0x{:02X}".format(rx_buf[0]),
+                    "[UART] Dropping invalid byte: 0x{:02X}".format(rx_buf[0]),
+                )
             rx_buf[:] = rx_buf[1:]
             continue
 
@@ -224,20 +237,26 @@ def uart_handle(uart, rx_buf=None):
             total_len = 12
             if len(rx_buf) < total_len:
                 if DEBUG:
-                    print("[UART] 等待 0x01 包数据到齐")
+                    _print_i18n("[UART] 等待 0x01 包数据到齐", "[UART] Waiting for 0x01 packet data")
                 break
             pkt = bytes(rx_buf[:total_len])
             checksum = CheckCode(pkt[:11])  # 校验包头+命令+数据(共11字节)
             if DEBUG:
-                print("[UART] 解析到 0x01 包: " + pkt.hex(' ').upper())
+                _print_i18n(
+                    "[UART] 解析到 0x01 包: " + pkt.hex(' ').upper(),
+                    "[UART] Parsed 0x01 packet: " + pkt.hex(' ').upper(),
+                )
             if checksum == pkt[11]:
                 if DEBUG:
-                    print("[UART] 校验成功")
+                    _print_i18n("[UART] 校验成功", "[UART] Checksum passed")
                 rx_buf[:] = rx_buf[total_len:]
                 return pkt
 
             if DEBUG:
-                print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]))
+                _print_i18n(
+                    "[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]),
+                    "[UART] Checksum failed (calculated={:02X}, received={:02X})".format(checksum, pkt[11]),
+                )
             # 只丢弃当前包头的第一个字节，继续寻找可能的下一个包头。
             rx_buf[:] = rx_buf[1:]
 
@@ -245,38 +264,50 @@ def uart_handle(uart, rx_buf=None):
         elif cmd_type == 0x02:
             if len(rx_buf) < 22:  # 至少要有固定头和2字节字符串长度
                 if DEBUG:
-                    print("[UART] 等待 0x02 头部数据到齐")
+                    _print_i18n("[UART] 等待 0x02 头部数据到齐", "[UART] Waiting for 0x02 header data")
                 break
             # 两字节长度，高字节在前，低字节在后
             str_len = (rx_buf[20] << 8) | rx_buf[21]
             total_len = 22 + str_len + 1
             if total_len > MAX_BUF_SIZE:
                 if DEBUG:
-                    print("[UART] 0x02 包长度异常: {}".format(total_len))
+                    _print_i18n(
+                        "[UART] 0x02 包长度异常: {}".format(total_len),
+                        "[UART] Invalid 0x02 packet length: {}".format(total_len),
+                    )
                 # 长度字段已经不可信，丢弃当前固定头和长度字段，
                 # 保留其后的数据，允许后续合法帧重新同步。
                 rx_buf[:] = rx_buf[22:]
                 continue
             if len(rx_buf) < total_len:
                 if DEBUG:
-                    print("[UART] 等待 0x02 字符串数据到齐 (len={})".format(str_len))
+                    _print_i18n(
+                        "[UART] 等待 0x02 字符串数据到齐 (len={})".format(str_len),
+                        "[UART] Waiting for 0x02 string data (len={})".format(str_len),
+                    )
                 break
             pkt = bytes(rx_buf[:total_len])
 
             if pkt[-1] != 0xAB:
                 if DEBUG:
-                    print("[UART] 0x02 包尾校验失败 (期望=AB, 接收={:02X})，丢弃第一个字节".format(pkt[-1]))
+                    _print_i18n(
+                        "[UART] 0x02 包尾校验失败 (期望=AB, 接收={:02X})，丢弃第一个字节".format(pkt[-1]),
+                        "[UART] Invalid 0x02 packet terminator (expected=AB, received={:02X}); dropping first byte".format(pkt[-1]),
+                    )
                 rx_buf[:] = rx_buf[1:]
                 continue
             if DEBUG:
-                print("[UART] 解析到 0x02 包")
+                _print_i18n("[UART] 解析到 0x02 包", "[UART] Parsed 0x02 packet")
                 print(pkt)
             rx_buf[:] = rx_buf[total_len:]
             return pkt
 
         else:
             if DEBUG:
-                print("[UART] 未知命令 0x{:02X}，丢弃第一个字节".format(cmd_type))
+                _print_i18n(
+                    "[UART] 未知命令 0x{:02X}，丢弃第一个字节".format(cmd_type),
+                    "[UART] Unknown command 0x{:02X}; dropping first byte".format(cmd_type),
+                )
             rx_buf[:] = rx_buf[1:]
 
     return None  # 当前还没有完整数据包

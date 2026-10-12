@@ -1,5 +1,6 @@
 from machine import Pin, UART, Timer
 from lib.k230_ai import *
+from k230_ai.public import _print_i18n
 import time
 import gc
 import sys
@@ -27,11 +28,12 @@ class SmartCameraK230:
             self.tim9 = Timer(-1)
             self.tim9.init(period=50, mode=Timer.PERIODIC, callback=self.timer9_tick)
         except Exception as e:
-            self._report_exception("启动 K230 UART 定时器", e)
+            self._report_exception("启动 K230 UART 定时器", "Starting K230 UART timer", e)
 
-    def _report_exception(self, context, error):
+    def _report_exception(self, context_zh, context_en, error):
         """统一输出 K230 异常；尽量保留 MicroPython 堆栈信息。"""
-        print("[K230] {}: {}".format(context, error))
+        _print_i18n("[K230] {}: {}".format(context_zh, error),
+                    "[K230] {}: {}".format(context_en, error))
         try:
             sys.print_exception(error)
         except Exception:
@@ -48,8 +50,8 @@ class SmartCameraK230:
             num += 1
             
             if num > 200:
-                print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
-                print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
+                _print_i18n('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！',
+                            'Error: Communication timeout. Check the wiring and controller expansion power.')
                 break
                 
             # 发送初始化命令
@@ -104,8 +106,7 @@ class SmartCameraK230:
                     if checksum == packet[11]:  # 校验成功
                         # 检查是否是期望的初始化响应
                         if packet[3] == 0x01 and packet[4] == 0xFF:
-                            print("AI摄像头4.0初始化完成")
-                            print("AI camera 4.0 init end")
+                            _print_i18n("AI摄像头4.0初始化完成", "AI camera 4.0 initialized")
                             time.sleep(0.1)
                             # 清空缓冲区中的剩余数据
                             rx_buffer = self.uart.read()
@@ -131,13 +132,14 @@ class SmartCameraK230:
             
             # 防止缓冲区过大
             if len(rx_buffer) > MAX_BUF_SIZE:
-                print("警告: 接收缓冲区过大，清空缓冲区")
+                _print_i18n("警告: 接收缓冲区过大，清空缓冲区",
+                            "Warning: receive buffer too large; clearing it")
                 rx_buffer = bytearray()
                 gc.collect()
     
     def model_init(self,cur_state):
         if(self.mode == cur_state):
-            print('模式相同,无需切换')
+            _print_i18n('模式相同,无需切换', 'Mode unchanged; no switch needed')
             time.sleep_ms(0.1)
             return
         elif(cur_state==DEFAULT_MODE):
@@ -225,7 +227,7 @@ class SmartCameraK230:
             self.uart_thread()
         except Exception as e:
             # uart_thread 已有内部保护，这里作为定时器回调的最后一道保护。
-            self._report_exception("UART 定时器回调异常", e)
+            self._report_exception("UART 定时器回调异常", "UART timer callback failed", e)
         finally:
             self._timer_busy = False
 
@@ -362,7 +364,7 @@ class SmartCameraK230:
                             else:
                                 self.face_expression.lock = True
                                 self.face_expression.expression = CMD[5]
-                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION[CMD[5]]
+                                self.face_expression.expression_str = FACE_LANDMARK_EXPRESSION_LABELS[CMD[5]]
                 elif(self.mode==FALL_DETECTION and self.fall!=None):
                     if(len(CMD)>0):
                         if(CMD[3]==FALL_DETECTION and CMD[4]==0x01):
@@ -551,5 +553,6 @@ class SmartCameraK230:
                 cmd_info = "type=0x{:02X}, cmd=0x{:02X}".format(CMD[2], CMD[3])
             self._report_exception(
                 "UART 处理异常(mode={}, {})".format(self.mode, cmd_info),
+                "UART processing failed (mode={}, {})".format(self.mode, cmd_info),
                 e
             )
