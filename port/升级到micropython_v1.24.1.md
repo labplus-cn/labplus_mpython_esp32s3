@@ -1,324 +1,96 @@
-升级mpython micropython
+# MicroPython 移植与固件构建
 
-micropython v1.23.0
+> 文件名中的 `v1.24.1` 是历史升级记录名称，不代表当前依赖版本。以仓库中的子模块和版本宏为准：目前 `micropython/py/mpconfig.h` 的版本宏为 **1.26.1**，`esp-idf` 子模块及项目使用的构建环境为 **ESP-IDF 5.4.3**。不要再按旧记录切换到 MicroPython 1.23.0、ESP-IDF 5.0.4/5.2.5，或套用旧的 IDF 补丁。
 
-esp-idf v5.2.5
+## 项目结构与移植入口
 
-# esp32项目
+仓库将 MicroPython 作为 ESP-IDF 项目构建，顶层项目目录是 `port/`，不是 `micropython/ports/esp32/`。主要位置如下：
 
-esp-idf采用cmake构建编译系统，micropython现支持make和使用idf.py编译系统。make内部也是调用idf.py实现，因些需要了解esp32的编译。
-说明：esp32把用户的应用代码组织称之为项目。esp-idf不是项目的一部分。
-esp32项目管理：
-参考文档：[https://docs.espressif.com/projects/esp-idf/zh_CN/latest/esp32/](https://docs.espressif.com/projects/esp-idf/zh_CN/latest/esp32/)
+| 路径 | 作用 |
+| --- | --- |
+| `micropython/` | MicroPython 子模块；`micropython/mpy-cross/` 提供冻结模块交叉编译器 |
+| `esp-idf/`、`esp-gmf/` | 当前仓库的 ESP-IDF 与 ESP-GMF 子模块；旧文档中的 esp-adf 依赖描述已过时 |
+| `port/CMakeLists.txt`、`port/main/`、`port/esp32_common.cmake` | IDF 项目入口、`main` 组件和通用源码/组件配置 |
+| `port/boards/<板卡>/` | 板级 `mpconfigboard.cmake`、`sdkconfig.*`、分区表、冻结模块清单 |
+| `port/modules/`、`port/boards/<板卡>/modules/` | 通用及板级冻结 Python 模块 |
+| `port/usercmodule/micropython.cmake` | 当前统一引入 LVGL、LCD、音频等用户 C 模块；无需再手动传旧版 `USER_C_MODULES` 路径 |
+| `port/file_system/`、`port/en/` | 默认 LittleFS 文件和英文覆盖资源 |
+| `port/makeimg.py`、`port/filesystem_image.py` | LittleFS 打包、语言配置生成及完整固件合并 |
 
-关于esp32的构建系统，了解：
+`port/CMakeLists.txt` 选择板卡和语言，包含板级 `mpconfigboard.cmake`，并按顺序合并 `SDKCONFIG_DEFAULTS`。板级 `manifest.py` 包含通用 `port/boards/manifest.py`，再冻结本板的 `modules/`。增加驱动时，先判断它属于通用模块、板级模块、文件系统脚本，还是 C 用户模块；不要为中英文复制整套驱动。
 
-1. 项目及主程序概念
-2. 构建系统，idf.py
-3. 组件、main组件
-4. 示例项目
-5. 项目 CMakeLists.txt
-6. sdkconfig Kconfig
+## 准备 WSL 构建环境
 
-# micropython项目架构
+以下命令在 WSL 中执行；路径按本机仓库位置调整。每个新终端都要激活 IDF 环境：
 
-## micropython相关知识
-
-### 模块编写
-
-### 功能配置
-
-### python引用C
-
-### QSTR
-
-### 模块注册 模块使能
-
-### 把C变量纳入micropython gc内存管理
-
-参照modespnow做法，例如把_esp_espnow_obj_t *espnow_singleton加入gc管理：
-
-1. gc内存管理结构中，加入*espnow_singleton
-
-   ```c
-   MP_REGISTER_ROOT_POINTER(struct _esp_espnow_obj_t *espnow_singleton);
-   ```
-
-2. espnow_make_new()中获取指针
-
-```
-此函数中，esp_espnow_obj_t *self = MP_STATE_PORT(espnow_singleton)获取指针，如果为空，说明对应内存被释放，需新建。
+```bash
+source ~/.espressif/tools/activate_idf_v5.4.3.sh
+cd /mnt/g/labplus-project/labplus_mpython_esp32s3
+idf.py --version
 ```
 
-3. 模块使用此变量
+首次拉取仓库时，在确认子模块内没有需要保留的未提交修改后，初始化子模块：
 
+```bash
+git submodule update --init --recursive
+make -C micropython/mpy-cross
+cd port
 ```
-get_singleton()可获取注岫在gc内存管理结构中的本变量指针，然后模块就可以使用它了。get_singleton()内部也是调用MP_STATE_PORT(espnow_singleton)
+
+`make -C micropython/mpy-cross` 从仓库根目录运行；后续 `idf.py` 命令从 `port/` 运行。构建中如出现组件锁文件变动，先核对 IDF 环境与依赖版本，不要直接覆盖已有改动。
+
+## 构建板卡与语言版本
+
+`MICROPY_LANGUAGE` 默认是 `zh`；目前只有 `labplus_Ledong_v2` 和 `mpython_v3` 开放 `en`。每个板卡/语言组合使用独立构建目录，且同一仓库中的不同组合应串行构建，避免共享的 `managed_components/` 与组件锁文件互相干扰。
+
+```bash
+idf.py -B build_ledong_v2_zh -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=zh build
+idf.py -B build_ledong_v2_en -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=en build
+idf.py -B build_mpython_v3_zh -D MICROPY_BOARD=mpython_v3 -D MICROPY_LANGUAGE=zh build
+idf.py -B build_mpython_v3_en -D MICROPY_BOARD=mpython_v3 -D MICROPY_LANGUAGE=en build
 ```
 
-## micropython做为esp-idf项目
+其他板卡当前只能选择中文；例如：
 
-1. 项目组织
+```bash
+idf.py -B build_xunfei_primary_zh -D MICROPY_BOARD=labplus_xunfei_js_primary -D MICROPY_LANGUAGE=zh build
+```
 
-   - micropython整体做为一个基于esp-idf项目。
-   - 项目的文件夹保留micropython的框架
-   - 通过main组件组织micropython项目源文件
+项目的 `merge_bin` 已是默认构建目标，`idf.py ... build` 会在应用编译后自动打包 LittleFS 并合并固件。只需重新执行打包目标时，可从 `port/` 运行：
 
-     * main组件重命名
-       + 项目CMakeList.txt中添加重命名后的main组件
-         list(APPEND EXTRA_COMPONENT_DIRS main_${IDF_TARGET})，并对对应不同的ESP芯片。
-       + 在port/esp32_common.cmake中解决组件依赖。
-     * main组件的源文件配置
-       在port/esp32_common.cmake中配置，esp32_common.cmake会被main组件的CMakeList.txt包含。
-   - 添加其它组件
+```bash
+ninja -C build_mpython_v3_en merge_bin
+```
 
-     + esp-idf构建系统会默认加载项目文件下下的components下的用户自定义组件，类似乐鑫维护的espressif_esp-dsp，可以这样加入。
-     + 在项目已包含的组件中通过以下方式加入
-       ```bash
-       list(APPEND EXTRA_COMPONENT_DIRS
-       ${ADF_PATH}/components/audio_pipeline
-       ${ADF_PATH}/components/audio_sal
-       ${ADF_PATH}/components/esp-adf-libs
-       ${ADF_PATH}/components/esp-sr
-       ${MPY_PORT_DIR}/boards/labplus_classroom_kit_nanjing/audio
-       )
-       ```
+构建目录中的交付物要区分：
 
-     ```
-     + 解决加入组件的相关依赖
-     ```
-   - boards支持
-     port/boards下创建相关board文件夹，放入board相关特性源文件及编译特性文件。
-   - Kconfig
-     esp-idf下有个Kconfig，用于生成menuconfig菜单，里面一些选项有默认配置，执行idf.py menuconfig，生成sdkconfig文件，编译后，产生sdkconfig.h文件。
-     可以main components及其它组装件的CMkakeList.txt同级目录中，添加Kcongfig或Kconfig.projbuild添加新的配置项。其中，Kconfig配置项出出在Component config子菜单中,Kconfig.projbuild配置出现在主菜单中.
-     可通过添加多个sdkconfig.xxx修改配置值，避免每次执行idf.py menuconfig修改配置值。
-2. 项目顶层CMakeList.txt分析
+- `<板卡>-<版本>-<提交>_<日期>-<语言>.bin`：项目生成的**完整镜像**，包含 bootloader、分区表、应用、LittleFS 和对应语音模型；中文版还按分区配置包含中文语音数据。
+- 同名 `.uf2`：当前 `makeimg.py` 仅由 `micropython.bin`（应用）生成，**不是完整镜像**，不能替代首次完整烧录。
+- `merged-binary.bin`：ESP-IDF 自带 `merge-bin` 的产物；不要与本项目的 `merge_bin` 目标和上述完整镜像混淆。
 
-   位于port下。定义下以下内容
+中英文资源覆盖顺序、英文 Logo、ESP-SR 模型及 K230 标签的细节见[中英文固件与资源分布](中英文固件与资源分布.md)。`MICROPY_LANGUAGE` 同时决定构建时的默认语言和打包生成的 `/lib/firmware_language.py`；K230 的 `set_voice_language()` 只临时切换识别结果文本，不会切换已编译的 UI 或语音模型。
 
-   - IDF_VERSION
-   - MICROPY_BOARD
-   - MICROPY_BOARD_DIR
-   - SDKCONFIG #合并后的sdkconfig文件位置
-   - include(${MICROPY_BOARD_DIR}/mpconfigboard.cmake)
+## 烧录与串口
 
-     mpconfigboard.cmake定义了1、各个板的MICROPY_FROZEN_MANIFEST位置（当然也可能没定义）2、SDKCONFIG_DEFAULTS，各个板的skdconfig.xxx集合，有这两项，就可以做下面两件事。
+首次烧录或需要更新 LittleFS/语音模型时，选择与板卡、语言匹配的完整 `.bin`，确认实际文件名和串口后从地址 `0x0` 写入 ESP32-S3：
 
-     1. 定义MICROPY_FROZEN_MANIFEST # mainfest.py位置，通常在各个板目录下，如果没有，则用boards下的。
-     2. 定义SDKCONFIG_DEFAULT #
+```bash
+esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 921600 write_flash 0x0 "build_mpython_v3_en/实际生成的固件文件.bin"
+```
 
-        合并各个sdkcofig.xxx 生成sdkconfig.combobin,各个板其于sdkconfig.base，定制n个sdkconfig.xxx，用于实现不同的config，后面的配置会覆盖前面的配置？micropython中通过sdkconfig.base + 多个sckconfig.xxx来实现不同的配置，最后合并成config.combobin
-   - list(APPEND EXTRA_COMPONENT_DIRS main_${IDF_TARGET})
+烧录完整镜像会覆盖固件包含的文件系统分区，先备份板上需要保留的用户文件。以上是文件名占位示例，不能原样复制执行。`idf.py flash` 按 IDF 的 `flash_project_args` 烧录相应分区；当前配置不包含项目生成的 LittleFS 镜像，因此不能代替完整镜像烧录。只查看串口输出可运行：
 
-     重命名main组件，且通过这个区别项目用哪个esp芯片。各个不同芯片的main组件目录下，包含以下文件：
+```bash
+idf.py -B build_mpython_v3_en -p /dev/ttyACM0 monitor
+```
 
-     - CMakeList.txt：
+WSL 下如需使用 Windows 连接的 USB 串口，先在 Windows PowerShell 用 `usbipd list` 确认 BUSID，再按需 `usbipd bind --busid <BUSID>` 和 `usbipd attach --wsl --busid <BUSID>`；回到 WSL 确认实际设备名，不能假定每次都是 `/dev/ttyACM0`。
 
-       该芯片main组件的CMakeList.txt文件，会包含esp32_common.cmake（公用的cmake配置），及各芯片自已的一些配置
-     - idf_component.yml: Component Manager Manifest File,用于加入esp其它级件
-     - link.if
-3. mainfest.py
+## 移植维护要点
 
-   官方参考文档：[https://docs.micropython.org/en/latest/reference/manifest.html](https://docs.micropython.org/en/latest/reference/manifest.html)
+1. 新板卡应在 `port/boards/<板卡>/` 放置 `mpconfigboard.cmake`、板级 `sdkconfig.*`、分区表和 `manifest.py`，并明确冻结模块与外设源码。修改分区表后必须重新生成并烧录完整镜像。
+2. C 模块注册、QSTR、板级源文件和组件依赖分别检查 `port/usercmodule/`、`port/qstrdefsport.h`、板级 `mpconfigboard.cmake` 与 `port/esp32_common.cmake`；不要直接复制旧版 MicroPython 或 IDF 文件覆盖当前实现。
+3. 被长期持有的 MicroPython 对象或指针需纳入 GC 根管理。可参考现有 `modespnow.c` 中的 `MP_REGISTER_ROOT_POINTER(...espnow_singleton)` 和 `MP_STATE_PORT(espnow_singleton)` 用法；移植其他模块时应结合其实际生命周期处理。
+4. UI/图片放入文件系统资源目录；英文开机 Logo 由 C 数组编入应用，不会因替换 LittleFS 中的 PNG 自动更新。TinyUSB、RMT 等组件兼容问题应先核对当前 IDF 与组件依赖，不要照旧记录直接修改 `managed_components/`。
 
-   MicroPython除了能够从文件系统加载Python代码外，还可以把Python代码“冻结”到固件加载，这样做有几个好处：
-   代码已被预编译为字节码，无需在加载时编译Python源代码。
-   字节码可以直接从ROM（即闪存）中执行，而无需复制到内存。同样，任何常量对象（字符串、元组等）也从ROM中加载，这可以大大增加应用程序的可用内存。
-   在没有文件系统的设备上，这也是加载Python代码的唯一方法。
-
-   项目中，如果boards/xxx板文件夹中有manifest.py，则用此文件件，此文件会包含port/boards/manifest.py，否则直接用port/boards/manifest.py。
-
-# mpython项目组建
-
-1. 创建mpython项目文件夹
-
-   创建文件夹，并初始化仓库，推送到远程。
-2. 添加子模块
-
-   项目需要esp-idf、micrpython、esp-adf子模块，从官方fork项目，并分别checkout到v5.0.4，v1.23.0，然后在项目文件夹下执行：
-
-   ```bash
-   git submodule update --init --recursive
-   ```
-
-   拉取所有子模块。
-   因为esp-adf会对esp-idf及micropython打补丁，所以，打完补丁后，推送到公司github，做为子模块远程。
-3. 新建port文件夹
-
-   把以下文件（文件夹），从micropython/ports/esp32复制到port文件夹。
-
-   - boards 、README.md，README.ulp.md
-   - main_xxx文件兲：不同芯片的main组件。
-   - 顶层CMakeLists.txt
-   - esp32_common.cmake：是所有板的公共cmake文件。
-   - modules：所有板的公用python库。
-4. 移植修改
-
-   修改esp31_common.cmake内MICROPY_DIR MICROPY_PORT_DIR路径定义。
-   复制对应的partitions-xxx.csv到boards/对应board，修改，在sdkconfig.board中修改partitions-xxx路径为当前board。
-   PSRAM支持：复制sdkconfig.spiram到当前board下，修放（配置引脚、容量），配置mpconfigboard.cmake中配置本路径。
-   esp32_common.cmake中修改qstrdefsport.h路径
-
-Noto_Sans_CJK_SC_Light16.bin .gitignore过来，把.gitignore内容复制过来。
-
-_boot.py
-TAG
-板名
-
-# 添加一个新板
-
-添加乐动掌控
-
-按以上步聚创建完mpython项目。
-
-1. C层面添加OLED驱动及开机LOG显示
-
-   涉及port/drivers/startup main.c
-
-   2. 底层python异常显示在oled
-
-      涉及port/drivers/startup main.c,包括按CTRL C停止所有用户线程，关闭所有用户定时器。
-   3. 添加音乐模块
-
-      port/qstrdefsport.h中添加music相关QSTR.
-      mpconfigboard.cmake中把builtin音乐模块源文件加入项目，按新的micropython模块定义方式修改。
-      mpconfigboard中使能本模块。
-      music源码中，增加#if MICROPY_PY_ESP_MUSIC,用于使能/禁能模块
-   4. esp32_nvs
-
-      复制micropython/ports/esp32/下对应模块到port/builtins/，make_new()中增加以下代码:
-
-      ```c
-      check_esp_err(nvs_flash_init_partition("user_nvs"));
-      check_esp_err(nvs_open_from_partition("user_nvs", ns_name, NVS_READWRITE, &namespace));
-      ```
-      esp32_common.cmake中去掉esp32_nvs.c，mpconfigboard.cmake中增加port/builtins/eps32_nvs.c
-   5. machine_pin.c
-      esp32_common.cmake去掉对machine_pin.c编译，复制micropython/ports/esp32/machine_pin.c到port/builtins/，此文件添加mpython pin定义。
-      micropython对有PSRAM的板，限定的CS CLK pin为16 17引脚，需要重新修改machine.h为_machine_1.h，去掉对16 17脚的禁用。esp32_common.cmake重定义pins_prefix.c make-pins.py路径
-      machine.c和pins_prefix.c修改含头文件路径为machine_pin_1.h
-   6. 修改partition-8MiB.csv文件
-
-      保持跟乐动掌控的一致，但会出固件区域不够情况，扩容之，暂不知会有什么问题，之前似似乎有利用扩容区。此文件放在对应board文件下，注意在sdkconfig.board中修改文件路径.
-   7. 添加micropython-lib库的neopixel.py到port/modules,参照唐工的对应文件做修改。注释掉boards/manifest.py内的对本库的引用。
-   8. machine_touchpad.c
-
-      esp32_common.cmake去掉对machine_touchpad.c编译，复制micropython/ports/esp32/machine_touchpad.c到port/builtins/，按之版本修改本文件。
-      mpconfigboard.cmake添加此文件编译
-   9. modframebuf.c
-
-      esp32_common.cmake中禁止modframbuf.c编译，board/mpconfigboard.cmake添加此文件编译。按之前版本做相应修改。此文件影响mpython.py中的GUI库
-      可以用以下命令移除变量或列表中的一项：
-
-      ···bash
-      list(REMOVE_ITEM MICROPY_SOURCE_EXTMOD ${MICROPY_EXTMOD_DIR}/modframebuf.c)
-
-      ```
-      待解决：一些函数重定义了，是否用新版的函数，待用户端测试
-      ```
-   10. network and radio
-   11. 离线语音识别及合成
-
-       参考文档：[https://docs.espressif.com/projects/esp-sr/zh_CN/latest/esp32/getting_started/readme.html](https://docs.espressif.com/projects/esp-sr/zh_CN/latest/esp32/getting_started/readme.html)
-
-       参考项目：[https://github.com/espressif/esp-skainet](https://github.com/espressif/esp-skainet)
-
-       main_esp32/idf_componnet.yml中添加esp-sr组件：espressif/esp-sr: ">=1.7.0"
-   12. bluetooth
-   13. tag
-       图片转数组工具：[https://notisrac.github.io/FileToCArray](https://notisrac.github.io/FileToCArray)
-       ![alt text](image.png)
-
-
-# 项目编译
-
-linux系统按乐鑫要求安装一些库，安装gcc cmake
-
-1. 进入esp-idf，执行./install.sh，安装esp-idf的编译环境。
-2. 执行.
-
-   ```bash
-   cd port
-   ./esp-idf/export.sh # 导出相关环境变量。
-   ```
-3. micropython预编译
-
-   ```bash
-   cd micropython
-   make -C mpy-cross
-   ```
-4. 固件编译
-
-   ```bash
-   idf.py -D MICROPY_BOARD=mpython_v3 build
-   idf.py -D MICROPY_BOARD=labplus_Ledong_v2 build
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_primary build
-   idf.py -D MICROPY_BOARD=labplus_xunfei_js_middle build
-
-   idf.py -D MICROPY_BOARD=mpython_v3 -D USER_C_MODULES=../usercmodule/lv_binding_micropython/bindings.cmake build
-   ```   
-
-   合并固件
-
-   项目自定义的 `merge_bin` 已加入默认构建目标。运行一次 `idf.py ... build`，
-   就会在编译完成后自动打包 LittleFS，并生成按板卡、版本、提交、日期和语言
-   命名的 `.bin` 与 `.uf2`；无需再单独运行 `ninja -C build merge_bin`。
-   IDF 自带的 `merge-bin` 只生成 `merged-binary.bin`，不包含本项目额外的文件系统
-   打包流程。
-
-   Ledong V2 与 mpython_v3 的中文版和英文版各使用独立构建目录，避免 sdkconfig 与输出文件互相覆盖：
-
-   ```bash
-   idf.py -B build_ledong_v2_zh -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=zh build
-   idf.py -B build_ledong_v2_en -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=en build
-   idf.py -B build_mpython_v3_zh -D MICROPY_BOARD=mpython_v3 -D MICROPY_LANGUAGE=zh build
-   idf.py -B build_mpython_v3_en -D MICROPY_BOARD=mpython_v3 -D MICROPY_LANGUAGE=en build
-   ```
-
-   未指定 `MICROPY_LANGUAGE` 时默认为 `zh`。英文版目前支持 `labplus_Ledong_v2`
-   和 `mpython_v3`，后者沿用 `port/en/labplus_mpython_pro/` 的英文资源。若只需重新打包，
-   可从 `port/` 项目目录执行 `ninja -C <对应构建目录> merge_bin`。
-   资源覆盖顺序、驱动目录和英文 Logo 的处理见[中英文固件与资源分布](中英文固件与资源分布.md)。
-# 固件烧录
-
-## wls下linux使用usb转串口
-
-   要在wsl下使用USB设备，参阅：[https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb，安装USBIPD-WIN。](https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb%EF%BC%8C%E5%AE%89%E8%A3%85USBIPD-WIN%E3%80%82)
-   使用以下指令，实现USB设备共享到wsl。
-
-   ···bash
-   usbipd list # 列出usb设备ID，powershell中执行命令
-   usbipd bind --busid <busid> # bind ID，eg:4-4
-   usbipd attach --wsl --busid <busid> # 附加USB设备到wsl
-   lsusb # wsl下，查看USB设备是否附加。
-   usbipd detach --busid <busid> # 解除附加USB设备到wsl
-
-   1. idf.py烧录
-    
-   idf.py命令只会烧录app分区，不会烧其它分区
-   ```bash
-   idf.py -p /dev/ttyACM0 -b 4000000 flash monitor
-   idf.py -p /dev/ttyACM0 -b 4000000 monitor
-   ```
-
-   2. esptool命令：
-   ```bash
-   esptool.py \
-         --port $port --baud $baud --before default_reset --after hard_reset write_flash \
-         --flash_mode dio --flash_freq 40m --flash_size detect 0x0 "$file"
-   ```
-
-   ```bash
-   esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 4000000 --before default_reset --after hard_reset write_flash \
-          --flash_size detect 0x0 build/labplus_Ledong_v2-v1.0-38.g5a4cd1d.dirty-5a4cd1d_2025-12-30.bin
-   ```
-
-   3. windows使用flash_download_tool烧录
-
-# vscode安装插件pymakr
-
-可以使用pymakr调试，上传、下载用户代码。
-
-esp-idf打补丁：
-patch -p1 < ../port/idf_v5.2_freertos.patch
+本文件保留原有历史文件名以免破坏引用；后续升级以仓库内的版本宏、子模块提交和板级配置为准。
