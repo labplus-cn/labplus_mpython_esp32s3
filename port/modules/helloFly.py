@@ -7,6 +7,7 @@ from struct import pack, unpack
 from random import randint
 #from myVoice import textToSpeed
 from _thread import start_new_thread
+from mpython_i18n import print_i18n as _print_i18n
 
 from machine import UART,Pin
 
@@ -109,7 +110,7 @@ class fly():
         #运行数据接收线程
         start_new_thread(self.Receive_Thread, ())
         start_new_thread(self.Loop_1Hz_Thread, ())
-        print("准备就绪，开始起飞。\n")
+        _print_i18n("准备就绪，开始起飞。\n", "Ready. Takeoff!\n")
 
     #自动延时
     def setAutoDelay(self,auto):
@@ -191,9 +192,11 @@ class fly():
 
                 if self.rx.date[0]==0xF6:
                     self.flySensor[id].news = news
-                    print( '\33[1;36m' + str(id)+"号(消息)："+news + '\33[0m')
+                    _print_i18n('\33[1;36m' + str(id)+"号(消息)："+news + '\33[0m',
+                                '\33[1;36m' + str(id)+" (message): "+news + '\33[0m')
                 else:
-                    print( '\33[1;31m' + str(id)+"号(提示)："+news + '\33[0m')
+                    _print_i18n('\33[1;31m' + str(id)+"号(提示)："+news + '\33[0m',
+                                '\33[1;31m' + str(id)+" (notice): "+news + '\33[0m')
 
     #串口通信协议接收
     def Receive_Prepare(self,data):
@@ -731,4 +734,3 @@ class fly():
 
         return self.getFlySensor(id,type)
 
-        

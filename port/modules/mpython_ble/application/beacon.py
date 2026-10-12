@@ -6,6 +6,7 @@ from ..advertising import advertising_payload, AD_Structure
 
 import time
 import math
+from mpython_i18n import print_i18n as _print_i18n
 
 
 class iBeacon:
@@ -84,7 +85,7 @@ class Trilateration:
             # 如果矩阵不可逆，返回信标的质心
             avg_x = sum(b['x'] for b in beacons) / len(beacons)
             avg_y = sum(b['y'] for b in beacons) / len(beacons)
-            print("矩阵不可逆，返回信标质心位置")
+            _print_i18n("矩阵不可逆，返回信标质心位置", "Matrix is singular; returning beacon centroid")
             return (avg_x, avg_y)
         
     @staticmethod
@@ -128,7 +129,7 @@ class Trilateration:
         # 所有尝试都失败时返回信标质心
         avg_x = sum(b['x'] for b in beacons) / len(beacons)
         avg_y = sum(b['y'] for b in beacons) / len(beacons)
-        print("所有方法失败，返回信标质心位置")
+        _print_i18n("所有方法失败，返回信标质心位置", "All methods failed; returning beacon centroid")
         return (avg_x, avg_y)
     
 

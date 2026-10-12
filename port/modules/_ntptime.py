@@ -27,10 +27,11 @@ UTC_R12=3155716800
 import time
 import machine
 import ntptime
+from mpython_i18n import print_i18n as _print_i18n
 
 def sync_ntp(utc=8, host='ntp1.aliyun.com', max_retries=5, retry_delay=1):
     """通过网络校准时间，支持错误重试""" 
-    print("开始同步网络时间")
+    _print_i18n("开始同步网络时间", "Starting network time synchronization")
     
     for attempt in range(max_retries):
         try:
@@ -93,14 +94,16 @@ def sync_ntp(utc=8, host='ntp1.aliyun.com', max_retries=5, retry_delay=1):
             mytime=time.localtime()
             mytime=(mytime[0],mytime[1],mytime[2],mytime[6],mytime[3]+utc,mytime[4],mytime[5],mytime[7])
             machine.RTC().datetime(mytime)
-            print(f"时间同步成功: {mytime}")
+            _print_i18n("时间同步成功: {}".format(mytime), "Time synchronized: {}".format(mytime))
             return True  # 同步成功，返回True
             
         except Exception as e:
-            print(f"同步ntp时间错误 (尝试 {attempt + 1}/{max_retries}): {repr(e)}")
+            _print_i18n("NTP 同步错误 (尝试 {}/{}): {}".format(attempt + 1, max_retries, repr(e)),
+                        "NTP sync error (attempt {}/{}): {}".format(attempt + 1, max_retries, repr(e)))
             if attempt < max_retries - 1:  # 如果不是最后一次尝试
-                print(f"等待 {retry_delay} 秒后重试...")
+                _print_i18n("等待 {} 秒后重试...".format(retry_delay),
+                            "Retrying in {} seconds...".format(retry_delay))
                 time.sleep(retry_delay)
             else:
-                print("所有重试都失败了，时间同步失败")
+                _print_i18n("所有重试都失败了，时间同步失败", "All retries failed; time synchronization failed")
                 return False  # 所有重试都失败，返回False

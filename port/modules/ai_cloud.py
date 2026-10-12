@@ -5,6 +5,7 @@ import os
 import requests
 
 from mpython import *
+from mpython_i18n import print_i18n as _print_i18n
 
 # 语音文件转汉字api key
 API_KEY = "UiMsouhTOzHYmaWS1beQLA2w"
@@ -50,7 +51,7 @@ class AI:
         url = self.url
 
         if self.payload is None:
-            print("Error：请设置ai参数")
+            _print_i18n("错误：请设置 AI 参数", "Error: please set AI parameters", printer=print)
             return
         payload = json.dumps(self.payload)
 

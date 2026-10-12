@@ -1,4 +1,5 @@
 from rfid import rfid_522
+from mpython_i18n import print_i18n as _print_i18n
 
 class Rfid():
     """扫描Rfid卡类.
@@ -37,7 +38,7 @@ class Rfid():
                 if self._rfid.select_tag(self.serial_num_tuple):
                     return self._rfid.auth(self.serial_num_tuple, block_number)
         else:
-            print("未检测到射频卡")
+            _print_i18n("未检测到射频卡", "No RFID card detected")
             return False
                 
     def get_serial_num(self):
@@ -49,7 +50,7 @@ class Rfid():
                 serial_num = int.from_bytes(bytes(self.serial_num_tuple[:-1]), 'little')
                 return str(serial_num)
         else:
-            print("未检测到射频卡")
+            _print_i18n("未检测到射频卡", "No RFID card detected")
             return None
         
     def serial_number(self):
@@ -113,7 +114,3 @@ class Rfid():
             self.card_auth(self.purse_block)
             self._rfid.decrement(self.purse_block, value)
             self._rfid.halt()
-
-    
-
-            

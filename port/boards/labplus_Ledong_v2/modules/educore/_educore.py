@@ -11,6 +11,7 @@ from mpython import uuid
 import network
 import neopixel
 import machine
+from mpython_i18n import print_i18n as _print_i18n
 
 from bluebit import Scan_Rfid_Edu,Barometric,DelveBit
 from bluebit import SoilHumiditySensor
@@ -278,7 +279,7 @@ class parrot():
             for arg in args:
                 args_list.append(arg)
             if(self.in0 is None and len(args_list)!=1):
-                print('位置参数数量错误')
+                _print_i18n('位置参数数量错误', 'Incorrect number of positional arguments')
             else:
                 self.args_list = args_list
         else:
@@ -289,7 +290,7 @@ class parrot():
             self.mode = False
  
             if(self.in0==None or self.in1==None):
-                print('关键字参数错误')
+                _print_i18n('关键字参数错误', 'Invalid keyword arguments')
             self.out0 = MPythonPin(self.in0, PinMode.PWM)
             self.out1 = MPythonPin(self.in1, PinMode.PWM)
            

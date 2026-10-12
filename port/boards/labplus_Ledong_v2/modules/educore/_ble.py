@@ -2,6 +2,7 @@ from .mpython_ble.hidcode import Mouse as _Mouse
 from .mpython_ble.hidcode import KeyboardCode as _KeyboardCode
 from micropython import const
 import time
+from mpython_i18n import print_i18n as _print_i18n
 
 class keycode():
     # SPACE = 0
@@ -305,7 +306,7 @@ class hid():
             if(len(key)==2):
                 self._ble_hid.keyboard_send(key[0],key[1])
             else:
-                print('组合键有误')
+                _print_i18n('组合键有误', 'Invalid key combination')
         else:
             self._ble_hid.keyboard_send(key)
 

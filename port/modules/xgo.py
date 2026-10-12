@@ -2,6 +2,7 @@ import machine
 import struct
 import time
 import math
+from mpython_i18n import print_i18n as _print_i18n
 
 __version__ = '1.3.4'
 __last_modified__ = '2023/7/19'
@@ -718,9 +719,9 @@ class XGO():
                 file = f.read()
             # count = self.ser.write(file)
             count = self.ser.write(bytes(file))
-            print("更新成功，共发送字节数：", count)
+            _print_i18n("更新成功，共发送字节数：", "Update successful; bytes sent:", count)
         except Exception as e:
-            print("---更新错误---")
+            _print_i18n("---更新错误---", "---Update failed---")
             print(e)
 
     def calibration(self, state):

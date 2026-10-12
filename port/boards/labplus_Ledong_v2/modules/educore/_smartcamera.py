@@ -2,6 +2,7 @@ from machine import Pin, UART
 from .k230_ai import *
 import time
 import gc
+from mpython_i18n import print_i18n as _print_i18n
 
 DEBUG = False  # 增加全局debug控制变量
 MAX_BUF_SIZE = 1024  # 缓冲区最大字节数
@@ -25,8 +26,8 @@ class EduSmartCamera:
             num += 1
             
             if num > 500:
-                print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
-                print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
+                _print_i18n('错误：通信超时，请检查接线及掌控拓展电源！',
+                            'Error: communication timeout. Check the wiring and controller expansion power.')
                 break
                 
             # 发送初始化命令
@@ -81,8 +82,7 @@ class EduSmartCamera:
                     if checksum == packet[11]:  # 校验成功
                         # 检查是否是期望的初始化响应
                         if packet[3] == 0x01 and packet[4] == 0xFF:
-                            print("AI摄像头4.0初始化完成")
-                            print("AI camera 4.0 init end")
+                            _print_i18n("AI 摄像头 4.0 初始化完成", "AI camera 4.0 initialized")
                             time.sleep(0.1)
                             # 清空缓冲区中的剩余数据
                        
@@ -109,13 +109,13 @@ class EduSmartCamera:
             
             # 防止缓冲区过大
             if len(rx_buffer) > MAX_BUF_SIZE:
-                print("警告: 接收缓冲区过大，清空缓冲区")
+                _print_i18n("警告：接收缓冲区过大，已清空", "Warning: receive buffer too large; cleared")
                 rx_buffer = bytearray()
                 gc.collect()
     
     def model_init(self,cur_state):
         if(self.mode == cur_state):
-            print('模式相同')
+            _print_i18n('模式相同', 'Mode unchanged')
             return
         elif(cur_state==DEFAULT_MODE):
             for i in range(10):
@@ -169,7 +169,7 @@ class EduSmartCamera:
             args_list.append(arg)
         args_len = len(args_list)
         if(self.model_choose is None and args_len<1):
-            print('参数错误')
+            _print_i18n('参数错误', 'Invalid parameters')
         else:
             self.model_choose = args_list[0]
         
@@ -255,4 +255,3 @@ class EduSmartCamera:
         
         except Exception as e:
             print(e)
-    

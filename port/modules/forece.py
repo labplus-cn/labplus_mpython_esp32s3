@@ -1,4 +1,5 @@
 from mpython import i2c
+from mpython_i18n import print_i18n as _print_i18n
 import time
 
 
@@ -91,7 +92,7 @@ class Forece():
             return f"{version_numbers[0]}.{version_numbers[1]}.{version_numbers[2]}.{version_numbers[3]}"
             
         except Exception as e:
-            print(f"读取版本失败: {str(e)}")
+            _print_i18n("读取版本失败: {}".format(str(e)), "Failed to read version: {}".format(str(e)))
     
     def read(self):
         """读取传感器数据"""
@@ -100,5 +101,5 @@ class Forece():
             newton  = sensor_values * 0.00981    # 将质量g转为力的单位N
             return newton,sensor_values
         except Exception as e:
-            print("读取错误:", e)
+            _print_i18n("读取错误:", "Read error:", e)
             return None,None

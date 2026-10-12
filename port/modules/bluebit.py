@@ -24,6 +24,7 @@
 | more about with bluebit info browse http://wiki.labplus.cn/index.php?title=Bluebit
 """
 from mpython import i2c, MPythonPin, PinMode, numberMap
+from mpython_i18n import print_i18n as _print_i18n
 from micropython import const
 from machine import UART, ADC, Pin
 import framebuf
@@ -1122,7 +1123,7 @@ class EncoderMotor(object):
             self.stop()
             # print('编码电机')
         else:
-            print('编码电机有故障！')
+            _print_i18n('编码电机有故障！', 'Encoder motor fault!')
         
     def stop(self):
         if (self.batch == 1):
@@ -1198,7 +1199,7 @@ class EncoderMotor(object):
                 else:
                     break
         elif (self.batch == 0):
-            print('编码电机才支持')
+            _print_i18n('仅编码电机支持', 'Supported by encoder motors only')
             pass
 
     def move_distance(self, speed, distance):
@@ -1227,7 +1228,7 @@ class EncoderMotor(object):
                 else:
                     break
         elif (self.batch == 0):
-            print('编码电机才支持')
+            _print_i18n('仅编码电机支持', 'Supported by encoder motors only')
             return
 
     def set_correct(self, correct):
@@ -1251,7 +1252,7 @@ class EncoderMotor(object):
                 else:
                     break
         elif (self.batch == 0):
-            print('编码电机才支持')
+            _print_i18n('仅编码电机支持', 'Supported by encoder motors only')
             return
         
     def motor_run(self,num,speed):
@@ -1351,7 +1352,7 @@ class PM25_DC(object):
         if self.uart.any():
             data = self.uart.read()
             if self.debug:
-                print("接收到:", [hex(x) for x in data])
+                _print_i18n("接收到:", "Received:", [hex(x) for x in data])
             self.buffer += data
 
         # 缓冲区过大，截取尾部
@@ -1363,7 +1364,7 @@ class PM25_DC(object):
             # 找包头 0xA5
             if self.buffer[0] != 0xA5:
                 if self.debug:
-                    print("丢弃字节:", hex(self.buffer[0]))
+                    _print_i18n("丢弃字节:", "Discarded byte:", hex(self.buffer[0]))
                 self.buffer = self.buffer[1:]
                 continue
 
@@ -1379,13 +1380,13 @@ class PM25_DC(object):
                 pm25 = K * ((DATAH << 7) | (DATAL & 0x7F))
                 self.last_value = pm25  # 保存最新有效值
                 if self.debug:
-                    print("校验成功:", [hex(x) for x in packet], "=>", pm25)
+                    _print_i18n("校验成功:", "Checksum passed:", [hex(x) for x in packet], "=>", pm25)
                 return pm25
             else:
                 pm25 = K * ((DATAH << 7) | (DATAL & 0x7F))
                 self.last_value = pm25  # 保存最新有效值
                 if self.debug:
-                    print("校验失败:", [hex(x) for x in packet], "应得校验:", hex(checksum))
+                    _print_i18n("校验失败:", "Checksum failed:", [hex(x) for x in packet], "Expected checksum:", hex(checksum))
                     print(pm25, "ug/m³")
                 return pm25
 

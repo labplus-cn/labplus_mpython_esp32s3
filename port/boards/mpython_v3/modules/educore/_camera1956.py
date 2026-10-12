@@ -2,6 +2,7 @@ from machine import Pin, UART
 from .k210.public import * 
 import time
 import gc
+from mpython_i18n import print_i18n as _print_i18n
 gc.collect()
 
 class FCR:
@@ -34,7 +35,7 @@ class Camera1956:
             CMD_TEMP = []
             self.uart.write(bytes(self.Generate_CMD([shake_cmd]))) #通信握手
             if(num>1000):
-                print('错误:通信超时！')
+                _print_i18n('错误：通信超时！', 'Error: communication timeout!')
                 self.lock = False
                 break
 
@@ -52,7 +53,7 @@ class Camera1956:
                     if CMD_TEMP[1]==0xFE and CMD_TEMP[2]==0xFE and CMD_TEMP[3]==0xFE:
                         shake_cmd=0xFF #通信握手
                     elif CMD_TEMP[1]==0xFE and CMD_TEMP[2]==0xFE and CMD_TEMP[3]==0xFF:
-                        print('==1956摄像头通信成功==')
+                        _print_i18n('==1956 摄像头通信成功==', '==1956 camera connected successfully==')
                         # self.lock = False
                         # time.sleep_ms(100)
                         _cmd = self.uart.read()
@@ -125,7 +126,7 @@ class Camera1956:
             args_list.append(arg)
         args_len = len(args_list)
         if(self.model_choose is None and args_len<1):
-            print('参数错误')
+            _print_i18n('参数错误', 'Invalid parameters')
         else:
             self.model_choose = args_list[0]
         

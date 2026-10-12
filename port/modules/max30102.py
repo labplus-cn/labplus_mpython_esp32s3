@@ -1,5 +1,6 @@
 from machine import UART, Pin
 from mpython import *
+from mpython_i18n import print_i18n as _print_i18n
 import time
 import hrcalc
 
@@ -133,8 +134,9 @@ class MAX30102():
     def measurement(self):
         time.sleep(0.5)
         try:
-            print('In the measurement, it takes approximately 30 seconds.\n')
-            # print('测量中，将手指放在传感器上保持不动，大约需要30-60秒\n')
+            _print_i18n('测量中，请将手指放在传感器上保持不动，大约需要 30 秒。\n',
+                        'In the measurement, keep your finger still on the sensor for about 30 seconds.\n',
+                        printer=print)
             #采样数据，大约30秒钟
             red, ir = self.read_sequential(1000)
             #进行分析
@@ -157,12 +159,10 @@ class MAX30102():
 
             self.ir_D = int(self.ir_D)
             self.red_D = int(self.red_D)
-            print('Measurement completed.\n')
-            print('测试完成\n')
+            _print_i18n('测试完成\n', 'Measurement completed.\n', printer=print)
             # print('****************************\n')
         except Exception as e:
-            print("An error occurred.\n")
-            print('测量出错。\n')
+            _print_i18n('测量出错。\n', 'Measurement failed.\n', printer=print)
             print(e)
             self.ir_D = None
             self.red_D = None

@@ -1,4 +1,5 @@
 from mpython import *
+from mpython_i18n import print_i18n as _print_i18n
 import time
 
 def number_map(inputNum, bMin, bMax, cMin, cMax):
@@ -30,7 +31,7 @@ class PM25_():
         if (dustDensity < 0 ):
             dustDensity = 0
         
-        print('测量中...')
+        _print_i18n('测量中...', 'Measuring...', printer=print)
         return dustDensity
         
     def dustDensity_average(self):
@@ -64,7 +65,7 @@ class PM25():
         
     def read(self, sample_size=50):
         vals = []
-        print('PM2.5测量中..')
+        _print_i18n('PM2.5 测量中...', 'Measuring PM2.5...', printer=print)
         while True:
             time.sleep(0.005)
             try:

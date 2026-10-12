@@ -1,5 +1,6 @@
 from machine import UART, Pin
 import time
+from mpython_i18n import print_i18n as _print_i18n
 
 class BDS():
     def __init__(self,uart_num=1, pin_tx=Pin.P1, pin_rx=Pin.P0):
@@ -184,15 +185,14 @@ class BDS():
         if(self.isParseData):
             self.isParseData = False
             if(self.DataIsUseful):
-                print("维度: %s %s",self.latitude,self.N_S)
-                print("经度: %s %s",self.longitude,self.E_W)
-                print("日期: %s",self.date,end=' ')
-                print("UTC时间: %s",self.UTC_Time)
-                print("卫星对地速度: %f km/h",self.speed_to_groud_kh)
+                _print_i18n("纬度:", "Latitude:", self.latitude, self.N_S)
+                _print_i18n("经度:", "Longitude:", self.longitude, self.E_W)
+                _print_i18n("日期:", "Date:", self.date, end=' ')
+                _print_i18n("UTC 时间:", "UTC time:", self.UTC_Time)
+                _print_i18n("地面速度:", "Ground speed:", self.speed_to_groud_kh, "km/h")
                 # print("course_over_groud: %f°",self.course_over_ground)
             else:
                 print("")
-
 
 
 class GPS():
@@ -378,11 +378,11 @@ class GPS():
         if(self.isParseData):
             self.isParseData = False
             if(self.DataIsUseful):
-                print("维度: %s %s",self.latitude,self.N_S)
-                print("经度: %s %s",self.longitude,self.E_W)
-                print("日期: %s",self.date,end=' ')
-                print("UTC时间: %s",self.UTC_Time)
-                print("卫星对地速度: %f km/h",self.speed_to_groud_kh)
+                _print_i18n("纬度:", "Latitude:", self.latitude, self.N_S)
+                _print_i18n("经度:", "Longitude:", self.longitude, self.E_W)
+                _print_i18n("日期:", "Date:", self.date, end=' ')
+                _print_i18n("UTC 时间:", "UTC time:", self.UTC_Time)
+                _print_i18n("地面速度:", "Ground speed:", self.speed_to_groud_kh, "km/h")
                 # print("course_over_groud: %f°",self.course_over_ground)
             else:
                 print("")
