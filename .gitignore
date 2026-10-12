@@ -26,5 +26,6 @@ port/littlefs.bin
 port/build_en/*
 port/build_mpython_v3_en/*
 port/build_ledong_v2_zh/*
+port/build_mpython_v3_zh/*
 port/lockfiles/dependencies.lock.esp32s3
 port/tests/test_firmware_language.py
