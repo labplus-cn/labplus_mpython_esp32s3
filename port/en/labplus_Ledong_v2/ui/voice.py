@@ -20,10 +20,10 @@ play_time = time.time() - 16
 # 初始化
 audio.player_init()
 sr.init(timeout=6000)
-sr.add(1,"turn on the light")
-sr.add(2,"turn off the light")
-sr.add(3,"play music")
-sr.add(4,"stop music")
+sr.add(1,"TURN ON THE LIGHT")
+sr.add(2,"TURN OFF THE LIGHT")
+sr.add(3,"PLAY MUSIC")
+sr.add(4,"STOP MUSIC")
 sr.update()
 
 def gui_back_cb(e):

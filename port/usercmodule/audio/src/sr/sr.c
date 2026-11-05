@@ -43,6 +43,7 @@ static char wakeup_word[64] = "";
 static uint16_t timeout  = 6000;
 static bool vad_record_flag = false;
 static volatile bool multinet_ready = false;  // detect_Task完成multinet初始化后置true
+static volatile bool wakeup_debug = false;
 static esp_mn_iface_t *s_multinet = NULL;
 static model_iface_data_t *s_model_data = NULL;
 
@@ -164,6 +165,9 @@ void detect_Task(void *arg)
                     audio_play_prompt_file(wakeup_word);
                 }
 #endif
+                if (wakeup_debug) {
+                    printf("[SR] Wake word detected\n");
+                }
                 afe_handle->disable_wakenet(afe_data);
                 wakenet_enabled = false;
                 wakeup_flag = 1;
@@ -181,6 +185,9 @@ void detect_Task(void *arg)
                     audio_play_prompt_file(wakeup_word);
                 }
 #endif
+                if (wakeup_debug) {
+                    printf("[SR] Wake word detected\n");
+                }
                 afe_handle->disable_wakenet(afe_data);
                 wakenet_enabled = false;
                 wakeup_flag = 1;
@@ -269,9 +276,11 @@ void sr_init(const char *word, uint16_t t)
     esp_log_level_set("MODEL_LOADER", ESP_LOG_ERROR);
     esp_log_level_set("AFE_CONFIG", ESP_LOG_ERROR);
 
+    wakeup_debug = false;
 #if defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN
     if (word != NULL && (strcmp(word, "none") == 0 || strcmp(word, "mute") == 0)) {
         wakeup_word[0] = '\0'; // 显式静音
+        wakeup_debug = true;
     } else if (word != NULL && word[0] != '\0') {
         strncpy(wakeup_word, word, sizeof(wakeup_word) - 1);
         wakeup_word[sizeof(wakeup_word) - 1] = '\0';
@@ -295,19 +304,15 @@ void sr_init(const char *word, uint16_t t)
     afe_config_t *afe_config = afe_config_init("M", models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
     afe_config->afe_ringbuf_size = 150;  // 增大ring buffer至150帧(~4.8秒)，避免multinet推理导致feed buffer溢出
 
-    // 确保若有多个唤醒词模型（如 Hi ESP + Alexa），二者均被加载
+#if defined(MPYTHON_LANGUAGE_EN) && MPYTHON_LANGUAGE_EN
+    // Keep only Hi ESP active even if the resource partition contains other WakeNet models.
+    afe_config->wakenet_model_name = esp_srmodel_filter(models, ESP_WN_PREFIX, "hiesp");
+    afe_config->wakenet_model_name_2 = NULL;
+#else
     if (afe_config->wakenet_model_name == NULL) {
         afe_config->wakenet_model_name = esp_srmodel_filter(models, ESP_WN_PREFIX, NULL);
     }
-    if (afe_config->wakenet_model_name_2 == NULL && models != NULL) {
-        for (int i = 0; i < models->num; i++) {
-            if (strstr(models->model_name[i], "wn") &&
-                (afe_config->wakenet_model_name == NULL || strcmp(models->model_name[i], afe_config->wakenet_model_name) != 0)) {
-                afe_config->wakenet_model_name_2 = models->model_name[i];
-                break;
-            }
-        }
-    }
+#endif
     ESP_LOGI(TAG, "WakeNet models: [1] '%s', [2] '%s'",
              afe_config->wakenet_model_name ? afe_config->wakenet_model_name : "none",
              afe_config->wakenet_model_name_2 ? afe_config->wakenet_model_name_2 : "none");

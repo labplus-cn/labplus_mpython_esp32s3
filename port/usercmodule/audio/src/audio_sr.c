@@ -61,6 +61,9 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mp_esp_mn_commands_clear_obj, mp_esp_mn_command
 // 添加语音指令，参数：command_id（整数,不可为0），text（拼音字符串）
 // 首次调用（即上次sr.update()之后的第一次sr.add()）会自动清除旧命令词
 static mp_obj_t mp_esp_mn_commands_add(mp_obj_t command_id_obj, mp_obj_t text_obj) {
+    // sr_init() starts model loading asynchronously. Do not touch the command
+    // manager until detect_Task has allocated it for the active MultiNet.
+    wait_for_multinet_ready();
     if (pending_clear) {
         esp_mn_commands_clear();
         pending_clear = false;
@@ -81,6 +84,9 @@ static MP_DEFINE_CONST_FUN_OBJ_2(mp_esp_mn_commands_add_obj, mp_esp_mn_commands_
 static mp_obj_t mp_esp_mn_commands_update(void) {
     ESP_LOGI("SPEECH", "sr.update: waiting for multinet ready...");
     wait_for_multinet_ready();  // 确保multinet已初始化，否则命令词不生效
+    if (esp_mn_commands_get_from_index(0) == NULL) {
+        mp_raise_msg(&mp_type_ValueError, MP_ERROR_TEXT("Add at least one valid command before sr.update()"));
+    }
     ESP_LOGI("SPEECH", "sr.update: updating speech commands FST...");
     esp_mn_commands_update();
     ESP_LOGI("SPEECH", "sr.update: FST update completed");

@@ -1,6 +1,6 @@
 # MicroPython 移植与固件构建
 
-> 文件名中的 `v1.24.1` 是历史升级记录名称，不代表当前依赖版本。以仓库中的子模块和版本宏为准：目前 `micropython/py/mpconfig.h` 的版本宏为 **1.26.1**，`esp-idf` 子模块及项目使用的构建环境为 **ESP-IDF 5.4.3**。不要再按旧记录切换到 MicroPython 1.23.0、ESP-IDF 5.0.4/5.2.5，或套用旧的 IDF 补丁。
+> 本文记录当前仓库的移植与构建方式。版本信息以仓库中的子模块和版本宏为准：目前 `micropython/py/mpconfig.h` 的版本宏为 **1.26.1**，`esp-idf` 子模块及项目使用的构建环境为 **ESP-IDF 5.4.3**。不要再按旧记录切换到 MicroPython 1.23.0、ESP-IDF 5.0.4/5.2.5，或套用旧的 IDF 补丁。
 
 ## 项目结构与移植入口
 
@@ -41,7 +41,7 @@ cd port
 
 ## 构建板卡与语言版本
 
-`MICROPY_LANGUAGE` 默认是 `zh`；目前只有 `labplus_Ledong_v2` 和 `mpython_v3` 开放 `en`。每个板卡/语言组合使用独立构建目录，且同一仓库中的不同组合应串行构建，避免共享的 `managed_components/` 与组件锁文件互相干扰。
+`MICROPY_LANGUAGE` 默认是 `zh`；目前只有 `labplus_Ledong_v2` 和 `mpython_v3` 开放 `en`，英文版默认使用 `mn6_en` 命令词模型，命令短语使用大写英文（如 `TURN ON THE LIGHT`）。每个板卡/语言组合使用独立构建目录，且同一仓库中的不同组合应串行构建，避免共享的 `managed_components/` 与组件锁文件互相干扰。已有构建目录会保留 `sdkconfig` 中的旧模型选择；切换时使用新目录，或通过 `idf.py -B <构建目录> menuconfig` 选择 MN6，并在重新构建后确认 `CONFIG_SR_MN_EN_MULTINET6_QUANT=y`。
 
 ```bash
 idf.py -B build_ledong_v2_zh -D MICROPY_BOARD=labplus_Ledong_v2 -D MICROPY_LANGUAGE=zh build
@@ -93,4 +93,4 @@ WSL 下如需使用 Windows 连接的 USB 串口，先在 Windows PowerShell 用
 3. 被长期持有的 MicroPython 对象或指针需纳入 GC 根管理。可参考现有 `modespnow.c` 中的 `MP_REGISTER_ROOT_POINTER(...espnow_singleton)` 和 `MP_STATE_PORT(espnow_singleton)` 用法；移植其他模块时应结合其实际生命周期处理。
 4. UI/图片放入文件系统资源目录；英文开机 Logo 由 C 数组编入应用，不会因替换 LittleFS 中的 PNG 自动更新。TinyUSB、RMT 等组件兼容问题应先核对当前 IDF 与组件依赖，不要照旧记录直接修改 `managed_components/`。
 
-本文件保留原有历史文件名以免破坏引用；后续升级以仓库内的版本宏、子模块提交和板级配置为准。
+后续升级以仓库内的版本宏、子模块提交和板级配置为准。
