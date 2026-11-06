@@ -235,6 +235,10 @@ class SmartHomeMQTT:
         """登记一条本地规则；reader 返回 trigger 当前字段值。"""
         self.rule_engine.add_rule(rule, reader)
 
+    def add_event(self, event_id, reader, operator, value, callback, debounce_ms=500, cooldown_ms=3000):
+        """登记本地事件；回调运行在既有 MQTT 轮询调度上下文中。"""
+        self.rule_engine.add_event(event_id, reader, operator, value, callback, debounce_ms, cooldown_ms)
+
     def set_manual_override(self, endpoint_id, until_ms):
         """记录手动优先窗口（默认30秒）。"""
         self.manual_overrides[endpoint_id] = int(until_ms)

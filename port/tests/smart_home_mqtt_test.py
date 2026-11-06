@@ -736,7 +736,26 @@ def test_manual_override_priority_and_safety_lock():
     assert executed[-1] == 0
 
 
+def test_local_event_uses_scheduled_tick_and_stays_off_when_wifi_is_lost():
+    reset_fake_clients()
+    now = [0]
+    calls = []
+    home = module.SmartHomeMQTT(server='127.0.0.1', client_id='esp32_class_01',
+                                user='device_user', password='device_password',
+                                topic_key='a1b2cX7kP9', now_ms=lambda: now[0])
+    home.connect()
+    home.subscribe_commands()
+    home.add_event('event_1', lambda: 30, '>', 28, lambda: calls.append('fired'), 0, 0)
+    FakeNetwork.connected = False
+    home._scheduled_command_poll(home.command_timer_generation)
+    assert calls == []
+    FakeNetwork.connected = True
+    home._scheduled_command_poll(home.command_timer_generation)
+    assert calls == ['fired']
+
+
 # 该文件不依赖 pytest，直接在 MicroPython REPL 中运行即可执行全部行为测试。
+test_local_event_uses_scheduled_tick_and_stays_off_when_wifi_is_lost()
 test_sensor_state_cache_reuses_a_sample_for_rule_readers()
 test_set_command_runs_registered_action_and_acknowledges()
 test_default_keepalive_detects_abnormal_program_stop_promptly()

@@ -264,6 +264,66 @@ def test_rule_executed_event_contains_action_details_and_source():
     assert event['actions'] == [{'endpoint_id': 'relay_01', 'action': 'set_power', 'data': {'power': True}}]
 
 
+def test_callback_event_runs_once_per_entry_and_rearms():
+    now = [0]
+    reading = [27]
+    calls = []
+    rules = SmartHomeRules(FakeHome(), now_ms=lambda: now[0])
+    rules.add_event('evt1', lambda: reading[0], '>', 28, lambda: calls.append('fired'), 500, 3000)
+    rules.tick()
+    reading[0] = 29
+    rules.tick()
+    now[0] = 500
+    rules.tick()
+    now[0] = 600
+    rules.tick()
+    assert calls == ['fired']
+    reading[0] = 27
+    rules.tick()
+    now[0] = 4000
+    reading[0] = 30
+    rules.tick()
+    now[0] = 4500
+    rules.tick()
+    assert calls == ['fired', 'fired']
+
+
+def test_callback_exception_does_not_stop_other_rules():
+    calls = []
+    rules = SmartHomeRules(FakeHome(), now_ms=lambda: 0)
+    def fail():
+        raise ValueError('failure')
+    rules.add_event('bad', lambda: 30, '>', 28, fail, 0, 0)
+    rules.add_event('good', lambda: 30, '>', 28, lambda: calls.append('ok'), 0, 0)
+    rules.tick()
+    assert calls == ['ok']
+
+
+def test_callback_reentry_inside_cooldown_is_skipped_until_next_transition():
+    now = [0]
+    reading = [30]
+    calls = []
+    rules = SmartHomeRules(FakeHome(), now_ms=lambda: now[0])
+    rules.add_event('evt', lambda: reading[0], '>', 28, lambda: calls.append('fired'), 0, 3000)
+    rules.tick()
+    reading[0] = 20
+    rules.tick()
+    reading[0] = 30
+    now[0] = 1000
+    rules.tick()
+    now[0] = 4000
+    rules.tick()
+    assert calls == ['fired']
+    reading[0] = 20
+    rules.tick()
+    reading[0] = 30
+    rules.tick()
+    assert calls == ['fired', 'fired']
+
+
+test_callback_event_runs_once_per_entry_and_rearms()
+test_callback_exception_does_not_stop_other_rules()
+test_callback_reentry_inside_cooldown_is_skipped_until_next_transition()
 test_rule_waits_for_debounce_and_runs_once()
 test_cooldown_blocks_retrigger_until_next_window()
 test_failed_action_is_reported_and_rule_can_be_updated_without_duplicate_registration()

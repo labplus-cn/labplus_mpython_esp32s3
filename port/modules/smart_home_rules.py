@@ -76,6 +76,21 @@ class SmartHomeRules:
         if rule_id in self.rules:
             del self.rules[rule_id]
 
+    def add_event(self, event_id, reader, operator, value, callback, debounce_ms=500, cooldown_ms=3000):
+        """Register a board-local callback; arbitrary callback code is not a platform rule."""
+        if (not event_id or not callable(reader) or not callable(callback) or
+                operator not in ('>', '>=', '<', '<=', '==', '!=') or
+                not isinstance(debounce_ms, int) or debounce_ms < 0 or
+                not isinstance(cooldown_ms, int) or cooldown_ms < 0):
+            raise ValueError('invalid_rule')
+        self.rules[event_id] = {
+            'rule': {'rule_id': event_id, 'trigger': {'operator': operator, 'value': value},
+                     'debounce_ms': debounce_ms, 'cooldown_ms': cooldown_ms},
+            'reader': reader, 'callback': callback, 'was_matched': False,
+            'candidate_since': None, 'fired_active': False, 'last_run_at': None,
+            'last_skip_at': None
+        }
+
     def _compare(self, actual, operator, expected):
         try:
             if operator == '>':
@@ -112,6 +127,14 @@ class SmartHomeRules:
     def _execute(self, entry, now):
         rule = entry['rule']
         rule_id = rule.get('rule_id')
+        if 'callback' in entry:
+            entry['last_run_at'] = now
+            entry['last_skip_at'] = None
+            try:
+                entry['callback']()
+            except Exception:
+                pass  # One user callback must not prevent evaluation of later rules.
+            return
         actions = rule.get('actions') or []
         action_data = []
         try:
@@ -157,7 +180,8 @@ class SmartHomeRules:
             actual = entry['reader']()
         except Exception:
             if not entry['was_matched']:
-                self._event(rule.get('rule_id'), 'failed', 0, 'read_failed')
+                if 'callback' not in entry:
+                    self._event(rule.get('rule_id'), 'failed', 0, 'read_failed')
             entry['was_matched'] = False
             entry['candidate_since'] = None
             entry['fired_active'] = False
@@ -189,7 +213,8 @@ class SmartHomeRules:
             entry['fired_active'] = True
             if entry.get('last_skip_at') is None:
                 entry['last_skip_at'] = now
-                self._event(rule.get('rule_id'), 'skipped', 0, 'cooldown')
+                if 'callback' not in entry:
+                    self._event(rule.get('rule_id'), 'skipped', 0, 'cooldown')
             return
 
         entry['fired_active'] = True
