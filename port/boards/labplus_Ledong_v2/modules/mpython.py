@@ -177,6 +177,7 @@ class wifi:
             time.sleep_ms(500)
         print("")
         print('WiFi(%s,%sdBm) Connection Successful, Config:%s' % (ssid, str(wifi_dbm), str(self.sta.ifconfig())))
+        sync_ntp(utc=0, host="time.windows.com")
 
     def disconnectWiFi(self):
         if self.sta.isconnected():

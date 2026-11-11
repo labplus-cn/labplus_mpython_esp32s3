@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 
 try:
     import ujson
@@ -11,6 +12,14 @@ except ImportError:
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'modules')))
 from smart_home_rules import SmartHomeRules
+
+
+def wait_callbacks(rules):
+    for _ in range(200):
+        if not rules._callback_worker_running:
+            return
+        time.sleep(0.005)
+    raise AssertionError('callback worker did not finish')
 
 
 class FakeHome:
@@ -277,6 +286,7 @@ def test_callback_event_runs_once_per_entry_and_rearms():
     rules.tick()
     now[0] = 600
     rules.tick()
+    wait_callbacks(rules)
     assert calls == ['fired']
     reading[0] = 27
     rules.tick()
@@ -285,6 +295,7 @@ def test_callback_event_runs_once_per_entry_and_rearms():
     rules.tick()
     now[0] = 4500
     rules.tick()
+    wait_callbacks(rules)
     assert calls == ['fired', 'fired']
 
 
@@ -296,6 +307,7 @@ def test_callback_exception_does_not_stop_other_rules():
     rules.add_event('bad', lambda: 30, '>', 28, fail, 0, 0)
     rules.add_event('good', lambda: 30, '>', 28, lambda: calls.append('ok'), 0, 0)
     rules.tick()
+    wait_callbacks(rules)
     assert calls == ['ok']
 
 
@@ -306,6 +318,7 @@ def test_callback_reentry_inside_cooldown_is_skipped_until_next_transition():
     rules = SmartHomeRules(FakeHome(), now_ms=lambda: now[0])
     rules.add_event('evt', lambda: reading[0], '>', 28, lambda: calls.append('fired'), 0, 3000)
     rules.tick()
+    wait_callbacks(rules)
     reading[0] = 20
     rules.tick()
     reading[0] = 30
@@ -318,6 +331,7 @@ def test_callback_reentry_inside_cooldown_is_skipped_until_next_transition():
     rules.tick()
     reading[0] = 30
     rules.tick()
+    wait_callbacks(rules)
     assert calls == ['fired', 'fired']
 
 

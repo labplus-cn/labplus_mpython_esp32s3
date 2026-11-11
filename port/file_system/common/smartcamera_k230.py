@@ -6,12 +6,31 @@ import gc
 import sys
 gc.collect()
 
+DEFAULT_BAUDRATE = 1152000
+SUPPORTED_BAUDRATES = (115200, 1152000)
+HANDSHAKE_INTERVAL_MS = 1000
+
+
+def _validate_baudrate(baudrate):
+    """校验上电时使用的 UART 波特率。"""
+    if type(baudrate) is not int or baudrate not in SUPPORTED_BAUDRATES:
+        raise ValueError(
+            "baudrate must be one of {}".format(SUPPORTED_BAUDRATES)
+        )
+    return baudrate
+
+
 class SmartCameraK230:
-    def __init__(self, tx=Pin.P1, rx=Pin.P0):
+    def __init__(self, tx=Pin.P1, rx=Pin.P0, baudrate=DEFAULT_BAUDRATE):
+        self._tx_pin = tx
+        self._rx_pin = rx
+        # 掌控板端只使用启动时指定的固定速率，不主动扫描匹配。
+        baudrate = _validate_baudrate(baudrate)
         # K230 字符串帧最大约 2071 字节，1024 字节会在 ESP32-S3 UART
         # 硬件层直接截断，必须与协议解析缓冲区保持同量级。
-        self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
-        # self.uart = UART(2, baudrate=1152000, tx=tx, rx=rx)
+        self.uart = UART(2, baudrate=baudrate, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
+        # self.uart = UART(2, baudrate=baudrate, tx=tx, rx=rx)
+        self.baudrate = baudrate
         self.mode = DEFAULT_MODE
         self.lock = False
         self.slc_parameter = [3, 15, 11, 1]
@@ -21,6 +40,7 @@ class SmartCameraK230:
         self.tf_sn = ''
         self.rx_buffer = bytearray()
         self._timer_busy = False
+        self._last_handshake_ms = time.ticks_ms()
 
         time.sleep(0.01)
         self.wait_for_ai_init()
@@ -40,7 +60,16 @@ class SmartCameraK230:
             # CPython 或精简版固件可能没有 sys.print_exception。
             pass
   
-    def wait_for_ai_init(self): 
+    def wait_for_ai_init(self):
+        self.lock = True
+        if not self._wait_for_ai_init(800):
+            # 超时不能永久锁住 UART；定时器启动后继续发送握手并监听应答。
+            self.lock = False
+            self._last_handshake_ms = time.ticks_ms()
+            _print_i18n('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！',
+                        'Error: Communication timeout. Check the wiring and controller expansion power.')
+
+    def _wait_for_ai_init(self, attempts):
         self.lock = True
         num = 0
         rx_buffer = bytearray()  # 接收缓冲区
@@ -49,14 +78,12 @@ class SmartCameraK230:
             gc.collect()
             num += 1
             
-            if num > 200:
-                _print_i18n('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！',
-                            'Error: Communication timeout. Check the wiring and controller expansion power.')
-                break
+            if num > attempts:
+                return False
                 
             # 发送初始化命令
             AI_Uart_CMD(self.uart, 0x01, 0xFF)
-            time.sleep_ms(100)
+            time.sleep_ms(50)
             
             # 读取可用数据到缓冲区
             if self.uart.any():
@@ -74,8 +101,8 @@ class SmartCameraK230:
                         break
                 
                 if packet_start == -1:
-                    # 没有找到包头，清除无效数据
-                    rx_buffer = bytearray()
+                    # 保留可能跨两次读取的包头首字节。
+                    rx_buffer = rx_buffer[-1:] if rx_buffer[-1] == 0xBB else bytearray()
                     break
                 
                 # 移除包头前的无效数据
@@ -112,8 +139,9 @@ class SmartCameraK230:
                             rx_buffer = self.uart.read()
                             del rx_buffer
                             gc.collect()
+                            self._last_handshake_ms = time.ticks_ms()
                             self.lock = False
-                            return
+                            return True
                         else:
                             # 不是期望的响应，移除这个包继续处理
                             rx_buffer = rx_buffer[12:]
@@ -231,11 +259,19 @@ class SmartCameraK230:
         finally:
             self._timer_busy = False
 
+    def _send_handshake_heartbeat(self):
+        """连接建立后定期发送握手，便于 K230 检测掌控板重启或换速率。"""
+        now_ms = time.ticks_ms()
+        if time.ticks_diff(now_ms, self._last_handshake_ms) >= HANDSHAKE_INTERVAL_MS:
+            AI_Uart_CMD(self.uart, 0x01, 0xFF)
+            self._last_handshake_ms = now_ms
+
     def uart_thread(self):
         gc.collect()
         CMD = None
         try:
             if(self.lock==False):
+                self._send_handshake_heartbeat()
                 # 使用成员缓冲区，保留分包、粘包以及一次读取中的剩余帧。
                 CMD = uart_handle(self.uart, self.rx_buffer)
                 # print(CMD)

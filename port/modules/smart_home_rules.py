@@ -5,6 +5,7 @@
 """
 
 import time
+import _thread
 try:
     import ujson
 except ImportError:
@@ -24,12 +25,98 @@ except AttributeError:
 
 
 class SmartHomeRules:
-    """在 MQTT 辅助模块的 scheduled tick 中执行本地规则。"""
+    """在 scheduled tick 中求值；用户事件回调由有界 FIFO 工作线程执行。"""
 
     def __init__(self, owner, now_ms=None):
         self.owner = owner
         self.rules = {}
         self._now_ms = now_ms or _ticks_ms
+        self._callback_queue = []
+        self._callback_lock = _thread.allocate_lock()
+        self._callback_worker_running = False
+        self._callback_generation = 0
+        self.callback_rejections = 0
+        self.callback_failures = 0
+        self.last_callback_error = None
+
+    def _callback_error(self, event_id, error, rejected=False):
+        # Keep diagnostics local: publishing here would race the MQTT socket or
+        # synchronously reconnect from the scheduled poll we are protecting.
+        if rejected:
+            self.callback_rejections += 1
+        else:
+            self.callback_failures += 1
+        self.last_callback_error = {'event_id': event_id, 'error': str(error)}
+        print('smart_home callback', event_id, str(error))
+
+    def cancel_callbacks(self):
+        """Invalidate queued work on disconnect; an in-flight callback cannot be killed."""
+        self._callback_generation += 1
+
+    def _queue_callback(self, entry):
+        event_id = entry['rule']['rule_id']
+        # A scheduled callback may interrupt the worker holding this lock. Never
+        # wait in the producer: that could deadlock MicroPython's scheduler/GIL.
+        if not self._callback_lock.acquire(False):
+            self._callback_error(event_id, 'callback_queue_busy', True)
+            return
+        error = None
+        try:
+            if entry.get('callback_pending'):
+                return  # Coalesce edges while this event is queued or running.
+            if len(self._callback_queue) >= 8:
+                error = 'callback_queue_full'
+            else:
+                entry['callback_pending'] = True
+                self._callback_queue.append((entry, self._callback_generation))
+                if not self._callback_worker_running:
+                    self._callback_worker_running = True
+                    try:
+                        _thread.start_new_thread(self._run_callbacks, ())
+                    except Exception as exc:
+                        self._callback_worker_running = False
+                        self._callback_queue.pop()
+                        entry['callback_pending'] = False
+                        error = 'callback_worker_start_failed: ' + str(exc)
+        finally:
+            self._callback_lock.release()
+        if error:
+            # Reject newest, consume this edge, and retain existing FIFO order.
+            self._callback_error(event_id, error, True)
+
+    def _run_callbacks(self):
+        while True:
+            self._callback_lock.acquire()
+            try:
+                if not self._callback_queue:
+                    self._callback_worker_running = False
+                    return  # No permanent thread/resource leak after events stop.
+                entry, generation = self._callback_queue.pop(0)
+            finally:
+                self._callback_lock.release()
+            event_id = entry['rule']['rule_id']
+            callback_started = False
+            try:
+                # Removed/replaced events and disconnected sessions must not run
+                # stale queued cloud commands after a slow earlier callback.
+                if (generation == self._callback_generation and
+                        self.rules.get(event_id) is entry):
+                    begin_callback = getattr(self.owner, '_begin_rule_callback', None)
+                    if callable(begin_callback):
+                        begin_callback(generation)
+                        callback_started = True
+                    entry['callback']()
+            except BaseException as error:
+                # A user SystemExit/KeyboardInterrupt belongs to this task, not
+                # the worker lifetime; otherwise later queued work is stranded.
+                self._callback_error(event_id, error)
+            finally:
+                if callback_started:
+                    try:
+                        self.owner._end_rule_callback(generation)
+                    except BaseException as error:
+                        self._callback_error(event_id, error)
+                entry['callback_pending'] = False
 
     def _announce(self, rule):
         """规则上报是平台展示附加能力，失败时不能阻断本地控制。"""
@@ -130,10 +217,7 @@ class SmartHomeRules:
         if 'callback' in entry:
             entry['last_run_at'] = now
             entry['last_skip_at'] = None
-            try:
-                entry['callback']()
-            except Exception:
-                pass  # One user callback must not prevent evaluation of later rules.
+            self._queue_callback(entry)
             return
         actions = rule.get('actions') or []
         action_data = []

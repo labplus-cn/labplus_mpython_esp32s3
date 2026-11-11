@@ -8,6 +8,7 @@ except ImportError:
     network = None
 import micropython
 import time
+import _thread
 from machine import Timer
 from umqtt.robust import MQTTClient
 from smart_home_rules import SmartHomeRules
@@ -26,6 +27,7 @@ except AttributeError:
 
 
 COMMAND_RESULT_LIMIT = 64
+CALLBACK_PUBLISH_BUDGET = 8
 
 
 
@@ -87,6 +89,15 @@ class SmartHomeMQTT:
         self._registered_rules = {}
         self._announced_rules = set()
         self.rule_engine = SmartHomeRules(self, now_ms=self._now_ms)
+        # Rule callbacks run on a worker thread. Any MQTT publishes they request
+        # are handed back to the scheduled poll thread to keep the client socket
+        # single-owner and avoid racing publish() against check_msg().
+        self._callback_publish_generation = None
+        self._callback_publish_queue = []
+        self._callback_publish_lock = _thread.allocate_lock()
+        self.callback_publish_rejections = 0
+        self.callback_publish_failures = 0
+        self.last_callback_publish_error = None
         # publish() 等待 QoS 1 PUBACK 时，不能让定时轮询读取同一个 socket。
         self._mqtt_io_busy = False
         # 防止 robust.wait_msg() 在恢复回调发布消息时重入同一组恢复回调。
@@ -123,6 +134,26 @@ class SmartHomeMQTT:
 
     def _publish(self, channel, endpoint_id, data=None, qos=1, **fields):
         message = self._encode(channel, endpoint_id, data, **fields)
+        generation = self._callback_publish_generation
+        if generation is not None:
+            if generation != self.rule_engine._callback_generation:
+                self.callback_publish_rejections += 1
+                self.last_callback_publish_error = 'callback_invalidated'
+                return False
+            if not self._callback_publish_lock.acquire(False):
+                self.callback_publish_rejections += 1
+                self.last_callback_publish_error = 'callback_publish_queue_busy'
+                return False
+            try:
+                if len(self._callback_publish_queue) >= 32:
+                    self.callback_publish_rejections += 1
+                    self.last_callback_publish_error = 'callback_publish_queue_full'
+                    return False
+                queued_data = dict(data) if isinstance(data, dict) else data
+                self._callback_publish_queue.append((generation, message, qos, channel, endpoint_id, queued_data))
+            finally:
+                self._callback_publish_lock.release()
+            return 'queued'
         previous_io_busy = self._mqtt_io_busy
         self._mqtt_io_busy = True
         try:
@@ -130,6 +161,51 @@ class SmartHomeMQTT:
         finally:
             # 重连时可能递归发送端点声明；恢复外层状态，避免保护被提前解除。
             self._mqtt_io_busy = previous_io_busy
+        return True
+
+    def _begin_rule_callback(self, generation):
+        self._callback_publish_generation = generation
+
+    def _end_rule_callback(self, generation):
+        if self._callback_publish_generation == generation:
+            self._callback_publish_generation = None
+
+    def _flush_callback_publishes(self):
+        """Publish queued callback messages only from the MQTT polling context."""
+        if not self.connected:
+            return
+        for _ in range(CALLBACK_PUBLISH_BUDGET):
+            if not self._callback_publish_lock.acquire(False):
+                return
+            try:
+                if not self._callback_publish_queue:
+                    return
+                item = self._callback_publish_queue.pop(0)
+            finally:
+                self._callback_publish_lock.release()
+            generation, message, qos, channel, endpoint_id, data = item
+            if generation != self.rule_engine._callback_generation:
+                continue
+            previous_io_busy = self._mqtt_io_busy
+            self._mqtt_io_busy = True
+            try:
+                self.client.publish(self.topic, message, retain=False, qos=qos)
+            except Exception as error:
+                self.callback_publish_failures += 1
+                self.last_callback_publish_error = str(error)
+                if channel == 'state' and isinstance(data, dict):
+                    self._queue_latest_state(endpoint_id, data)
+                return
+            finally:
+                self._mqtt_io_busy = previous_io_busy
+            if channel == 'state' and self.pending_states.get(endpoint_id) == data:
+                self.pending_states.pop(endpoint_id, None)
+            elif channel == 'register':
+                self.announced_endpoints.add(endpoint_id)
+            elif channel == 'rule' and isinstance(data, dict):
+                rule_id = data.get('rule_id')
+                if rule_id:
+                    self._announced_rules.add(rule_id)
 
     def connect(self):
         self.client.connect()
@@ -141,6 +217,12 @@ class SmartHomeMQTT:
         self._flush_pending_states()
 
     def disconnect(self):
+        self.rule_engine.cancel_callbacks()
+        self._callback_publish_lock.acquire()
+        try:
+            self._callback_publish_queue = []
+        finally:
+            self._callback_publish_lock.release()
         self._enter_offline_protection('disconnect')
         try:
             self.client.disconnect()
@@ -206,8 +288,8 @@ class SmartHomeMQTT:
         if not force and endpoint_id in self.announced_endpoints:
             return
         endpoint = self.endpoints[endpoint_id]
-        self._publish('register', endpoint_id, self._registration_data(endpoint), qos=1)
-        self.announced_endpoints.add(endpoint_id)
+        if self._publish('register', endpoint_id, self._registration_data(endpoint), qos=1) is True:
+            self.announced_endpoints.add(endpoint_id)
 
     def _announce_registered_endpoints(self, force=False):
         for endpoint_id in self.endpoints:
@@ -220,23 +302,23 @@ class SmartHomeMQTT:
             raise ValueError('invalid_rule')
         self._registered_rules[rule_id] = ujson.loads(ujson.dumps(rule))
         if self.connected:
-            self._publish('rule', self.rule_endpoint_id, self._registered_rules[rule_id], qos=1)
-            self._announced_rules.add(rule_id)
+            if self._publish('rule', self.rule_endpoint_id, self._registered_rules[rule_id], qos=1) is True:
+                self._announced_rules.add(rule_id)
 
     def _announce_registered_rules(self, force=False):
         if not self.connected:
             return
         for rule_id in self._registered_rules:
             if force or rule_id not in self._announced_rules:
-                self._publish('rule', self.rule_endpoint_id, self._registered_rules[rule_id], qos=1)
-                self._announced_rules.add(rule_id)
+                if self._publish('rule', self.rule_endpoint_id, self._registered_rules[rule_id], qos=1) is True:
+                    self._announced_rules.add(rule_id)
 
     def add_rule(self, rule, reader):
         """登记一条本地规则；reader 返回 trigger 当前字段值。"""
         self.rule_engine.add_rule(rule, reader)
 
     def add_event(self, event_id, reader, operator, value, callback, debounce_ms=500, cooldown_ms=3000):
-        """登记本地事件；回调运行在既有 MQTT 轮询调度上下文中。"""
+        """登记本地事件；轮询只求值，回调在独立有界工作线程中串行运行。"""
         self.rule_engine.add_event(event_id, reader, operator, value, callback, debounce_ms, cooldown_ms)
 
     def set_manual_override(self, endpoint_id, until_ms):
@@ -290,8 +372,8 @@ class SmartHomeMQTT:
                 self.pending_states.pop(endpoint_id, None)
                 continue
             try:
-                self._publish('state', endpoint_id, data, qos=1)
-                self.pending_states.pop(endpoint_id, None)
+                if self._publish('state', endpoint_id, data, qos=1) is True:
+                    self.pending_states.pop(endpoint_id, None)
             except Exception:
                 break
 
@@ -301,9 +383,12 @@ class SmartHomeMQTT:
             self._queue_latest_state(endpoint_id, data)
             return
         try:
-            self._publish('state', endpoint_id, data)
-            if endpoint_id in self.pending_states:
-                self.pending_states.pop(endpoint_id, None)
+            result = self._publish('state', endpoint_id, data)
+            if result is True:
+                if endpoint_id in self.pending_states:
+                    self.pending_states.pop(endpoint_id, None)
+            else:
+                self._queue_latest_state(endpoint_id, data)
         except Exception:
             self._queue_latest_state(endpoint_id, data)
 
@@ -347,9 +432,11 @@ class SmartHomeMQTT:
             try:
                 # 直接发布，保留 reader 来源的缓存时间，避免每次规则 tick
                 # 都把缓存标成新的主循环采样。
-                self._publish('state', endpoint_id, self._state_cache[endpoint_id], qos=1)
-                if endpoint_id in self.pending_states:
+                result = self._publish('state', endpoint_id, self._state_cache[endpoint_id], qos=1)
+                if result is True and endpoint_id in self.pending_states:
                     self.pending_states.pop(endpoint_id, None)
+                elif result is not True:
+                    self._queue_latest_state(endpoint_id, self._state_cache[endpoint_id])
             except Exception:
                 # 平台暂不可用不应阻断本地规则；进入待补发队列并在下一次缓存过期后继续采样。
                 self._queue_latest_state(endpoint_id, self._state_cache[endpoint_id])
@@ -420,6 +507,7 @@ class SmartHomeMQTT:
                 self._leave_offline_protection()
                 self.check_msg()
                 self.rule_engine.tick()
+                self._flush_callback_publishes()
         finally:
             if generation == self.command_timer_generation:
                 self.command_poll_pending = False

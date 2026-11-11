@@ -7,6 +7,7 @@
 
 import sys
 import os
+import time
 try:
     import ujson
 except ImportError:
@@ -751,6 +752,10 @@ def test_local_event_uses_scheduled_tick_and_stays_off_when_wifi_is_lost():
     assert calls == []
     FakeNetwork.connected = True
     home._scheduled_command_poll(home.command_timer_generation)
+    for _ in range(200):
+        if not home.rule_engine._callback_worker_running:
+            break
+        time.sleep(0.005)
     assert calls == ['fired']
 
 
