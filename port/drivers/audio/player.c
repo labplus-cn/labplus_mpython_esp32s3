@@ -11,6 +11,7 @@
 #include "bsp_audio.h"
 #include "simple_file_decoder.h"
 #include "simple_http_decoder.h"
+#include "esp_audio_simple_dec.h"
 #include "http_stream.h"
 
 #define TAG    "player"
