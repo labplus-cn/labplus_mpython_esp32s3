@@ -27,3 +27,4 @@ port/build*
 port/firmware*
 port/lockfiles/dependencies.lock.esp32s3
 port/tests/test_firmware_language.py
+port/file_system/common/smartcamera_k230.pyc
