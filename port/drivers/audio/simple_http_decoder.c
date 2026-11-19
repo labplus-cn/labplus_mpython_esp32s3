@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -71,33 +72,51 @@ void simple_http_read_task(void *arg)
     uint8_t *buffer = NULL;
     size_t len;
     EventBits_t uxBits;
+    bool decoder_started = false;
 
-    do{
-        if(http_open(player->file_uri) != ESP_OK){ break; }
+    do {
+        if (http_open(player->file_uri) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to open HTTP stream");
+            break;
+        }
         buffer = malloc(READ_SIZE);
-        if(!buffer){ break; }
-
-        while(1){ //填满ringbuff
-            ringBufFreeBytes = rb_bytes_available(player->decode_ringbuff);
-            if( ringBufFreeBytes >= READ_SIZE){
-                len =  http_read((char *)buffer, READ_SIZE);
-                if(len > 0){
-                    rb_write(player->decode_ringbuff, (char *)buffer, len, 100/portTICK_PERIOD_MS);
-                }
-            }else{ break;}
+        if (!buffer) {
+            break;
         }
 
-        xTaskCreatePinnedToCore(&simple_http_decoder_task, "simple_http_decoder_task", 4 * 1024, (void*)player, 8, &player->simple_http_decoder_task_handle, CORE_NUM1);
-
-        while(1){
+        while (1) { // 填满 ring buffer
             ringBufFreeBytes = rb_bytes_available(player->decode_ringbuff);
-            if( ringBufFreeBytes >= READ_SIZE){
-                len =  http_read((char *)buffer, READ_SIZE);
-                if(len > 0){
+            if (ringBufFreeBytes >= READ_SIZE) {
+                len = http_read((char *)buffer, READ_SIZE);
+                if (len > 0) {
+                    rb_write(player->decode_ringbuff, (char *)buffer, len, 100/portTICK_PERIOD_MS);
+                }
+                if (len < READ_SIZE) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        BaseType_t task_result = xTaskCreatePinnedToCore(
+            &simple_http_decoder_task, "simple_http_decoder_task", 4 * 1024,
+            (void *)player, 8, &player->simple_http_decoder_task_handle, CORE_NUM1);
+        if (task_result != pdPASS) {
+            player->simple_http_decoder_task_handle = NULL;
+            break;
+        }
+        decoder_started = true;
+
+        while (1) {
+            ringBufFreeBytes = rb_bytes_available(player->decode_ringbuff);
+            if (ringBufFreeBytes >= READ_SIZE) {
+                len = http_read((char *)buffer, READ_SIZE);
+                if (len > 0) {
                     rb_write(player->decode_ringbuff, (char *)buffer, len, 100/portTICK_PERIOD_MS);
                 }
 
-                if(len < READ_SIZE){  //文件读完了
+                if (len < READ_SIZE) { // 文件读完了
                     break;
                 }
             }
@@ -108,17 +127,25 @@ void simple_http_read_task(void *arg)
                     pdTRUE,         // BIT_0 and BIT_4 should be cleared before returning.
                     pdFALSE,         // not wait for both bits, either bit will do.
                     20 / portTICK_PERIOD_MS ); // Wait a maximum of 100ms for either bit to be set.
-            if( ( uxBits & EV_PLAY_STOP) ==  EV_PLAY_STOP ){
+            if ((uxBits & EV_PLAY_STOP) == EV_PLAY_STOP) {
                 xEventGroupSetBits(player->player_event, EV_READ_END);
                 break;
             }
         }
-    }while(0);
+    } while (0);
 
-    http_close();
-    if(buffer){ free(buffer);}
+    if (buffer) {
+        free(buffer);
+    }
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    // ESP_LOGE(TAG, "simple_http_read_task end, RAM left: %ld", esp_get_free_heap_size());
+    player->simple_http_read_task_handle = NULL;
+    if (decoder_started) {
+        player_task_done(player, EV_PLAY_HTTP_READ_DONE);
+    } else {
+        player->simple_http_decoder_task_handle = NULL;
+        player_task_done(player,
+            EV_PLAY_HTTP_READ_DONE | EV_PLAY_HTTP_DECODER_DONE);
+    }
     vTaskDelete(NULL);
 }
 
@@ -133,24 +160,35 @@ void simple_http_decoder_task(void *arg)
     uint8_t *out_buf = NULL;
     esp_audio_simple_dec_handle_t decoder = NULL;
     EventBits_t uxBits;
+    bool decoder_registered = false;
+    bool simple_decoder_registered = false;
+    bool codec_open = false;
+    bool decoder_failed = false;
 
     do { //执行一次，便于用break实现出错统一退出
         esp_audio_dec_register_default();
+        decoder_registered = true;
         if(esp_audio_simple_dec_register_default() != ESP_AUDIO_ERR_OK){
+            decoder_failed = true;
             break;
         }
+        simple_decoder_registered = true;
 
         in_buf = malloc(READ_SIZE);
         out_buf = malloc(max_out_size);
         if (in_buf == NULL || out_buf == NULL) {
             ESP_LOGE(TAG, "No memory for decoder");
             ret = ESP_AUDIO_ERR_MEM_LACK;
+            decoder_failed = true;
             break;
         }
         
         simp_dec_all_t all_cfg = {};
         http_stream_t *http = get_http_handle();
-        if(!http){ break; }
+        if (!http) {
+            decoder_failed = true;
+            break;
+        }
         // ESP_LOGE(TAG, "http stream type : %d", http->stream_type);
         esp_audio_simple_dec_cfg_t dec_cfg = {
             .dec_type = http->stream_type,
@@ -159,6 +197,7 @@ void simple_http_decoder_task(void *arg)
         get_simple_decoder_config(&dec_cfg);
         if (esp_audio_simple_dec_open(&dec_cfg, &decoder) != ESP_AUDIO_ERR_OK) {
             ESP_LOGE(TAG, "Fail to open simple decoder");
+            decoder_failed = true;
             break;
         }
 
@@ -184,6 +223,7 @@ void simple_http_decoder_task(void *arg)
                     // Handle output buffer not enough case
                     uint8_t *new_buf = realloc(out_buf, out_frame.needed_size);
                     if (new_buf == NULL) {
+                        decoder_failed = true;
                         break;
                     }
                     out_buf = new_buf;
@@ -194,6 +234,7 @@ void simple_http_decoder_task(void *arg)
                 }
                 if (ret != ESP_AUDIO_ERR_OK) {
                     ESP_LOGE(TAG, "Fail to decode data ret %d", ret);
+                    decoder_failed = true;
                     break;
                 }
                 if (out_frame.decoded_size) { //有解码数据
@@ -202,6 +243,7 @@ void simple_http_decoder_task(void *arg)
                         esp_audio_simple_dec_info_t dec_info = {};
                         esp_audio_simple_dec_get_info(decoder, &dec_info);
                         bsp_codec_dev_open(dec_info.sample_rate, dec_info.channel, dec_info.bits_per_sample);
+                        codec_open = true;
                     }
                     total_decoded += out_frame.decoded_size;
                     bsp_audio_play((int8_t *)out_frame.buffer, out_frame.decoded_size, portMAX_DELAY);
@@ -209,6 +251,10 @@ void simple_http_decoder_task(void *arg)
                 // In case that input data contain multiple frames
                 raw.len -= raw.consumed;
                 raw.buffer += raw.consumed;
+            }
+
+            if (decoder_failed) {
+                break;
             }
             
             if(raw.eos){ break; } //播完
@@ -223,19 +269,31 @@ void simple_http_decoder_task(void *arg)
                 break;
             }  
         }
-        bsp_codec_dev_close();
     } while (0);
 
-    player->player_state = PLAYER_STATE_STOPPED;
-    esp_audio_simple_dec_close(decoder);
-    esp_audio_simple_dec_unregister_default();
-    esp_audio_dec_unregister_default();
+    if (decoder_failed) {
+        xEventGroupSetBits(player->player_event, EV_PLAY_STOP);
+    }
+    if (codec_open) {
+        bsp_codec_dev_close();
+    }
+    if (decoder) {
+        esp_audio_simple_dec_close(decoder);
+    }
+    if (simple_decoder_registered) {
+        esp_audio_simple_dec_unregister_default();
+    }
+    if (decoder_registered) {
+        esp_audio_dec_unregister_default();
+    }
     if (in_buf) {
         free(in_buf);
     }
     if (out_buf) {
         free(out_buf);
     }
+    player->simple_http_decoder_task_handle = NULL;
+    player_task_done(player, EV_PLAY_HTTP_DECODER_DONE);
     // ESP_LOGE(TAG, "simple_http_decoder_task end, RAM left: %ld", esp_get_free_heap_size());
     vTaskDelete(NULL);
 }

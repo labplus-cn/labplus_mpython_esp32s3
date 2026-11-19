@@ -20,3 +20,6 @@ managed_components/
 port/tests/test_codexpad_mac.py
 port/tests/test_k230_voice_lists.py
 port/eim_config.toml
+port/littlefs.bin
+port/build*
+port/firmware_compare*

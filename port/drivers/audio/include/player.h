@@ -12,6 +12,12 @@
 #define EV_READ_END                  0x08
 #define EV_PLAY_READ_TASK_PAUSE      0x10
 #define EV_PLAY_WRITE_TASK_PAUSE     0x20
+#define EV_PLAY_FILE_DONE            0x40
+#define EV_PLAY_HTTP_READ_DONE       0x80
+#define EV_PLAY_HTTP_DECODER_DONE    0x100
+#define EV_PLAY_SESSION_DONE         0x200
+#define EV_PLAY_COMPLETION_BITS      (EV_PLAY_FILE_DONE | EV_PLAY_HTTP_READ_DONE | EV_PLAY_HTTP_DECODER_DONE | EV_PLAY_SESSION_DONE)
+#define PLAYER_STOP_TIMEOUT_MS      31000
 typedef enum{
     AUDIO_WAV_FILE_PLAY,
     AUDIO_WAV_FILE_RECORD,
@@ -51,6 +57,7 @@ void player_resume(void);
 void player_stop(void);
 void player_deinit(void);
 int player_get_state(void);
+void player_task_done(player_handle_t *player, EventBits_t done_bits);
 void player_set_vol(int vol);
 void player_increase_vol(void);
 void player_decrease_vol(void);

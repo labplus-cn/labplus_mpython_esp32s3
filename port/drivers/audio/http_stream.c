@@ -251,6 +251,7 @@ esp_err_t http_open(const char *uri)
         http->is_open = true;
     }else{
         esp_http_client_cleanup(http->client);
+        http->client = NULL;
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -263,20 +264,22 @@ esp_err_t http_open(const char *uri)
 void http_close(void)
 {
     if(http){
+        http_stream_t *stream = http;
+        http = NULL;
         ESP_LOGD(TAG, "_http_close");
-        if (http->is_open)
-            http->is_open = false;
+        if (stream->is_open)
+            stream->is_open = false;
 
         // if (http->gzip) {
         //     gzip_miniz_deinit(http->gzip);
         //     http->gzip = NULL;
         // }
-        if (http->client) {
-            esp_http_client_close(http->client);
-            esp_http_client_cleanup(http->client);
-            http->client = NULL;
+        if (stream->client) {
+            esp_http_client_close(stream->client);
+            esp_http_client_cleanup(stream->client);
+            stream->client = NULL;
         }
-        free(http);
+        free(stream);
     }
 }
 

@@ -110,12 +110,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(audio_volume_obj, audio_volume);
 
 static mp_obj_t audio_get_status(void)
 {
-    // player_status_t status = player_get_status();
-    // if(status == RUNNING || status == PAUSED){
-    //     return MP_OBJ_NEW_SMALL_INT(1); 
-    // }     
-
-    return MP_OBJ_NEW_SMALL_INT(0);
+    return MP_OBJ_NEW_SMALL_INT(player_get_state());
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(audio_get_status_obj, audio_get_status);
 
