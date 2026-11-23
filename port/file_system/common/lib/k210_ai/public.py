@@ -64,110 +64,58 @@ def CheckCode(tmp):
         sum += tmp[i]
     return sum & 0xff
 
-def uart_handle(uart):
-    """
-    处理 UART 数据，解析命令并返回完整的命令包。
-    增加粘包处理逻辑。
-    """
-    rx_buf = bytearray()  # 全局接收缓冲区
+_uart_compat_owner = None
+_uart_compat_buffer = bytearray()
 
-    # 初始化缓冲区
-    if not hasattr(uart_handle, "rx_buf"):
-        rx_buf = bytearray()
 
-    # 读取 UART 数据
-    if uart.any():
-        data = uart.read()
+def uart_handle(uart, rx_buf=None):
+    # The optional buffer lets each SmartCamera own its receive state.
+    global _uart_compat_owner, _uart_compat_buffer
+    if rx_buf is None:
+        if _uart_compat_owner is not uart:
+            _uart_compat_owner = uart
+            _uart_compat_buffer = bytearray()
+        rx_buf = _uart_compat_buffer
+
+    pending = uart.any()
+    available = MAX_BUF_SIZE - len(rx_buf)
+    if pending and available > 0:
+        data = uart.read(min(pending, available))
         if data:
             rx_buf.extend(data)
-            # if DEBUG:
-            #     print("[UART RX] " + ' '.join('{:02X}'.format(b) for b in data))
 
-            # 缓冲区保护，防止溢出
-            if len(rx_buf) > MAX_BUF_SIZE:
-                if DEBUG:
-                    print("[UART] 缓冲区超限，清空缓冲区")
-                rx_buf = bytearray()
-
-    # 解析命令包
-    while True:
-        # 至少要有包头(2字节) + 命令类型(1字节)
+    while len(rx_buf) >= 2:
+        head = rx_buf.find(b"\xbb\xaa")
+        if head < 0:
+            if rx_buf[-1] == 0xBB:
+                del rx_buf[:-1]
+            else:
+                del rx_buf[:]
+            return None
+        if head:
+            del rx_buf[:head]
         if len(rx_buf) < 3:
-            break
-
-        # 检查包头
-        if not (rx_buf[0] == 0xBB and rx_buf[1] == 0xAA):
-            if DEBUG:
-                print("[UART] 丢弃无效字节: 0x{:02X}".format(rx_buf[0]))
-            rx_buf = rx_buf[1:]
-            continue
-
-        # 获取命令类型
-        cmd_type = rx_buf[2]
-
-        # 处理固定长度命令 (cmd_type == 0x01)
-        if cmd_type == 0x01:
-            total_len = 12  # 固定长度
-            if len(rx_buf) < total_len:
-                if DEBUG:
-                    print("[UART] 等待 0x01 包数据到齐")
-                break
-            pkt = rx_buf[:total_len]
-            checksum = CheckCode(pkt[:11])  # 校验包头+命令+数据(共11字节)
-            if checksum == pkt[11]:
-                if DEBUG:
-                    print("[UART] 校验成功: " + ' '.join('{:02X}'.format(b) for b in pkt))
-                rx_buf = rx_buf[total_len:]  # 移除已处理的数据
-                return pkt
-            else:
-                if DEBUG:
-                    print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[11]))
-            rx_buf = rx_buf[total_len:]  # 移除已处理的数据
-
-        # 处理可变长度命令 (cmd_type == 0x02)
-        elif cmd_type == 0x02:
-            if len(rx_buf) < 21:  # 至少要有包头+命令+固定头+2字节长度
-                if DEBUG:
-                    print("[UART] 等待 0x02 头部数据到齐")
-                break
-            # 获取字符串长度（2字节，高字节在前，低字节在后）
-            str_len = rx_buf[20]
-            total_len = 21 + str_len + 1  # 包头+命令+固定头+字符串长度+校验
-            if len(rx_buf) < total_len:
-                if DEBUG:
-                    print("[UART] 等待 0x02 字符串数据到齐 (len={})".format(str_len))
-                break
-            pkt = rx_buf[:total_len]
-            if pkt[-1] != 0xAB:  # 校验包尾
-                if DEBUG:
-                    print("[UART] 包尾校验失败 (期望=0xAB, 接收={:02X})".format(pkt[-1]))
-                rx_buf = rx_buf[1:]  # 丢弃第一个字节
-                continue
-            # checksum = CheckCode(pkt[:-1])  # 校验数据
-            # if checksum == pkt[-1]:
-            #     if DEBUG:
-            #         print("[UART] 校验成功: " + pkt.hex(' ').upper())
-            #     rx_buf = rx_buf[total_len:]  # 移除已处理的数据
-            #     return pkt
-            # else:
-            #     if DEBUG:
-            #         print("[UART] 校验失败 (计算={:02X}, 接收={:02X})".format(checksum, pkt[-1]))
-            # rx_buf = rx_buf[total_len:]  # 移除已处理的数据
-            else:
-                if DEBUG:
-                    print("[UART] 解析到 0x02 包")
-                    # print("complete packet:", pkt)
-                rx_buf = rx_buf[total_len:]
-        
-                return pkt  # 返回完整包
-
-        # 未知命令类型
+            return None
+        if rx_buf[2] == 0x01:
+            size = 12
+        elif rx_buf[2] == 0x02:
+            if len(rx_buf) < 21:
+                return None
+            size = 22 + rx_buf[20]
         else:
-            if DEBUG:
-                print("[UART] 未知命令类型 0x{:02X}，丢弃第一个字节".format(cmd_type))
-            rx_buf = rx_buf[1:]
+            del rx_buf[0]
+            continue
+        if len(rx_buf) < size:
+            return None
+        if ((rx_buf[2] == 0x01 and CheckCode(rx_buf[:11]) != rx_buf[11])
+                or (rx_buf[2] == 0x02 and rx_buf[size - 1] != 0xAB)):
+            del rx_buf[0]
+            continue
+        packet = rx_buf[:size]
+        del rx_buf[:size]
+        return packet
+    return None
 
-            return None  # 无有效包返回
 
 def AI_Uart_CMD(uart, data_type, cmd, cmd_type, cmd_data=[0, 0, 0, 0, 0, 0, 0, 0]):
     gc.collect()

@@ -2,6 +2,7 @@ from machine import Pin, UART
 from lib.k210_ai import *
 import time
 import gc
+import _thread
 from machine import Timer
 gc.collect()
 
@@ -11,6 +12,8 @@ class SmartCamera:
         self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
         self.mode = DEFAULT_MODE
         self.lock = False
+        self._uart_rx = bytearray()
+        self._uart_guard = _thread.allocate_lock()
         time.sleep(0.05)
         self.wait_for_ai_init()
         # self.thread_listen()
@@ -22,85 +25,81 @@ class SmartCamera:
         self.tf_status = 0
         self.tf_sn = ''
 
-    def wait_for_ai_init(self): 
+    def _read_uart_packet(self, control=False):
+        if self.lock and not control:
+            return None
+        if not self._uart_guard.acquire(False):
+            return None
+        try:
+            if self.lock and not control:
+                return None
+            return uart_handle(self.uart, self._uart_rx)
+        finally:
+            self._uart_guard.release()
+
+    def _clear_uart_input(self):
+        self._uart_guard.acquire()
+        try:
+            del self._uart_rx[:]
+            pending = self.uart.any()
+            if pending:
+                self.uart.read(pending)
+        finally:
+            self._uart_guard.release()
+
+    def wait_for_ai_init(self):
         self.lock = True
-        num = 0        
-        while True:
-            gc.collect()
-            time.sleep_ms(100)
-            num +=1
-            CMD_TEMP = []
-            if(num>1000):
-                print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
-                print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
-                break
-            AI_Uart_CMD(self.uart,0x01,0x01,0xFF) # 发送k210软重启命令
-            if(self.uart.any()):
-                head = self.uart.read(2)
-                if(head and head[0] == 0xBB and head[1] == 0xAA):
-                    CMD_TEMP.extend([0xBB,0xAA])
-                    cmd_type = self.uart.read(1)
-                    CMD_TEMP.append(cmd_type[0])
-                    if(CMD_TEMP[2]==0x01):
-                        res = self.uart.read(9)
-                        if(res[0]==0x01 and res[1]==0xff):
-                            print("AI摄像头重启中...")
-                            print("AI camera is restarting")
-                            time.sleep(0.5)
-                            _cmd = self.uart.read()
-                            del _cmd
-                            gc.collect()
-                            break
-                else:
-                    _cmd = self.uart.read()
-                    del _cmd
-                    gc.collect()
-        time.sleep(1) #等待k210重启
-        num = 0
-        
-        while True:
-            time.sleep_ms(100)
-            gc.collect()
-            num +=1
-            CMD_TEMP = []
-            if(num>1000):
-                print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
-                print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
-                self.lock = False
-                break
-            if(num%30==0 and num<500):
-                print('.'*int(num/30))
-            AI_Uart_CMD(self.uart,0x01,0x01,0x00) #通信握手
-            time.sleep_ms(50)
-            if(self.uart.any()):
-                head = self.uart.read(2)
-                if(head and head[0] == 0xBB and head[1] == 0xAA):
-                    CMD_TEMP.extend([0xBB,0xAA])
-                    cmd_type = self.uart.read(1)
-                    CMD_TEMP.append(cmd_type[0])
-                    if(CMD_TEMP[2]==0x01):
-                        res = self.uart.read(9)
-                        for i in range(9):
-                            CMD_TEMP.append(res[i])                  
-                        checksum = CheckCode(CMD_TEMP[:11])
-                        if(res and checksum == CMD_TEMP[11]):
-                            if CMD_TEMP[3]==0x01 and CMD_TEMP[4]==0x00:
-                                num += 1
-                                AI_Uart_CMD(self.uart, 0x01, 0x01, 0x01)
-                            elif CMD_TEMP[3]==0x01 and CMD_TEMP[4]==0x01:
-                                print('==AI摄像头通信成功==')
-                                print('==AI camera communication successful==')
-                                self.lock = False
-                                time.sleep_ms(50)
-                                _cmd = self.uart.read()
-                                del _cmd
-                                gc.collect()
-                                # time.sleep_ms(50)
-                                break
-                    elif(CMD_TEMP[2]==0x02):
-                        pass
-                else:
-                    gc.collect()
+        try:
+            num = 0
+            while True:
+                gc.collect()
+                time.sleep_ms(100)
+                num += 1
+                if num > 1000:
+                    print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
+                    print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
+                    break
+                AI_Uart_CMD(self.uart, 0x01, 0x01, 0xFF)
+                packet = self._read_uart_packet(control=True)
+                while packet is not None:
+                    if packet[2] == 0x01 and packet[3] == 0x01 and packet[4] == 0xFF:
+                        print("AI摄像头重启中...")
+                        print("AI camera is restarting")
+                        time.sleep(0.5)
+                        self._clear_uart_input()
+                        break
+                    packet = self._read_uart_packet(control=True)
+                if packet is not None:
+                    break
+
+            time.sleep(1)
+            num = 0
+            while True:
+                time.sleep_ms(100)
+                gc.collect()
+                num += 1
+                if num > 1000:
+                    print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
+                    print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
+                    break
+                if num % 30 == 0 and num < 500:
+                    print('.' * int(num / 30))
+                AI_Uart_CMD(self.uart, 0x01, 0x01, 0x00)
+                time.sleep_ms(50)
+                packet = self._read_uart_packet(control=True)
+                while packet is not None:
+                    if packet[2] == 0x01 and packet[3] == 0x01:
+                        if packet[4] == 0x00:
+                            AI_Uart_CMD(self.uart, 0x01, 0x01, 0x01)
+                        elif packet[4] == 0x01:
+                            print('==AI摄像头通信成功==')
+                            print('==AI camera communication successful==')
+                            time.sleep_ms(50)
+                            self._clear_uart_input()
+                            return
+                    packet = self._read_uart_packet(control=True)
+        finally:
+            self.lock = False
 
     def image_init(self):
         # 主绘图对象
@@ -238,107 +237,109 @@ class SmartCamera:
     def switcher_mode(self, mode, choice):
         '''切换模式'''
         self.lock = True
+        try:
         
-        if(self.mode==mode):
-            print('模式相同，未切换')
-            print('当前模式:',MODE[self.mode])
-            self.lock = False
-            time.sleep(0.01)
-            return
+            if(self.mode==mode):
+                print('模式相同，未切换')
+                print('当前模式:',MODE[self.mode])
+                time.sleep(0.01)
+                return
 
-        if(self.mode==COLOR_STATISTICS_MODE):
-            self.color_statistics.lock = True
-        elif(self.mode==TRACK_MODE):
-            self.track.lock = True
-        elif(self.mode==GUIDEPOST_MODE):
-            self.guidepost.lock = True
-        elif(self.mode==MNIST_MODE):
-            self.mnist.lock = True
-        elif(self.mode==OBJECT_RECOGNIZATION_MODE):
-            self.yolo_detect.lock = True
-        elif(self.mode==FACE_DETECTION_MODE):
-            self.face_detect.lock = True
-        elif(self.mode==FACE_RECOGNIZATION_MODE):
-            self.fcr.lock = True
-        elif(self.mode==SELF_LEARNING_CLASSIFIER_MODE):
-            self.slc.lock = True
-        elif(self.mode==COLOE_MODE):
-            self.color.lock = True
-        elif(self.mode==QRCODE_MODE):
-            self.qrcode.lock = True
-        elif(self.mode==SPEECH_RECOGNIZATION_MODE):
-            self.asr.lock = True
-        elif(self.mode==KPU_MODEL_MODE):
-            self.kpu_model.lock = True
-        elif(self.mode==COLOR_EXTRACTO_MODE):
-            self.color_extracto.lock = True
-        elif(self.mode==APRILTAG_MODE):
-            self.apriltag.lock = True
-        elif(self.mode==KPU_YOLO_MODEL_MODE):
-            self.kpu_yolo_model.lock = True
+            if(self.mode==COLOR_STATISTICS_MODE):
+                self.color_statistics.lock = True
+            elif(self.mode==TRACK_MODE):
+                self.track.lock = True
+            elif(self.mode==GUIDEPOST_MODE):
+                self.guidepost.lock = True
+            elif(self.mode==MNIST_MODE):
+                self.mnist.lock = True
+            elif(self.mode==OBJECT_RECOGNIZATION_MODE):
+                self.yolo_detect.lock = True
+            elif(self.mode==FACE_DETECTION_MODE):
+                self.face_detect.lock = True
+            elif(self.mode==FACE_RECOGNIZATION_MODE):
+                self.fcr.lock = True
+            elif(self.mode==SELF_LEARNING_CLASSIFIER_MODE):
+                self.slc.lock = True
+            elif(self.mode==COLOE_MODE):
+                self.color.lock = True
+            elif(self.mode==QRCODE_MODE):
+                self.qrcode.lock = True
+            elif(self.mode==SPEECH_RECOGNIZATION_MODE):
+                self.asr.lock = True
+            elif(self.mode==KPU_MODEL_MODE):
+                self.kpu_model.lock = True
+            elif(self.mode==COLOR_EXTRACTO_MODE):
+                self.color_extracto.lock = True
+            elif(self.mode==APRILTAG_MODE):
+                self.apriltag.lock = True
+            elif(self.mode==KPU_YOLO_MODEL_MODE):
+                self.kpu_yolo_model.lock = True
         
-        num = 0        
-        while True:
-            time.sleep_ms(50)
-            gc.collect()
-            num += 1
-            CMD_TEMP = []
-            if(num>1000):
-                print('错误:切换模式超时！\n')
-                self.lock = False
-                print('当前模式:\n',MODE[self.mode])
-                return 
+            num = 0        
+            while True:
+                time.sleep_ms(50)
+                gc.collect()
+                num += 1
+                CMD_TEMP = []
+                if(num>1000):
+                    print('错误:切换模式超时！\n')
+                    print('当前模式:\n',MODE[self.mode])
+                    return 
             
-            AI_Uart_CMD(self.uart,0x01,0x01,0xFE,[mode])#切换模式指令
-            time.sleep_ms(50)
-            if(self.uart.any()):
-                head = self.uart.read(2)
-                if(head and head[0] == 0xBB and head[1] == 0xAA):
-                    CMD_TEMP.extend([0xBB,0xAA])
-                    cmd_type = self.uart.read(1)
-                    CMD_TEMP.append(cmd_type[0])
-                    if(CMD_TEMP[2]==0x01):
-                        time.sleep_ms(1)
-                        res = self.uart.read(9)
-                        if(res[0]==0x01 and res[1]==0xFE):
-                            print("AI摄像头正在切换模式...\n")
-                            gc.collect()
-                            break
-                else:
-                    gc.collect()
-        
-        time.sleep(2)
-        _cmd = self.uart.read()
-        del _cmd   
-        gc.collect()
+                AI_Uart_CMD(self.uart,0x01,0x01,0xFE,[mode])#切换模式指令
+                time.sleep_ms(50)
+                packet = self._read_uart_packet(control=True)
+                while packet is not None:
+                    if packet[2] == 0x01 and packet[3] == 0x01 and packet[4] == 0xFE:
+                        print("AI摄像头正在切换模式...\n")
+                        gc.collect()
+                        break
+                    packet = self._read_uart_packet(control=True)
+                if packet is not None:
+                    break
+
+            time.sleep(2)
+            self._clear_uart_input()
+            gc.collect()
       
-        if(mode==GUIDEPOST_MODE):
-            self.guidepost_init(choice)    
-        elif(mode==TRACK_MODE):
-            self.track_init(choice)
-        elif(mode==COLOR_STATISTICS_MODE):
-            self.color_statistics_init(_choice=choice)
-        elif(mode==COLOR_EXTRACTO_MODE):
-            self.color_extracto_init(_choice=choice)
-        elif(mode==APRILTAG_MODE):
-            self.apriltag_init(_choice=choice)
-        elif(mode==SELF_LEARNING_CLASSIFIER_MODE):
-            self.self_learning_classifier_init(self.slc_parameter[0],self.slc_parameter[1],self.slc_parameter[2],_choice=choice)
-            self.slc_parameter[3]=choice
-        elif(mode==OBJECT_RECOGNIZATION_MODE):
-            self.yolo_detect_init(_choice=choice)
-        elif(mode==FACE_DETECTION_MODE):
-            self.face_detect_init(_choice=choice)
-        elif(mode==FACE_RECOGNIZATION_MODE):
-            self.face_recognize_init(1,80,1)
+            if(mode==GUIDEPOST_MODE):
+                self.guidepost_init(choice)    
+            elif(mode==TRACK_MODE):
+                self.track_init(choice)
+            elif(mode==COLOR_STATISTICS_MODE):
+                self.color_statistics_init(_choice=choice)
+            elif(mode==COLOR_EXTRACTO_MODE):
+                self.color_extracto_init(_choice=choice)
+            elif(mode==APRILTAG_MODE):
+                self.apriltag_init(_choice=choice)
+            elif(mode==SELF_LEARNING_CLASSIFIER_MODE):
+                self.self_learning_classifier_init(self.slc_parameter[0],self.slc_parameter[1],self.slc_parameter[2],_choice=choice)
+                self.slc_parameter[3]=choice
+            elif(mode==OBJECT_RECOGNIZATION_MODE):
+                self.yolo_detect_init(_choice=choice)
+            elif(mode==FACE_DETECTION_MODE):
+                self.face_detect_init(_choice=choice)
+            elif(mode==FACE_RECOGNIZATION_MODE):
+                self.face_recognize_init(1,80,1)
 
-        time.sleep(1)
-        print('当前模式:\n',MODE[self.mode])
-        self.lock = False
+            time.sleep(1)
+            print('当前模式:\n',MODE[self.mode])
 
-    def uart_thread(self): 
+        finally:
+            self.lock = False
+
+    def uart_thread(self):
         gc.collect()
-        CMD = uart_handle(self.uart)
+        for _ in range(32):
+            if self.lock:
+                return
+            packet = self._read_uart_packet()
+            if packet is None:
+                return
+            self._dispatch_uart_packet(packet)
+
+    def _dispatch_uart_packet(self, CMD):
         if DEBUG:
             print(CMD)
             print("===CMD===")          
