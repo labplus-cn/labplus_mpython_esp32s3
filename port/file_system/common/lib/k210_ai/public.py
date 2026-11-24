@@ -65,18 +65,19 @@ def CheckCode(tmp):
     return sum & 0xff
 
 _uart_compat_owner = None
-_uart_compat_buffer = bytearray()
+_uart_compat_buffer = [bytearray()]
 
 
-def uart_handle(uart, rx_buf=None):
-    # The optional buffer lets each SmartCamera own its receive state.
+def uart_handle(uart, rx_state=None):
+    # The holder keeps the receive state while bytearray slices are replaced.
     global _uart_compat_owner, _uart_compat_buffer
-    if rx_buf is None:
+    if rx_state is None:
         if _uart_compat_owner is not uart:
             _uart_compat_owner = uart
-            _uart_compat_buffer = bytearray()
-        rx_buf = _uart_compat_buffer
+            _uart_compat_buffer = [bytearray()]
+        rx_state = _uart_compat_buffer
 
+    rx_buf = rx_state[0]
     pending = uart.any()
     available = MAX_BUF_SIZE - len(rx_buf)
     if pending and available > 0:
@@ -85,15 +86,17 @@ def uart_handle(uart, rx_buf=None):
             rx_buf.extend(data)
 
     while len(rx_buf) >= 2:
-        head = rx_buf.find(b"\xbb\xaa")
-        if head < 0:
-            if rx_buf[-1] == 0xBB:
-                del rx_buf[:-1]
-            else:
-                del rx_buf[:]
+        head = 0
+        while head + 1 < len(rx_buf):
+            if rx_buf[head] == 0xBB and rx_buf[head + 1] == 0xAA:
+                break
+            head += 1
+        if head + 1 >= len(rx_buf):
+            rx_state[0] = rx_buf[-1:] if rx_buf[-1] == 0xBB else bytearray()
             return None
         if head:
-            del rx_buf[:head]
+            rx_buf = rx_buf[head:]
+            rx_state[0] = rx_buf
         if len(rx_buf) < 3:
             return None
         if rx_buf[2] == 0x01:
@@ -103,16 +106,18 @@ def uart_handle(uart, rx_buf=None):
                 return None
             size = 22 + rx_buf[20]
         else:
-            del rx_buf[0]
+            rx_buf = rx_buf[1:]
+            rx_state[0] = rx_buf
             continue
         if len(rx_buf) < size:
             return None
         if ((rx_buf[2] == 0x01 and CheckCode(rx_buf[:11]) != rx_buf[11])
                 or (rx_buf[2] == 0x02 and rx_buf[size - 1] != 0xAB)):
-            del rx_buf[0]
+            rx_buf = rx_buf[1:]
+            rx_state[0] = rx_buf
             continue
         packet = rx_buf[:size]
-        del rx_buf[:size]
+        rx_state[0] = rx_buf[size:]
         return packet
     return None
 

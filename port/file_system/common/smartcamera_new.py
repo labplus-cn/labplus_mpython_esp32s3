@@ -12,7 +12,7 @@ class SmartCamera:
         self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
         self.mode = DEFAULT_MODE
         self.lock = False
-        self._uart_rx = bytearray()
+        self._uart_rx = [bytearray()]
         self._uart_guard = _thread.allocate_lock()
         time.sleep(0.05)
         self.wait_for_ai_init()
@@ -40,7 +40,7 @@ class SmartCamera:
     def _clear_uart_input(self):
         self._uart_guard.acquire()
         try:
-            del self._uart_rx[:]
+            self._uart_rx[0] = bytearray()
             pending = self.uart.any()
             if pending:
                 self.uart.read(pending)
