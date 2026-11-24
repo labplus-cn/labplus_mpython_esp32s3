@@ -12,6 +12,10 @@ class SmartCamera:
         self.uart = UART(2, baudrate=1152000, rx=rx, tx=tx, rxbuf=MAX_BUF_SIZE)
         self.mode = DEFAULT_MODE
         self.lock = False
+        self.connected = False
+        self.last_error = None
+        self._model_parameters = {}
+        self._face_parameters = (1, 80)
         self._uart_rx = [bytearray()]
         self._uart_guard = _thread.allocate_lock()
         time.sleep(0.05)
@@ -48,8 +52,11 @@ class SmartCamera:
             self._uart_guard.release()
 
     def wait_for_ai_init(self):
+        previous_lock = self.lock
         self.lock = True
         try:
+            self._invalidate_mode_objects()
+            self._clear_uart_input()
             num = 0
             while True:
                 gc.collect()
@@ -58,7 +65,8 @@ class SmartCamera:
                 if num > 1000:
                     print('错误:通信超时，请检查接线情况及掌控拓展电源是否打开！')
                     print('Error: Communication timeout, please check the wiring and control whether the expansion power is turned on!')
-                    break
+                    self.last_error = "camera reset timed out"
+                    return False
                 AI_Uart_CMD(self.uart, 0x01, 0x01, 0xFF)
                 packet = self._read_uart_packet(control=True)
                 while packet is not None:
@@ -96,10 +104,17 @@ class SmartCamera:
                             print('==AI camera communication successful==')
                             time.sleep_ms(50)
                             self._clear_uart_input()
-                            return
+                            self.connected = True
+                            self.last_error = None
+                            return True
                     packet = self._read_uart_packet(control=True)
+            self.last_error = "camera handshake timed out"
+            return False
+        except Exception as error:
+            self.last_error = str(error)
+            raise
         finally:
-            self.lock = False
+            self.lock = previous_lock
 
     def image_init(self):
         # 主绘图对象
@@ -126,6 +141,7 @@ class SmartCamera:
     def face_recognize_init(self, _face_num, _accuracy, _choice):
         self.fcr = Face_recogization(self.uart, face_num=_face_num, accuracy=_accuracy, choice=_choice)
         self.mode = FACE_RECOGNIZATION_MODE
+        self._face_parameters = (_face_num, _accuracy)
 
     def asr_init(self):
         self.asr = Maix_asr(self.uart)
@@ -134,7 +150,7 @@ class SmartCamera:
     def self_learning_classifier_init(self, _class_num, _sample_num, _threshold, _choice):
         self.slc = Self_learning_classfier(self.uart, class_num=_class_num, sample_num=_sample_num, choice=_choice)
         self.mode = SELF_LEARNING_CLASSIFIER_MODE
-        self.slc_parameter = [_class_num, _sample_num, 11, _choice]
+        self.slc_parameter = [_class_num, _sample_num, _threshold, _choice]
 
     def qrcode_init(self, _choice):
         self.qrcode = QRCode_recognization(self.uart, choice=_choice)
@@ -151,6 +167,7 @@ class SmartCamera:
     def kmodel_init(self, _choice, _komodel_path, width, height):
         self.kpu_model = KPU_MODEL(self.uart, choice=_choice, komodel_path=_komodel_path, width=width, height=height)
         self.mode = KPU_MODEL_MODE
+        self._model_parameters[KPU_MODEL_MODE] = (_komodel_path, width, height)
 
     def track_init(self, _choice):
         self.track = Track(self.uart, choice=_choice)
@@ -177,7 +194,8 @@ class SmartCamera:
 
     def kmodel_yolo_init(self, _choice, _komodel_path, width, height, anchors):
         self.kpu_yolo_model = KPU_YOLO_MODEL(self.uart, choice=_choice, komodel_path=_komodel_path, width=width, height=height, anchors=anchors)
-        self.mode = KPU_YOLO_MODEL_MODE 
+        self.mode = KPU_YOLO_MODEL_MODE
+        self._model_parameters[KPU_YOLO_MODEL_MODE] = (_komodel_path, width, height, tuple(anchors))
         
     def canvas_init(self):
         AI_Uart_CMD(self.uart, 0x01, 0x01, 0xFA, [0x01])
@@ -234,105 +252,162 @@ class SmartCamera:
     def timer9_tick(self,_):
         self.uart_thread()
 
-    def switcher_mode(self, mode, choice):
-        '''切换模式'''
-        self.lock = True
-        try:
-        
-            if(self.mode==mode):
-                print('模式相同，未切换')
-                print('当前模式:',MODE[self.mode])
-                time.sleep(0.01)
-                return
+    _MODE_INITIALIZERS = {
+        DEFAULT_MODE: "canvas_init",
+        MNIST_MODE: "mnist_init",
+        OBJECT_RECOGNIZATION_MODE: "yolo_detect_init",
+        FACE_DETECTION_MODE: "face_detect_init",
+        FACE_RECOGNIZATION_MODE: "face_recognize_init",
+        SELF_LEARNING_CLASSIFIER_MODE: "self_learning_classifier_init",
+        COLOE_MODE: "color_init",
+        QRCODE_MODE: "qrcode_init",
+        GUIDEPOST_MODE: "guidepost_init",
+        KPU_MODEL_MODE: "kmodel_init",
+        TRACK_MODE: "track_init",
+        COLOR_STATISTICS_MODE: "color_statistics_init",
+        COLOR_EXTRACTO_MODE: "color_extracto_init",
+        APRILTAG_MODE: "apriltag_init",
+        KPU_YOLO_MODEL_MODE: "kmodel_yolo_init",
+        FACTORY_MODE: "factory_init",
+    }
+    _MODE_OBJECTS = {
+        MNIST_MODE: "mnist",
+        OBJECT_RECOGNIZATION_MODE: "yolo_detect",
+        FACE_DETECTION_MODE: "face_detect",
+        FACE_RECOGNIZATION_MODE: "fcr",
+        SELF_LEARNING_CLASSIFIER_MODE: "slc",
+        COLOE_MODE: "color",
+        QRCODE_MODE: "qrcode",
+        SPEECH_RECOGNIZATION_MODE: "asr",
+        GUIDEPOST_MODE: "guidepost",
+        KPU_MODEL_MODE: "kpu_model",
+        TRACK_MODE: "track",
+        COLOR_STATISTICS_MODE: "color_statistics",
+        COLOR_EXTRACTO_MODE: "color_extracto",
+        APRILTAG_MODE: "apriltag",
+        KPU_YOLO_MODEL_MODE: "kpu_yolo_model",
+    }
 
-            if(self.mode==COLOR_STATISTICS_MODE):
-                self.color_statistics.lock = True
-            elif(self.mode==TRACK_MODE):
-                self.track.lock = True
-            elif(self.mode==GUIDEPOST_MODE):
-                self.guidepost.lock = True
-            elif(self.mode==MNIST_MODE):
-                self.mnist.lock = True
-            elif(self.mode==OBJECT_RECOGNIZATION_MODE):
-                self.yolo_detect.lock = True
-            elif(self.mode==FACE_DETECTION_MODE):
-                self.face_detect.lock = True
-            elif(self.mode==FACE_RECOGNIZATION_MODE):
-                self.fcr.lock = True
-            elif(self.mode==SELF_LEARNING_CLASSIFIER_MODE):
-                self.slc.lock = True
-            elif(self.mode==COLOE_MODE):
-                self.color.lock = True
-            elif(self.mode==QRCODE_MODE):
-                self.qrcode.lock = True
-            elif(self.mode==SPEECH_RECOGNIZATION_MODE):
-                self.asr.lock = True
-            elif(self.mode==KPU_MODEL_MODE):
-                self.kpu_model.lock = True
-            elif(self.mode==COLOR_EXTRACTO_MODE):
-                self.color_extracto.lock = True
-            elif(self.mode==APRILTAG_MODE):
-                self.apriltag.lock = True
-            elif(self.mode==KPU_YOLO_MODEL_MODE):
-                self.kpu_yolo_model.lock = True
-        
-            num = 0        
-            while True:
-                time.sleep_ms(50)
-                gc.collect()
-                num += 1
-                CMD_TEMP = []
-                if(num>1000):
-                    print('错误:切换模式超时！\n')
-                    print('当前模式:\n',MODE[self.mode])
-                    return 
-            
-                AI_Uart_CMD(self.uart,0x01,0x01,0xFE,[mode])#切换模式指令
-                time.sleep_ms(50)
-                packet = self._read_uart_packet(control=True)
-                while packet is not None:
-                    if packet[2] == 0x01 and packet[3] == 0x01 and packet[4] == 0xFE:
-                        print("AI摄像头正在切换模式...\n")
-                        gc.collect()
-                        break
-                    packet = self._read_uart_packet(control=True)
-                if packet is not None:
-                    break
+    def _mode_name(self, mode):
+        extra = {
+            KPU_YOLO_MODEL_MODE: "KPU YOLO",
+            VIDEO_MODE: "Video",
+            FACTORY_MODE: "Factory",
+        }
+        if 0 <= mode < len(MODE):
+            return MODE[mode]
+        return extra.get(mode, str(mode))
 
-            time.sleep(2)
-            self._clear_uart_input()
+    def _prepare_mode_init(self, mode, choice):
+        if not isinstance(mode, int) or mode not in self._MODE_INITIALIZERS:
+            raise ValueError("unsupported camera mode: " + str(mode))
+        if not isinstance(choice, int) or not 0 <= choice <= 255:
+            raise ValueError("camera choice must be a byte")
+        method = self._MODE_INITIALIZERS[mode]
+        if mode in (DEFAULT_MODE, FACTORY_MODE):
+            args = ()
+        elif mode == FACE_RECOGNIZATION_MODE:
+            count, accuracy = self._face_parameters
+            if (not isinstance(count, int) or not 1 <= count <= 255
+                    or not isinstance(accuracy, int) or not 0 <= accuracy <= 100):
+                raise ValueError("invalid face recognition parameters")
+            args = (count, accuracy, choice)
+        elif mode == SELF_LEARNING_CLASSIFIER_MODE:
+            parameters = getattr(self, "slc_parameter", (3, 15, 11, 1))
+            count, samples, threshold = parameters[:3]
+            if (not isinstance(count, int) or not 1 <= count <= 255
+                    or not isinstance(samples, int) or not 1 <= samples <= 255):
+                raise ValueError("invalid self learning parameters")
+            args = (count, samples, threshold, choice)
+        elif mode in (KPU_MODEL_MODE, KPU_YOLO_MODEL_MODE):
+            parameters = self._model_parameters.get(mode)
+            if parameters is None:
+                raise ValueError("initialize the custom model parameters before switching")
+            path, width, height = parameters[:3]
+            if (not isinstance(path, str) or not path or "|" in path
+                    or not isinstance(width, int) or width <= 0
+                    or not isinstance(height, int) or height <= 0):
+                raise ValueError("invalid custom model parameters")
+            payload = str(path) + "|" + str(width) + "|" + str(height)
+            if mode == KPU_YOLO_MODEL_MODE:
+                anchors = parameters[3]
+                if (not anchors or len(anchors) % 2
+                        or any(not isinstance(value, (int, float)) or value <= 0 for value in anchors)):
+                    raise ValueError("invalid YOLO anchors")
+                payload += "|" + str(anchors)
+            if len(payload.encode("utf-8")) > 255:
+                raise ValueError("custom model parameters exceed the UART payload limit")
+            args = (choice,) + parameters
+        else:
+            args = (choice,)
+        return method, args
+
+    def _invalidate_mode_objects(self):
+        for attribute in self._MODE_OBJECTS.values():
+            model = getattr(self, attribute, None)
+            if model is not None:
+                model.lock = True
+        self.mode = DEFAULT_MODE
+        self.connected = False
+
+    def _request_mode_exit(self, mode):
+        for _ in range(1000):
+            time.sleep_ms(50)
             gc.collect()
-      
-            if(mode==GUIDEPOST_MODE):
-                self.guidepost_init(choice)    
-            elif(mode==TRACK_MODE):
-                self.track_init(choice)
-            elif(mode==COLOR_STATISTICS_MODE):
-                self.color_statistics_init(_choice=choice)
-            elif(mode==COLOR_EXTRACTO_MODE):
-                self.color_extracto_init(_choice=choice)
-            elif(mode==APRILTAG_MODE):
-                self.apriltag_init(_choice=choice)
-            elif(mode==SELF_LEARNING_CLASSIFIER_MODE):
-                self.self_learning_classifier_init(self.slc_parameter[0],self.slc_parameter[1],self.slc_parameter[2],_choice=choice)
-                self.slc_parameter[3]=choice
-            elif(mode==OBJECT_RECOGNIZATION_MODE):
-                self.yolo_detect_init(_choice=choice)
-            elif(mode==FACE_DETECTION_MODE):
-                self.face_detect_init(_choice=choice)
-            elif(mode==FACE_RECOGNIZATION_MODE):
-                self.face_recognize_init(1,80,1)
+            AI_Uart_CMD(self.uart, 0x01, 0x01, 0xFE, [mode])
+            time.sleep_ms(50)
+            packet = self._read_uart_packet(control=True)
+            while packet is not None:
+                if packet[2] == 0x01 and packet[3] == 0x01 and packet[4] == 0xFE:
+                    return
+                packet = self._read_uart_packet(control=True)
+        raise RuntimeError("camera mode switch timed out")
 
+    def switcher_mode(self, mode, choice):
+        method, args = self._prepare_mode_init(mode, choice)
+        if self.lock:
+            raise RuntimeError("camera control is busy")
+        attribute = self._MODE_OBJECTS.get(self.mode)
+        old_model = getattr(self, attribute, None) if attribute else None
+        if self.connected and self.mode == mode and (attribute is None or old_model is not None):
+            print("当前模式:", self._mode_name(self.mode))
+            return True
+
+        self.lock = True
+        self.last_error = None
+        try:
+            if old_model is not None:
+                old_model.lock = True
+            try:
+                if not self.connected:
+                    raise RuntimeError("camera connection needs recovery")
+                self._request_mode_exit(mode)
+                time.sleep(2)
+                self._clear_uart_input()
+                self._invalidate_mode_objects()
+                getattr(self, method)(*args)
+            except Exception as error:
+                self.last_error = str(error)
+                self._invalidate_mode_objects()
+                if not self.wait_for_ai_init():
+                    raise RuntimeError("camera recovery failed: " + self.last_error)
+                getattr(self, method)(*args)
+            self.connected = True
+            self.last_error = None
             time.sleep(1)
-            print('当前模式:\n',MODE[self.mode])
-
+            print("当前模式:", self._mode_name(self.mode))
+            return True
+        except Exception as error:
+            self.last_error = str(error)
+            self._invalidate_mode_objects()
+            raise
         finally:
             self.lock = False
 
     def uart_thread(self):
         gc.collect()
         for _ in range(32):
-            if self.lock:
+            if self.lock or not self.connected:
                 return
             packet = self._read_uart_packet()
             if packet is None:
