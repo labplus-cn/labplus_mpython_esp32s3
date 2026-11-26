@@ -6,8 +6,8 @@ container = None
 INDEX_PAGE = [
     {'name': '水平仪', 'page': 'gradienter', 'icon': 'gradienter', 'x': 10, 'y': 6},
     {'name': '人脸检测', 'page': 'face', 'icon': 'face', 'x': 113, 'y': 6},
-    # {'name': '时钟', 'page': 'clock', 'icon': 'clock', 'x': 113, 'y': 6},
-    {'name': '语音识别', 'page': 'voice', 'icon': 'voice', 'x': 216, 'y': 6},
+    {'name': '时钟', 'page': 'clock', 'icon': 'clock', 'x': 216, 'y': 6},
+    # {'name': '语音识别', 'page': 'voice', 'icon': 'voice', 'x': 216, 'y': 6},
     {'name': '光线', 'page': 'light', 'icon': 'light', 'x': 10, 'y': 88},
     {'name': '声音', 'page': 'sound', 'icon': 'sound', 'x': 113, 'y': 88},
     {'name': '游戏', 'page': 'game', 'icon': 'game', 'x': 216, 'y': 88}
