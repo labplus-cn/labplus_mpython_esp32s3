@@ -49,7 +49,7 @@ class FACE_DETECT(object):
     def __init__(self, uart, choice=1):
         self.uart = uart
         self.choice = choice
-        self.face_num = None
+        self.face_num = 0
         self.max_score = None
         self._task = None
         self.lock = False
